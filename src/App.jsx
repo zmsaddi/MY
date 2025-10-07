@@ -76,15 +76,22 @@ function App() {
 
   const drawer = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper' }}>
-      <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
+      <Box sx={{ 
+        p: { xs: 2, sm: 3 }, 
+        borderBottom: 1, 
+        borderColor: 'divider' 
+      }}>
         <Typography variant="h5" fontWeight={800} sx={{
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
+          fontSize: { xs: '1.25rem', sm: '1.5rem' }
         }}>
           نظام إدارة الصفائح
         </Typography>
-        <Typography variant="caption" color="text.secondary" fontSize="0.875rem">
+        <Typography variant="caption" color="text.secondary" sx={{
+          fontSize: { xs: '0.75rem', sm: '0.875rem' }
+        }}>
           Metal Sheets Management
         </Typography>
       </Box>
@@ -97,7 +104,7 @@ function App() {
             selected={selectedTab === index}
             onClick={() => handleTabChange(index)}
             sx={{
-              mx: 1.5,
+              mx: { xs: 1, sm: 1.5 },
               mb: 0.5,
               borderRadius: 2,
               '&.Mui-selected': {
@@ -115,25 +122,36 @@ function App() {
               },
             }}
           >
-            <ListItemIcon sx={{ color: selectedTab === index ? 'white' : 'text.secondary', minWidth: 48 }}>
+            <ListItemIcon sx={{ 
+              color: selectedTab === index ? 'white' : 'text.secondary', 
+              minWidth: { xs: 40, sm: 48 }
+            }}>
               {item.icon}
             </ListItemIcon>
             <ListItemText 
               primary={item.label} 
               primaryTypographyProps={{ 
                 fontWeight: selectedTab === index ? 700 : 500,
-                fontSize: '1rem'
+                fontSize: { xs: '0.875rem', sm: '1rem' }
               }} 
             />
           </ListItem>
         ))}
       </List>
 
-      <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
-        <Typography variant="caption" color="text.secondary" display="block" fontSize="0.8125rem">
+      <Box sx={{ 
+        p: { xs: 1.5, sm: 2 }, 
+        borderTop: 1, 
+        borderColor: 'divider' 
+      }}>
+        <Typography variant="caption" color="text.secondary" display="block" sx={{
+          fontSize: { xs: '0.7rem', sm: '0.8125rem' }
+        }}>
           الإصدار 1.0.0
         </Typography>
-        <Typography variant="caption" color="text.secondary" fontSize="0.8125rem">
+        <Typography variant="caption" color="text.secondary" sx={{
+          fontSize: { xs: '0.7rem', sm: '0.8125rem' }
+        }}>
           © 2025 جميع الحقوق محفوظة
         </Typography>
       </Box>
@@ -145,22 +163,42 @@ function App() {
       <CacheProvider value={cacheRtl}>
         <ThemeProvider theme={theme}>
           <CssBaseline />
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', flexDirection: 'column', gap: 2 }}>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            height: '100vh', 
+            flexDirection: 'column', 
+            gap: 2,
+            p: 2
+          }}>
             {dbError ? (
               <>
-                <Typography variant="h5" color="error" fontWeight={700}>
+                <Typography variant="h5" color="error" fontWeight={700} sx={{
+                  fontSize: { xs: '1.25rem', sm: '1.5rem' },
+                  textAlign: 'center'
+                }}>
                   فشل في تحميل قاعدة البيانات
                 </Typography>
-                <Typography color="text.secondary" fontSize="1rem">
+                <Typography color="text.secondary" sx={{
+                  fontSize: { xs: '0.875rem', sm: '1rem' },
+                  textAlign: 'center'
+                }}>
                   {dbError}
                 </Typography>
               </>
             ) : (
               <>
-                <Typography variant="h5" fontWeight={700}>
+                <Typography variant="h5" fontWeight={700} sx={{
+                  fontSize: { xs: '1.25rem', sm: '1.5rem' },
+                  textAlign: 'center'
+                }}>
                   جاري تحميل النظام...
                 </Typography>
-                <Typography color="text.secondary" fontSize="1rem">
+                <Typography color="text.secondary" sx={{
+                  fontSize: { xs: '0.875rem', sm: '1rem' },
+                  textAlign: 'center'
+                }}>
                   يرجى الانتظار
                 </Typography>
               </>
@@ -184,7 +222,7 @@ function App() {
               zIndex: (theme) => theme.zIndex.drawer + 1,
             }}
           >
-            <Toolbar>
+            <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }}>
               <IconButton
                 color="inherit"
                 edge="start"
@@ -193,7 +231,9 @@ function App() {
               >
                 <MenuIcon />
               </IconButton>
-              <Typography variant="h6" noWrap component="div" fontWeight={700}>
+              <Typography variant="h6" noWrap component="div" fontWeight={700} sx={{
+                fontSize: { xs: '1rem', sm: '1.25rem' }
+              }}>
                 {menuItems[selectedTab].label}
               </Typography>
             </Toolbar>
@@ -213,7 +253,10 @@ function App() {
               ModalProps={{ keepMounted: true }}
               sx={{
                 display: { xs: 'block', md: 'none' },
-                '& .MuiDrawer-paper': { boxSizing: 'border-box', width: DRAWER_WIDTH },
+                '& .MuiDrawer-paper': { 
+                  boxSizing: 'border-box', 
+                  width: { xs: 260, sm: DRAWER_WIDTH }
+                },
               }}
             >
               {drawer}
@@ -243,8 +286,14 @@ function App() {
               bgcolor: 'background.default',
             }}
           >
-            <Toolbar sx={{ display: { xs: 'block', md: 'none' } }} />
-            <Container maxWidth="xl" sx={{ py: 4 }}>
+            <Toolbar sx={{ 
+              display: { xs: 'block', md: 'none' },
+              minHeight: { xs: 56, sm: 64 }
+            }} />
+            <Container maxWidth="xl" sx={{ 
+              py: { xs: 2, sm: 3, md: 4 },
+              px: { xs: 1.5, sm: 2, md: 3 }
+            }}>
               <ErrorBoundary>
                 {menuItems[selectedTab].component}
               </ErrorBoundary>

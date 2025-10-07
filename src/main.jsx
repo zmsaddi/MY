@@ -8,6 +8,7 @@ import rtl from 'jss-rtl';
 import { StylesProvider, jssPreset } from '@mui/styles';
 import { theme, cacheRtl } from './utils/theme';
 import App from './App';
+import './index.css';
 
 const jss = create({
   plugins: [...jssPreset().plugins, rtl()],
