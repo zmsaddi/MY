@@ -1,6 +1,7 @@
 // src/utils/database/suppliers.js
 import { db, saveDatabase, lastId, safe } from './core.js';
 import { validators, parseDbError } from '../validators.js';
+import { insertSupplierTransactionInline } from './accounting.js';
 
 /* ============================================
    SUPPLIERS MANAGEMENT
@@ -174,17 +175,14 @@ export function addSupplierPayment(paymentData) {
     
     const paymentId = lastId();
     
-    // Record in supplier transactions
-    import('./accounting.js').then(({ insertSupplierTransactionInline }) => {
-      insertSupplierTransactionInline({
-        supplier_id: paymentData.supplier_id,
-        transaction_type: 'payment',
-        amount: -safe(paymentData.amount),
-        reference_type: 'payment',
-        reference_id: paymentId,
-        transaction_date: paymentData.payment_date || new Date().toISOString().split('T')[0],
-        notes: paymentData.notes || 'دفعة للمورد'
-      });
+    insertSupplierTransactionInline({
+      supplier_id: paymentData.supplier_id,
+      transaction_type: 'payment',
+      amount: -safe(paymentData.amount),
+      reference_type: 'payment',
+      reference_id: paymentId,
+      transaction_date: paymentData.payment_date || new Date().toISOString().split('T')[0],
+      notes: paymentData.notes || 'دفعة للمورد'
     });
     
     saveDatabase();
@@ -240,7 +238,6 @@ export function getSupplierBalance(supplierId) {
   if (!db) return { total_purchases: 0, total_payments: 0, balance: 0 };
   
   try {
-    // Total purchases from batches
     const purchasesStmt = db.prepare(`
       SELECT COALESCE(SUM(total_cost), 0) as total_purchases
       FROM batches
@@ -255,7 +252,6 @@ export function getSupplierBalance(supplierId) {
     }
     purchasesStmt.free();
     
-    // Total payments made
     const paymentsStmt = db.prepare(`
       SELECT COALESCE(SUM(amount), 0) as total_payments
       FROM supplier_payments
@@ -270,10 +266,12 @@ export function getSupplierBalance(supplierId) {
     }
     paymentsStmt.free();
     
+    const balance = totalPurchases - totalPayments;
+    
     return {
       total_purchases: totalPurchases,
       total_payments: totalPayments,
-      balance: totalPurchases - totalPayments
+      balance: balance
     };
   } catch (e) {
     console.error('Get supplier balance error:', e);
@@ -282,10 +280,9 @@ export function getSupplierBalance(supplierId) {
 }
 
 export function getAllSuppliersWithBalances() {
-  const suppliers = getSuppliers(true);
-  
-  return suppliers.map(supplier => ({
-    ...supplier,
-    ...getSupplierBalance(supplier.id)
+  const suppliers = getSuppliers(false);
+  return suppliers.map(s => ({
+    ...s,
+    ...getSupplierBalance(s.id)
   }));
 }

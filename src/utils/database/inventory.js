@@ -1,35 +1,38 @@
 // src/utils/database/inventory.js
 import { db, tx, saveDatabase, safe, lastId, generateSheetCode } from './core.js';
 import { validators, parseDbError } from '../validators.js';
+import { insertSupplierTransactionInline } from './accounting.js';
 
 /* ============================================
    INVENTORY MOVEMENTS
    ============================================ */
 
-export function recordInventoryMovement(movementType, sheetId, batchId, quantity, referenceType, referenceId, notes) {
+export function recordInventoryMovement(movementType, sheetId, batchId, quantity, referenceType = null, referenceId = null, notes = null) {
   try {
     const stmt = db.prepare(`
       INSERT INTO inventory_movements 
-      (movement_type, sheet_id, batch_id, quantity, reference_type, reference_id, notes) 
-      VALUES (?, ?, ?, ?, ?, ?, ?)`);
+      (movement_type, sheet_id, batch_id, quantity, reference_type, reference_id, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
     
     stmt.run([
       movementType,
       sheetId,
       batchId || null,
-      quantity,
-      referenceType || null,
-      referenceId || null,
-      notes || null
+      safe(quantity),
+      referenceType,
+      referenceId,
+      notes
     ]);
     stmt.free();
+    
   } catch (e) {
     console.error('Record inventory movement error:', e);
   }
 }
 
 /* ============================================
-   SHEETS MANAGEMENT
+   SHEETS - GET ALL
    ============================================ */
 
 export function getAllSheets() {
@@ -38,21 +41,20 @@ export function getAllSheets() {
   try {
     const stmt = db.prepare(`
       SELECT 
-        s.id, s.code, s.length_mm, s.width_mm, s.thickness_mm, s.weight_per_sheet_kg,
-        s.metal_type_id, s.grade_id, s.finish_id, s.is_remnant, s.parent_sheet_id, s.created_at,
-        m.name_ar as metal_name, m.abbreviation as metal_abbr,
-        g.name as grade_name,
+        s.*,
+        mt.name_ar as metal_name,
+        mt.abbreviation as metal_abbr,
+        g.name_ar as grade_name,
         f.name_ar as finish_name,
-        COALESCE(SUM(CASE WHEN b.quantity_remaining > 0 THEN b.quantity_remaining ELSE 0 END), 0) as total_quantity,
-        MIN(b.price_per_kg) as min_price,
-        MAX(b.price_per_kg) as max_price
+        COALESCE(SUM(b.quantity_remaining), 0) as total_quantity,
+        COUNT(DISTINCT b.id) as batch_count
       FROM sheets s
-      JOIN metal_types m ON s.metal_type_id = m.id
+      LEFT JOIN metal_types mt ON s.metal_type_id = mt.id
       LEFT JOIN grades g ON s.grade_id = g.id
       LEFT JOIN finishes f ON s.finish_id = f.id
-      LEFT JOIN batches b ON s.id = b.sheet_id
+      LEFT JOIN batches b ON s.id = b.sheet_id AND b.quantity_remaining > 0
       GROUP BY s.id
-      ORDER BY s.is_remnant ASC, s.created_at DESC
+      ORDER BY s.created_at DESC
     `);
     
     const sheets = [];
@@ -62,21 +64,20 @@ export function getAllSheets() {
         id: row.id,
         code: row.code,
         metal_type_id: row.metal_type_id,
+        metal_name: row.metal_name,
+        metal_abbr: row.metal_abbr,
         grade_id: row.grade_id,
+        grade_name: row.grade_name,
         finish_id: row.finish_id,
+        finish_name: row.finish_name,
         length_mm: row.length_mm,
         width_mm: row.width_mm,
         thickness_mm: row.thickness_mm,
         weight_per_sheet_kg: row.weight_per_sheet_kg,
         is_remnant: row.is_remnant,
         parent_sheet_id: row.parent_sheet_id,
-        metal_name: row.metal_name,
-        metal_abbr: row.metal_abbr,
-        grade_name: row.grade_name || 'XX',
-        finish_name: row.finish_name || 'XX',
         total_quantity: row.total_quantity || 0,
-        min_price: row.min_price,
-        max_price: row.max_price,
+        batch_count: row.batch_count || 0,
         created_at: row.created_at
       });
     }
@@ -88,6 +89,10 @@ export function getAllSheets() {
     return [];
   }
 }
+
+/* ============================================
+   ADD SHEET WITH INITIAL BATCH
+   ============================================ */
 
 export function addSheetWithBatch(sheetData, batchData) {
   try {
@@ -118,22 +123,23 @@ export function addSheetWithBatch(sheetData, batchData) {
       );
     }
     
-    // Check if sheet with same code already exists
     const existingStmt = db.prepare('SELECT id FROM sheets WHERE code = ? AND is_remnant = ?');
     existingStmt.bind([sheetCode, sheetData.is_remnant ? 1 : 0]);
     
     let sheetId = null;
+    let isLinked = false;
+    
     if (existingStmt.step()) {
-      // Sheet exists - use existing sheet
       sheetId = existingStmt.getAsObject().id;
+      isLinked = true;
       existingStmt.free();
       
-      // Add batch to existing sheet
       const batchStmt = db.prepare(`
         INSERT INTO batches 
         (sheet_id, supplier_id, quantity_original, quantity_remaining, 
          price_per_kg, total_cost, storage_location, received_date, notes) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
       
       batchStmt.run([
         sheetId,
@@ -153,16 +159,14 @@ export function addSheetWithBatch(sheetData, batchData) {
       recordInventoryMovement('IN', sheetId, batchId, safe(batchData.quantity, 0), 'purchase', null, 'إضافة دفعة لصفيحة موجودة');
       
       if (batchData.supplier_id && safe(batchData.total_cost, 0) > 0) {
-        import('./accounting.js').then(({ insertSupplierTransactionInline }) => {
-          insertSupplierTransactionInline({
-            supplier_id: batchData.supplier_id,
-            transaction_type: 'purchase',
-            amount: safe(batchData.total_cost),
-            reference_type: 'batch',
-            reference_id: batchId,
-            transaction_date: batchData.received_date,
-            notes: `شراء دفعة - ${sheetCode}`
-          });
+        insertSupplierTransactionInline({
+          supplier_id: batchData.supplier_id,
+          transaction_type: 'purchase',
+          amount: safe(batchData.total_cost),
+          reference_type: 'batch',
+          reference_id: batchId,
+          transaction_date: batchData.received_date,
+          notes: `شراء دفعة - ${sheetCode}`
         });
       }
       
@@ -174,12 +178,12 @@ export function addSheetWithBatch(sheetData, batchData) {
     } else {
       existingStmt.free();
       
-      // Sheet doesn't exist - create new one
       const sheetStmt = db.prepare(`
         INSERT INTO sheets 
         (code, metal_type_id, grade_id, finish_id, length_mm, width_mm, thickness_mm, 
          weight_per_sheet_kg, is_remnant, parent_sheet_id) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
       
       sheetStmt.run([
         sheetCode,
@@ -201,7 +205,8 @@ export function addSheetWithBatch(sheetData, batchData) {
         INSERT INTO batches 
         (sheet_id, supplier_id, quantity_original, quantity_remaining, 
          price_per_kg, total_cost, storage_location, received_date, notes) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
       
       batchStmt.run([
         sheetId,
@@ -218,19 +223,17 @@ export function addSheetWithBatch(sheetData, batchData) {
       
       const batchId = lastId();
       
-      recordInventoryMovement('IN', sheetId, batchId, safe(batchData.quantity, 0), 'purchase', null, 'إضافة دفعة جديدة');
+      recordInventoryMovement('IN', sheetId, batchId, safe(batchData.quantity, 0), 'purchase', null, 'إضافة صفيحة جديدة مع دفعة');
       
       if (batchData.supplier_id && safe(batchData.total_cost, 0) > 0) {
-        import('./accounting.js').then(({ insertSupplierTransactionInline }) => {
-          insertSupplierTransactionInline({
-            supplier_id: batchData.supplier_id,
-            transaction_type: 'purchase',
-            amount: safe(batchData.total_cost),
-            reference_type: 'batch',
-            reference_id: batchId,
-            transaction_date: batchData.received_date,
-            notes: `شراء دفعة - ${sheetCode}`
-          });
+        insertSupplierTransactionInline({
+          supplier_id: batchData.supplier_id,
+          transaction_type: 'purchase',
+          amount: safe(batchData.total_cost),
+          reference_type: 'batch',
+          reference_id: batchId,
+          transaction_date: batchData.received_date,
+          notes: `شراء دفعة - ${sheetCode}`
         });
       }
       
@@ -248,7 +251,7 @@ export function addSheetWithBatch(sheetData, batchData) {
 }
 
 /* ============================================
-   BATCHES MANAGEMENT
+   BATCHES - GET BY SHEET
    ============================================ */
 
 export function getBatchesBySheetId(sheetId, includeEmpty = false) {
@@ -341,6 +344,10 @@ export function getBatchById(batchId) {
   }
 }
 
+/* ============================================
+   ADD BATCH TO EXISTING SHEET
+   ============================================ */
+
 export function addBatchToSheet(data) {
   try {
     tx.begin();
@@ -376,16 +383,14 @@ export function addBatchToSheet(data) {
     recordInventoryMovement('IN', data.sheet_id, batchId, safe(data.quantity, 0), 'purchase', null, 'إضافة دفعة');
     
     if (data.supplier_id && safe(data.total_cost, 0) > 0) {
-      import('./accounting.js').then(({ insertSupplierTransactionInline }) => {
-        insertSupplierTransactionInline({
-          supplier_id: data.supplier_id,
-          transaction_type: 'purchase',
-          amount: safe(data.total_cost),
-          reference_type: 'batch',
-          reference_id: batchId,
-          transaction_date: data.received_date,
-          notes: `شراء دفعة - Sheet#${data.sheet_id}`
-        });
+      insertSupplierTransactionInline({
+        supplier_id: data.supplier_id,
+        transaction_type: 'purchase',
+        amount: safe(data.total_cost),
+        reference_type: 'batch',
+        reference_id: batchId,
+        transaction_date: data.received_date,
+        notes: `شراء دفعة - Sheet#${data.sheet_id}`
       });
     }
     
@@ -400,6 +405,10 @@ export function addBatchToSheet(data) {
     return { success: false, error: parseDbError(e) };
   }
 }
+
+/* ============================================
+   UPDATE BATCH
+   ============================================ */
 
 export function updateBatch(batchId, updates) {
   if (!db) return { success: false, error: 'قاعدة البيانات غير متاحة' };
@@ -455,16 +464,26 @@ export function updateBatch(batchId, updates) {
   }
 }
 
+/* ============================================
+   PRUNE EMPTY BATCHES
+   ============================================ */
+
 export function pruneEmptyBatches() {
+  if (!db) return { success: false, count: 0 };
+  
   try {
     const stmt = db.prepare('DELETE FROM batches WHERE quantity_remaining <= 0');
     stmt.run();
+    const changes = db.getRowsModified();
     stmt.free();
     
-    saveDatabase();
-    return { success: true };
+    if (changes > 0) {
+      saveDatabase();
+    }
+    
+    return { success: true, count: changes };
   } catch (e) {
-    console.error('Prune batches error:', e);
-    return { success: false, error: e.message };
+    console.error('Prune empty batches error:', e);
+    return { success: false, count: 0, error: parseDbError(e) };
   }
 }
