@@ -1,5 +1,5 @@
 // src/utils/database/paymentMethods.js
-import { db, saveDatabase, lastId } from './core.js';
+import { db, saveDatabase, lastId, getCurrentUser } from './core.js';
 import { validators, parseDbError } from '../validators.js';
 
 /* ============================================
@@ -58,11 +58,12 @@ export function addPaymentMethod(data) {
       return { success: false, error: nameError };
     }
     
-    const stmt = db.prepare('INSERT INTO payment_methods (name_ar, name_en, is_active) VALUES (?, ?, ?)');
+    const stmt = db.prepare('INSERT INTO payment_methods (name_ar, name_en, is_active, created_by) VALUES (?, ?, ?, ?)');
     stmt.run([
       data.name_ar.trim(),
       data.name_en ? data.name_en.trim() : null,
-      data.is_active !== false ? 1 : 0
+      data.is_active !== false ? 1 : 0,
+      getCurrentUser()
     ]);
     stmt.free();
     
@@ -77,11 +78,12 @@ export function addPaymentMethod(data) {
 
 export function updatePaymentMethod(methodId, data) {
   try {
-    const stmt = db.prepare('UPDATE payment_methods SET name_ar = ?, name_en = ?, is_active = ? WHERE id = ?');
+    const stmt = db.prepare('UPDATE payment_methods SET name_ar = ?, name_en = ?, is_active = ?, updated_by = ? WHERE id = ?');
     stmt.run([
       data.name_ar.trim(),
       data.name_en ? data.name_en.trim() : null,
       data.is_active ? 1 : 0,
+      getCurrentUser(),
       methodId
     ]);
     stmt.free();

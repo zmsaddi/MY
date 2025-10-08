@@ -1,5 +1,5 @@
 // src/utils/database/currencies.js
-import { db, saveDatabase, safe, lastId } from './core.js';
+import { db, saveDatabase, safe, lastId, getCurrentUser } from './core.js';
 import { validators, parseDbError } from '../validators.js';
 import { getCompanyProfile } from './profile.js';
 
@@ -89,17 +89,18 @@ export function addCurrency(data) {
       return { success: false, error: errors.join('. ') };
     }
     
-    const stmt = db.prepare(`INSERT INTO currencies 
-      (code, name_ar, name_en, symbol, exchange_rate, is_active) 
-      VALUES (?, ?, ?, ?, ?, ?)`);
-    
+    const stmt = db.prepare(`INSERT INTO currencies
+      (code, name_ar, name_en, symbol, exchange_rate, is_active, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`);
+
     stmt.run([
       data.code.toUpperCase().trim(),
       data.name_ar.trim(),
       data.name_en ? data.name_en.trim() : null,
       data.symbol || data.code,
       safe(data.exchange_rate, 1),
-      data.is_active ? 1 : 0
+      data.is_active ? 1 : 0,
+      getCurrentUser()
     ]);
     stmt.free();
     
@@ -119,21 +120,23 @@ export function updateCurrency(currencyId, data) {
       return { success: false, error: rateError };
     }
     
-    const stmt = db.prepare(`UPDATE currencies SET 
-      name_ar = ?, 
-      name_en = ?, 
-      symbol = ?, 
-      exchange_rate = ?, 
+    const stmt = db.prepare(`UPDATE currencies SET
+      name_ar = ?,
+      name_en = ?,
+      symbol = ?,
+      exchange_rate = ?,
       is_active = ?,
+      updated_by = ?,
       updated_at = CURRENT_TIMESTAMP
       WHERE id = ?`);
-    
+
     stmt.run([
       data.name_ar.trim(),
       data.name_en ? data.name_en.trim() : null,
       data.symbol || data.code,
       safe(data.exchange_rate, 1),
       data.is_active ? 1 : 0,
+      getCurrentUser(),
       currencyId
     ]);
     stmt.free();

@@ -4,6 +4,17 @@ import { validators, parseDbError } from '../validators.js';
 
 export let db = null;
 
+// Global current user context (set by App.jsx after login)
+let currentUserContext = 'System';
+
+export function setCurrentUser(username) {
+  currentUserContext = username || 'System';
+}
+
+export function getCurrentUser() {
+  return currentUserContext;
+}
+
 /* ============================================
    TRANSACTION HELPERS
    ============================================ */
@@ -193,21 +204,26 @@ export function generateInvoiceNumber() {
 
 export async function initDatabase() {
   try {
-    const SQL = await initSqlJs({ 
-      locateFile: (f) => `https://sql.js.org/dist/${f}` 
+    const SQL = await initSqlJs({
+      locateFile: (f) => `https://sql.js.org/dist/${f}`
     });
-    
+
     const saved = localStorage.getItem('metalsheets_database');
-    
+
     if (saved) {
       try {
         db = new SQL.Database(new Uint8Array(JSON.parse(saved)));
         const hasTables = db.exec("SELECT name FROM sqlite_master WHERE type='table'");
-        
+
         if (hasTables.length === 0) {
           throw new Error('No tables found');
         }
-        
+
+        // Enable critical SQLite pragmas
+        db.run('PRAGMA foreign_keys = ON');
+        db.run('PRAGMA journal_mode = WAL'); // Better concurrency
+        db.run('PRAGMA synchronous = NORMAL'); // Better performance
+
         // Import schema functions for migrations
         const { runMigrations } = await import('./schema.js');
         runMigrations();
@@ -216,7 +232,12 @@ export async function initDatabase() {
         console.warn('Database corrupted, recreating:', e);
         localStorage.removeItem('metalsheets_database');
         db = new SQL.Database();
-        
+
+        // Enable critical SQLite pragmas for new DB
+        db.run('PRAGMA foreign_keys = ON');
+        db.run('PRAGMA journal_mode = WAL');
+        db.run('PRAGMA synchronous = NORMAL');
+
         // Import and create all tables
         const { createAllTables, insertDefaultData } = await import('./schema.js');
         createAllTables();
@@ -224,7 +245,12 @@ export async function initDatabase() {
       }
     } else {
       db = new SQL.Database();
-      
+
+      // Enable critical SQLite pragmas for new DB
+      db.run('PRAGMA foreign_keys = ON');
+      db.run('PRAGMA journal_mode = WAL');
+      db.run('PRAGMA synchronous = NORMAL');
+
       // Import and create all tables
       const { createAllTables, insertDefaultData } = await import('./schema.js');
       createAllTables();

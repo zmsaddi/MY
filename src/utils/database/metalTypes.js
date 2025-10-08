@@ -1,5 +1,5 @@
 // src/utils/database/metalTypes.js
-import { db, saveDatabase, safe, lastId, generateSheetCode } from './core.js';
+import { db, saveDatabase, safe, lastId, generateSheetCode, getCurrentUser } from './core.js';
 import { validators, parseDbError } from '../validators.js';
 
 // Re-export code generator for convenience
@@ -60,16 +60,17 @@ export function addMetalType(data) {
       return { success: false, error: errors.join('. ') };
     }
     
-    const stmt = db.prepare(`INSERT INTO metal_types 
-      (name_ar, name_en, abbreviation, density, is_active) 
-      VALUES (?, ?, ?, ?, ?)`);
-    
+    const stmt = db.prepare(`INSERT INTO metal_types
+      (name_ar, name_en, abbreviation, density, is_active, created_by)
+      VALUES (?, ?, ?, ?, ?, ?)`);
+
     stmt.run([
       data.name_ar.trim(),
       data.name_en ? data.name_en.trim() : null,
       data.abbreviation.toUpperCase().trim(),
       data.density ? safe(data.density) : null,
-      data.is_active !== false ? 1 : 0
+      data.is_active !== false ? 1 : 0,
+      getCurrentUser()
     ]);
     stmt.free();
     
@@ -84,20 +85,22 @@ export function addMetalType(data) {
 
 export function updateMetalType(metalId, data) {
   try {
-    const stmt = db.prepare(`UPDATE metal_types SET 
-      name_ar = ?, 
-      name_en = ?, 
-      abbreviation = ?, 
-      density = ?, 
-      is_active = ?
+    const stmt = db.prepare(`UPDATE metal_types SET
+      name_ar = ?,
+      name_en = ?,
+      abbreviation = ?,
+      density = ?,
+      is_active = ?,
+      updated_by = ?
       WHERE id = ?`);
-    
+
     stmt.run([
       data.name_ar.trim(),
       data.name_en ? data.name_en.trim() : null,
       data.abbreviation.toUpperCase().trim(),
       data.density ? safe(data.density) : null,
       data.is_active ? 1 : 0,
+      getCurrentUser(),
       metalId
     ]);
     stmt.free();
@@ -174,11 +177,12 @@ export function addGrade(data) {
       return { success: false, error: errors.join('. ') };
     }
     
-    const stmt = db.prepare('INSERT INTO grades (metal_type_id, name, is_active) VALUES (?, ?, ?)');
+    const stmt = db.prepare('INSERT INTO grades (metal_type_id, name, is_active, created_by) VALUES (?, ?, ?, ?)');
     stmt.run([
       data.metal_type_id,
       data.name.trim(),
-      data.is_active !== false ? 1 : 0
+      data.is_active !== false ? 1 : 0,
+      getCurrentUser()
     ]);
     stmt.free();
     
@@ -193,10 +197,11 @@ export function addGrade(data) {
 
 export function updateGrade(gradeId, data) {
   try {
-    const stmt = db.prepare('UPDATE grades SET name = ?, is_active = ? WHERE id = ?');
+    const stmt = db.prepare('UPDATE grades SET name = ?, is_active = ?, updated_by = ? WHERE id = ?');
     stmt.run([
       data.name.trim(),
       data.is_active ? 1 : 0,
+      getCurrentUser(),
       gradeId
     ]);
     stmt.free();
@@ -274,12 +279,13 @@ export function addFinish(data) {
       return { success: false, error: errors.join('. ') };
     }
     
-    const stmt = db.prepare('INSERT INTO finishes (metal_type_id, name_ar, name_en, is_active) VALUES (?, ?, ?, ?)');
+    const stmt = db.prepare('INSERT INTO finishes (metal_type_id, name_ar, name_en, is_active, created_by) VALUES (?, ?, ?, ?, ?)');
     stmt.run([
       data.metal_type_id,
       data.name_ar.trim(),
       data.name_en ? data.name_en.trim() : null,
-      data.is_active !== false ? 1 : 0
+      data.is_active !== false ? 1 : 0,
+      getCurrentUser()
     ]);
     stmt.free();
     
@@ -294,11 +300,12 @@ export function addFinish(data) {
 
 export function updateFinish(finishId, data) {
   try {
-    const stmt = db.prepare('UPDATE finishes SET name_ar = ?, name_en = ?, is_active = ? WHERE id = ?');
+    const stmt = db.prepare('UPDATE finishes SET name_ar = ?, name_en = ?, is_active = ?, updated_by = ? WHERE id = ?');
     stmt.run([
       data.name_ar.trim(),
       data.name_en ? data.name_en.trim() : null,
       data.is_active ? 1 : 0,
+      getCurrentUser(),
       finishId
     ]);
     stmt.free();

@@ -633,7 +633,7 @@ export default function InventoryTab() {
       {/* Dialog: Add Sheet + Initial Batch */}
       <Dialog open={openAddDialog} onClose={handleCloseAddDialog} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
         <DialogTitle>
-          <Typography variant="h5" fontWeight={700}>إضافة صفيحة جديدة</Typography>
+          إضافة صفيحة جديدة
         </DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2 }}>
@@ -1020,13 +1020,15 @@ export default function InventoryTab() {
 
       {/* Dialog: Batches (view + add) */}
       <Dialog open={openBatchesDialog} onClose={() => setOpenBatchesDialog(false)} maxWidth="lg" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-        <DialogTitle>
-          <Typography variant="h5" fontWeight={700}>
-            الدفعات - {selectedSheet?.code}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">
-            {selectedSheet?.metal_name} | {selectedSheet?.length_mm}×{selectedSheet?.width_mm} | {selectedSheet?.thickness_mm} مم
-          </Typography>
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          <Box>
+            <Typography variant="h6" fontWeight={700}>
+              الدفعات - {selectedSheet?.code}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">
+              {selectedSheet?.metal_name} | {selectedSheet?.length_mm}×{selectedSheet?.width_mm} | {selectedSheet?.thickness_mm} مم
+            </Typography>
+          </Box>
         </DialogTitle>
         <DialogContent>
           <Box sx={{ mb: 3 }}>

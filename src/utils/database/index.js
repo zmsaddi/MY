@@ -15,7 +15,9 @@ export {
   currencyHelpers,
   generateSheetCode,
   generateInvoiceNumber,
-  initDatabase
+  initDatabase,
+  setCurrentUser,
+  getCurrentUser
 } from './core.js';
 
 /* ============================================
@@ -173,3 +175,19 @@ export {
   getPurchasesBySupplier,
   getPurchasesSummary
 } from './purchaseReports.js';
+
+/* ============================================
+   USER MANAGEMENT & AUTHENTICATION
+   ============================================ */
+export {
+  getAllUsers,
+  getUserById,
+  getUserByUsername,
+  authenticateUser,
+  addUser,
+  updateUser,
+  changeUserPassword,
+  deleteUser,
+  hashPassword,
+  verifyPassword
+} from './users.js';

@@ -1,9 +1,35 @@
 // src/utils/database/schema.js
 import { db, hasColumn, saveDatabase } from './core.js';
+import CryptoJS from 'crypto-js';
 
 /* ============================================
    TABLE CREATION FUNCTIONS
    ============================================ */
+
+function createUsersTable() {
+  db.run(`CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    password_hash TEXT NOT NULL,
+    display_name TEXT,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_by TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_by TEXT
+  )`);
+
+  // Create default admin user: ZAKARIYA / ZAKARIYA
+  const cnt = db.exec('SELECT COUNT(1) FROM users')?.[0]?.values?.[0]?.[0] ?? 0;
+  if (cnt === 0) {
+    const passwordHash = CryptoJS.SHA256('ZAKARIYA').toString();
+    const stmt = db.prepare(`INSERT INTO users (
+      id, username, password_hash, display_name, is_active, created_by
+    ) VALUES (1, ?, ?, ?, 1, ?)`);
+    stmt.run(['ZAKARIYA', passwordHash, 'ZAKARIYA', 'System']);
+    stmt.free();
+  }
+}
 
 function createCompanyProfileTable() {
   db.run(`CREATE TABLE IF NOT EXISTS company_profile (
@@ -326,23 +352,53 @@ function createExpensesTable() {
 
 function createIndexes() {
   const indexes = [
+    // Batch indexes
     'CREATE INDEX IF NOT EXISTS idx_batches_sheet_id ON batches(sheet_id)',
     'CREATE INDEX IF NOT EXISTS idx_batches_supplier_id ON batches(supplier_id)',
-    'CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sale_items(sale_id)',
-    'CREATE INDEX IF NOT EXISTS idx_sale_items_item_type ON sale_items(item_type)',
-    'CREATE INDEX IF NOT EXISTS idx_payments_sale_id ON payments(sale_id)',
-    'CREATE INDEX IF NOT EXISTS idx_supplier_payments_supplier_id ON supplier_payments(supplier_id)',
-    'CREATE INDEX IF NOT EXISTS idx_supplier_payments_batch_id ON supplier_payments(batch_id)',
+
+    // Sheet indexes
     'CREATE INDEX IF NOT EXISTS idx_sheets_code ON sheets(code)',
+    'CREATE INDEX IF NOT EXISTS idx_sheets_metal_type_id ON sheets(metal_type_id)', // NEW - Critical for filtering
     'CREATE INDEX IF NOT EXISTS idx_sheets_grade_id ON sheets(grade_id)',
     'CREATE INDEX IF NOT EXISTS idx_sheets_finish_id ON sheets(finish_id)',
+    'CREATE INDEX IF NOT EXISTS idx_sheets_is_remnant ON sheets(is_remnant)', // NEW - For remnants tab
+
+    // Sale indexes
+    'CREATE INDEX IF NOT EXISTS idx_sales_customer_id ON sales(customer_id)', // NEW - Critical for customer queries
+    'CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(sale_date)', // NEW - For date filtering
+    'CREATE INDEX IF NOT EXISTS idx_sales_payment_status ON sales(payment_status)', // NEW - For filtering
+
+    // Sale items indexes
+    'CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sale_items(sale_id)',
+    'CREATE INDEX IF NOT EXISTS idx_sale_items_item_type ON sale_items(item_type)',
+    'CREATE INDEX IF NOT EXISTS idx_sale_items_sheet_id ON sale_items(sheet_id)', // NEW
+    'CREATE INDEX IF NOT EXISTS idx_sale_items_batch_id ON sale_items(batch_id)', // NEW
+    'CREATE INDEX IF NOT EXISTS idx_sale_items_service_type_id ON sale_items(service_type_id)',
+
+    // Payment indexes
+    'CREATE INDEX IF NOT EXISTS idx_payments_sale_id ON payments(sale_id)',
+    'CREATE INDEX IF NOT EXISTS idx_payments_customer_id ON payments(customer_id)', // NEW
+    'CREATE INDEX IF NOT EXISTS idx_payments_date ON payments(payment_date)', // NEW
+
+    // Supplier payment indexes
+    'CREATE INDEX IF NOT EXISTS idx_supplier_payments_supplier_id ON supplier_payments(supplier_id)',
+    'CREATE INDEX IF NOT EXISTS idx_supplier_payments_batch_id ON supplier_payments(batch_id)',
+    'CREATE INDEX IF NOT EXISTS idx_supplier_payments_date ON supplier_payments(payment_date)', // NEW
+
+    // Transaction indexes
     'CREATE INDEX IF NOT EXISTS idx_customer_trans_customer_id ON customer_transactions(customer_id)',
     'CREATE INDEX IF NOT EXISTS idx_customer_trans_date ON customer_transactions(transaction_date)',
     'CREATE INDEX IF NOT EXISTS idx_supplier_trans_supplier_id ON supplier_transactions(supplier_id)',
     'CREATE INDEX IF NOT EXISTS idx_supplier_trans_date ON supplier_transactions(transaction_date)',
-    'CREATE INDEX IF NOT EXISTS idx_sale_items_service_type_id ON sale_items(service_type_id)',
+
+    // Expense indexes
     'CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(expense_date)',
-    'CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category_id)'
+    'CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category_id)',
+
+    // Inventory movement indexes
+    'CREATE INDEX IF NOT EXISTS idx_inventory_movements_sheet_id ON inventory_movements(sheet_id)', // NEW
+    'CREATE INDEX IF NOT EXISTS idx_inventory_movements_batch_id ON inventory_movements(batch_id)', // NEW
+    'CREATE INDEX IF NOT EXISTS idx_inventory_movements_type ON inventory_movements(movement_type)' // NEW
   ];
   
   indexes.forEach(sql => {
@@ -584,14 +640,48 @@ export function runMigrations() {
   if (!hasColumn('finishes', 'is_active')) {
     db.run(`ALTER TABLE finishes ADD COLUMN is_active INTEGER DEFAULT 1`);
   }
-  
+
+  // Create users table if not exists
+  if (!tableNames.includes('users')) {
+    createUsersTable();
+  }
+
+  // Add audit columns to all tables
+  addAuditColumns();
+
   insertDefaultCurrencies();
   insertDefaultPaymentMethods();
   insertDefaultServices();
   insertDefaultExpenseCategories();
-  
+
   createIndexes();
   saveDatabase();
+}
+
+/* ============================================
+   AUDIT TRAIL - Add created_by/updated_by to all tables
+   ============================================ */
+
+function addAuditColumns() {
+  const tables = [
+    'company_profile', 'currencies', 'payment_methods', 'metal_types', 'grades',
+    'finishes', 'suppliers', 'customers', 'sheets', 'batches', 'inventory_movements',
+    'service_types', 'sales', 'sale_items', 'payments', 'supplier_payments',
+    'customer_transactions', 'supplier_transactions', 'expense_categories', 'expenses'
+  ];
+
+  tables.forEach(table => {
+    try {
+      if (!hasColumn(table, 'created_by')) {
+        db.run(`ALTER TABLE ${table} ADD COLUMN created_by TEXT`);
+      }
+      if (!hasColumn(table, 'updated_by')) {
+        db.run(`ALTER TABLE ${table} ADD COLUMN updated_by TEXT`);
+      }
+    } catch (e) {
+      console.error(`Failed to add audit columns to ${table}:`, e);
+    }
+  });
 }
 
 /* ============================================
@@ -599,6 +689,7 @@ export function runMigrations() {
    ============================================ */
 
 export function createAllTables() {
+  createUsersTable();
   createCompanyProfileTable();
   createCurrenciesTable();
   createPaymentMethodsTable();

@@ -1,5 +1,5 @@
 // src/utils/database/customers.js
-import { db, saveDatabase, lastId } from './core.js';
+import { db, saveDatabase, lastId, getCurrentUser } from './core.js';
 import { validators, parseDbError } from '../validators.js';
 
 /* ============================================
@@ -48,11 +48,11 @@ export function addCustomer(data) {
     if (validationError) {
       return { success: false, error: validationError };
     }
-    
-    const stmt = db.prepare(`INSERT INTO customers 
-      (name, company_name, phone1, phone2, address, email, tax_number, notes) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
-    
+
+    const stmt = db.prepare(`INSERT INTO customers
+      (name, company_name, phone1, phone2, address, email, tax_number, notes, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+
     stmt.run([
       data.name.trim(),
       data.company_name ? data.company_name.trim() : null,
@@ -61,13 +61,14 @@ export function addCustomer(data) {
       data.address ? data.address.trim() : null,
       data.email ? data.email.trim() : null,
       data.tax_number ? data.tax_number.trim() : null,
-      data.notes ? data.notes.trim() : null
+      data.notes ? data.notes.trim() : null,
+      getCurrentUser()
     ]);
     stmt.free();
-    
+
     saveDatabase();
     return { success: true, id: lastId() };
-    
+
   } catch (e) {
     console.error('Add customer error:', e);
     return { success: false, error: parseDbError(e) };
@@ -80,18 +81,19 @@ export function updateCustomer(customerId, data) {
     if (validationError) {
       return { success: false, error: validationError };
     }
-    
-    const stmt = db.prepare(`UPDATE customers SET 
-      name = ?, 
-      company_name = ?, 
-      phone1 = ?, 
-      phone2 = ?, 
-      address = ?, 
-      email = ?, 
-      tax_number = ?, 
-      notes = ?
+
+    const stmt = db.prepare(`UPDATE customers SET
+      name = ?,
+      company_name = ?,
+      phone1 = ?,
+      phone2 = ?,
+      address = ?,
+      email = ?,
+      tax_number = ?,
+      notes = ?,
+      updated_by = ?
       WHERE id = ?`);
-    
+
     stmt.run([
       data.name.trim(),
       data.company_name ? data.company_name.trim() : null,
@@ -101,13 +103,14 @@ export function updateCustomer(customerId, data) {
       data.email ? data.email.trim() : null,
       data.tax_number ? data.tax_number.trim() : null,
       data.notes ? data.notes.trim() : null,
+      getCurrentUser(),
       customerId
     ]);
     stmt.free();
-    
+
     saveDatabase();
     return { success: true };
-    
+
   } catch (e) {
     console.error('Update customer error:', e);
     return { success: false, error: parseDbError(e) };

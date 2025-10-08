@@ -1,5 +1,5 @@
 // src/utils/database/accounting.js
-import { db, tx, saveDatabase, safe, round2, lastId } from './core.js';
+import { db, tx, saveDatabase, safe, round2, lastId, getCurrentUser } from './core.js';
 import { validators, parseDbError } from '../validators.js';
 
 /* ============================================
@@ -69,23 +69,33 @@ export function getCustomerStatement(customerId, fromDate = null, toDate = null)
   
   try {
     let sql = `
-      SELECT * 
-      FROM customer_transactions 
-      WHERE customer_id = ?
+      SELECT 
+        ct.*,
+        CASE 
+          WHEN ct.reference_type = 'sale' THEN s.invoice_number
+          ELSE NULL 
+        END as invoice_number,
+        CASE 
+          WHEN ct.reference_type = 'sale' THEN ct.reference_id
+          ELSE NULL 
+        END as sale_id
+      FROM customer_transactions ct
+      LEFT JOIN sales s ON ct.reference_type = 'sale' AND ct.reference_id = s.id
+      WHERE ct.customer_id = ?
     `;
     const params = [customerId];
     
     if (fromDate) {
-      sql += ` AND transaction_date >= ?`;
+      sql += ` AND ct.transaction_date >= ?`;
       params.push(fromDate);
     }
     
     if (toDate) {
-      sql += ` AND transaction_date <= ?`;
+      sql += ` AND ct.transaction_date <= ?`;
       params.push(toDate);
     }
     
-    sql += ` ORDER BY transaction_date ASC, id ASC`;
+    sql += ` ORDER BY ct.transaction_date ASC, ct.id ASC`;
     
     const stmt = db.prepare(sql);
     stmt.bind(params);
@@ -103,7 +113,9 @@ export function getCustomerStatement(customerId, fromDate = null, toDate = null)
         balance_after: row.balance_after,
         notes: row.notes,
         transaction_date: row.transaction_date,
-        created_at: row.created_at
+        created_at: row.created_at,
+        invoice_number: row.invoice_number,
+        sale_id: row.sale_id
       });
     }
     stmt.free();
@@ -173,14 +185,14 @@ export function getSupplierStatement(supplierId, fromDate = null, toDate = null)
 export function insertCustomerTransactionInline(data) {
   const currentBalance = getCustomerBalance(data.customer_id);
   const newBalance = round2(currentBalance + safe(data.amount));
-  
+
   const stmt = db.prepare(`
-    INSERT INTO customer_transactions 
-    (customer_id, transaction_type, amount, reference_type, reference_id, 
-     balance_after, notes, transaction_date)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO customer_transactions
+    (customer_id, transaction_type, amount, reference_type, reference_id,
+     balance_after, notes, transaction_date, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  
+
   stmt.run([
     data.customer_id,
     data.transaction_type,
@@ -189,7 +201,8 @@ export function insertCustomerTransactionInline(data) {
     data.reference_id || null,
     newBalance,
     data.notes || null,
-    data.transaction_date
+    data.transaction_date,
+    getCurrentUser()
   ]);
   stmt.free();
 }
@@ -197,14 +210,14 @@ export function insertCustomerTransactionInline(data) {
 export function insertSupplierTransactionInline(data) {
   const currentBalance = getSupplierBalance(data.supplier_id);
   const newBalance = round2(currentBalance + safe(data.amount));
-  
+
   const stmt = db.prepare(`
-    INSERT INTO supplier_transactions 
-    (supplier_id, transaction_type, amount, reference_type, reference_id, 
-     balance_after, notes, transaction_date)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO supplier_transactions
+    (supplier_id, transaction_type, amount, reference_type, reference_id,
+     balance_after, notes, transaction_date, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  
+
   stmt.run([
     data.supplier_id,
     data.transaction_type,
@@ -213,7 +226,8 @@ export function insertSupplierTransactionInline(data) {
     data.reference_id || null,
     newBalance,
     data.notes || null,
-    data.transaction_date
+    data.transaction_date,
+    getCurrentUser()
   ]);
   stmt.free();
 }

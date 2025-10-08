@@ -1,5 +1,5 @@
 // src/utils/database/profile.js
-import { db, saveDatabase, safe } from './core.js';
+import { db, saveDatabase, safe, getCurrentUser } from './core.js';
 import { validators, parseDbError } from '../validators.js';
 
 /* ============================================
@@ -64,22 +64,23 @@ export function updateCompanyProfile(data) {
       return { success: false, error: errors.join('. ') };
     }
     
-    const stmt = db.prepare(`UPDATE company_profile SET 
-      company_name = ?, 
-      company_name_en = ?, 
-      address = ?, 
-      phone1 = ?, 
-      phone2 = ?, 
-      email = ?, 
+    const stmt = db.prepare(`UPDATE company_profile SET
+      company_name = ?,
+      company_name_en = ?,
+      address = ?,
+      phone1 = ?,
+      phone2 = ?,
+      email = ?,
       tax_number = ?,
       base_currency = ?,
       default_payment_method = ?,
-      logo_base64 = ?, 
-      vat_rate = ?, 
+      logo_base64 = ?,
+      vat_rate = ?,
       vat_enabled = ?,
+      updated_by = ?,
       updated_at = CURRENT_TIMESTAMP
       WHERE id = 1`);
-    
+
     stmt.run([
       data.company_name,
       data.company_name_en || null,
@@ -92,7 +93,8 @@ export function updateCompanyProfile(data) {
       data.default_payment_method || 'Cash',
       data.logo_base64 || null,
       safe(data.vat_rate, 0),
-      data.vat_enabled ? 1 : 0
+      data.vat_enabled ? 1 : 0,
+      getCurrentUser()
     ]);
     stmt.free();
     

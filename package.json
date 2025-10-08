@@ -22,6 +22,7 @@
     "@mui/styles": "^6.5.0",
     "jss-rtl": "^0.3.0",
     "pdfmake": "^0.2.10",
+    "prop-types": "^15.8.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "sql.js": "^1.10.3",
@@ -33,6 +34,7 @@
     "concurrently": "^8.2.2",
     "electron": "^28.3.3",
     "electron-builder": "^24.9.1",
+    "terser": "^5.44.0",
     "vite": "^5.0.8",
     "wait-on": "^7.2.0"
   },

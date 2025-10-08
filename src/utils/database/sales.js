@@ -1,10 +1,10 @@
 // src/utils/database/sales.js
-import { db, tx, saveDatabase, safe, round2, lastId, currencyHelpers, generateInvoiceNumber } from './core.js';
+import { db, tx, saveDatabase, safe, round2, lastId, currencyHelpers, generateInvoiceNumber, getCurrentUser } from './core.js';
 import { validators, parseDbError } from '../validators.js';
 import { getCompanyProfile } from './profile.js';
 import { getCurrencies } from './currencies.js';
-import { getBatchesBySheetId } from './inventory.js';
-import { recordInventoryMovement } from './inventory.js';
+import { getBatchesBySheetId, recordInventoryMovement, pruneEmptyBatches } from './inventory.js';
+import { insertCustomerTransactionInline } from './accounting.js';
 
 // Re-export for convenience
 export { generateInvoiceNumber };
@@ -368,12 +368,12 @@ export function processSale(saleData) {
     else if (amountPaidBase > 0) paymentStatus = 'partial';
     
     const saleStmt = db.prepare(`
-      INSERT INTO sales 
+      INSERT INTO sales
       (invoice_number, customer_id, sale_date, currency_code, fx_rate,
-       subtotal, discount, tax, total_amount, payment_status, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       subtotal, discount, tax, total_amount, payment_status, notes, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    
+
     saleStmt.run([
       saleData.invoice_number,
       saleData.customer_id || null,
@@ -385,7 +385,8 @@ export function processSale(saleData) {
       taxBase,
       totalBase,
       paymentStatus,
-      saleData.notes ? saleData.notes.trim() : null
+      saleData.notes ? saleData.notes.trim() : null,
+      getCurrentUser()
     ]);
     saleStmt.free();
     
@@ -418,30 +419,27 @@ export function processSale(saleData) {
     }
     
     if (saleData.customer_id) {
-      // Import dynamically to avoid circular dependency
-      import('./accounting.js').then(({ insertCustomerTransactionInline }) => {
+      insertCustomerTransactionInline({
+        customer_id: saleData.customer_id,
+        transaction_type: 'sale',
+        amount: totalBase,
+        reference_type: 'sale',
+        reference_id: saleId,
+        transaction_date: saleData.sale_date,
+        notes: `فاتورة ${saleData.invoice_number}`
+      });
+      
+      if (amountPaidBase > 0) {
         insertCustomerTransactionInline({
           customer_id: saleData.customer_id,
-          transaction_type: 'sale',
-          amount: totalBase,
-          reference_type: 'sale',
+          transaction_type: 'payment',
+          amount: -amountPaidBase,
+          reference_type: 'payment',
           reference_id: saleId,
           transaction_date: saleData.sale_date,
-          notes: `فاتورة ${saleData.invoice_number}`
+          notes: `دفعة فورية - فاتورة ${saleData.invoice_number}`
         });
-        
-        if (amountPaidBase > 0) {
-          insertCustomerTransactionInline({
-            customer_id: saleData.customer_id,
-            transaction_type: 'payment',
-            amount: -amountPaidBase,
-            reference_type: 'payment',
-            reference_id: saleId,
-            transaction_date: saleData.sale_date,
-            notes: `دفعة فورية - فاتورة ${saleData.invoice_number}`
-          });
-        }
-      });
+      }
     }
     
     tx.commit();
@@ -480,6 +478,20 @@ export function deleteSale(saleId) {
     }
     itemsStmt.free();
     
+    // Delete customer transactions related to this sale
+    const deleteSaleTrans = db.prepare('DELETE FROM customer_transactions WHERE reference_type = ? AND reference_id = ?');
+    deleteSaleTrans.run(['sale', saleId]);
+    deleteSaleTrans.free();
+    
+    // Delete customer transactions related to payments for this sale
+    const deletePaymentTrans = db.prepare(`
+      DELETE FROM customer_transactions 
+      WHERE reference_type = 'payment' 
+      AND reference_id IN (SELECT id FROM payments WHERE sale_id = ?)
+    `);
+    deletePaymentTrans.run([saleId]);
+    deletePaymentTrans.free();
+    
     const deletePayments = db.prepare('DELETE FROM payments WHERE sale_id = ?');
     deletePayments.run([saleId]);
     deletePayments.free();
@@ -498,10 +510,8 @@ export function deleteSale(saleId) {
     
     tx.commit();
     
-    // Prune empty batches
-    import('./inventory.js').then(({ pruneEmptyBatches }) => {
-      pruneEmptyBatches();
-    });
+    // Prune empty batches synchronously
+    pruneEmptyBatches();
     
     saveDatabase();
     

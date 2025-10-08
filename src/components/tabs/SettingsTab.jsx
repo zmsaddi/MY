@@ -21,6 +21,9 @@ import EditIcon from '@mui/icons-material/Edit';
 import ClearIcon from '@mui/icons-material/Clear';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import PaymentIcon from '@mui/icons-material/Payment';
+import PeopleIcon from '@mui/icons-material/People';
+import LockIcon from '@mui/icons-material/Lock';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
 
 import {
   getCompanyProfile,
@@ -44,7 +47,14 @@ import {
   getFinishes,
   addFinish,
   updateFinish,
+  getAllUsers,
+  addUser,
+  updateUser,
+  changeUserPassword,
+  deleteUser,
 } from '../../utils/database';
+
+import { getCurrentUser } from '../../utils/auth';
 
 /* ---------------- Service Row ---------------- */
 function ServiceRow({ service, onUpdated }) {
@@ -953,6 +963,16 @@ export default function SettingsTab() {
   const [pmError, setPmError] = useState('');
   const [pmSuccess, setPmSuccess] = useState('');
 
+  // Users
+  const [users, setUsers] = useState([]);
+  const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [userForm, setUserForm] = useState({ username: '', password: '', display_name: '' });
+  const [newPassword, setNewPassword] = useState('');
+  const [userError, setUserError] = useState('');
+  const [userSuccess, setUserSuccess] = useState('');
+
   useEffect(() => {
     loadData();
   }, []);
@@ -979,6 +999,16 @@ export default function SettingsTab() {
     loadMaterials();
     loadCurrencies();
     loadPaymentMethods();
+    loadUsers();
+  };
+
+  const loadUsers = () => {
+    try {
+      const list = getAllUsers();
+      setUsers(list);
+    } catch (e) {
+      setUserError('تعذّر تحميل المستخدمين');
+    }
   };
 
   const loadServices = () => {
@@ -1185,6 +1215,71 @@ export default function SettingsTab() {
     }
   };
 
+  // User Management Handlers
+  const handleAddUser = async () => {
+    setUserError('');
+    if (!userForm.username.trim()) {
+      setUserError('اسم المستخدم مطلوب');
+      return;
+    }
+    if (!userForm.password) {
+      setUserError('كلمة المرور مطلوبة');
+      return;
+    }
+
+    try {
+      const res = await addUser(userForm, getCurrentUser());
+      if (res?.success) {
+        setUserSuccess('✓ تمت إضافة المستخدم بنجاح');
+        setUserDialogOpen(false);
+        loadUsers();
+        setTimeout(() => setUserSuccess(''), 2500);
+      } else {
+        setUserError(res?.error || 'فشل إضافة المستخدم');
+      }
+    } catch (e) {
+      setUserError(e.message || 'فشل إضافة المستخدم');
+    }
+  };
+
+  const handleChangePassword = async () => {
+    setUserError('');
+    if (!newPassword) {
+      setUserError('كلمة المرور الجديدة مطلوبة');
+      return;
+    }
+
+    try {
+      const res = await changeUserPassword(editingUser.id, newPassword, getCurrentUser());
+      if (res?.success) {
+        setUserSuccess('✓ تم تغيير كلمة المرور بنجاح');
+        setPasswordDialogOpen(false);
+        setTimeout(() => setUserSuccess(''), 2500);
+      } else {
+        setUserError(res?.error || 'فشل تغيير كلمة المرور');
+      }
+    } catch (e) {
+      setUserError(e.message || 'فشل تغيير كلمة المرور');
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذا المستخدم؟')) return;
+
+    try {
+      const res = await deleteUser(userId);
+      if (res?.success) {
+        setUserSuccess('✓ تم حذف المستخدم بنجاح');
+        loadUsers();
+        setTimeout(() => setUserSuccess(''), 2500);
+      } else {
+        setUserError(res?.error || 'فشل حذف المستخدم');
+      }
+    } catch (e) {
+      setUserError(e.message || 'فشل حذف المستخدم');
+    }
+  };
+
   return (
     <Box>
       <Box sx={{ mb: 3 }}>
@@ -1360,6 +1455,7 @@ export default function SettingsTab() {
               <Tab label={<Typography fontSize="1rem" fontWeight={600}>المواد</Typography>} />
               <Tab label={<Typography fontSize="1rem" fontWeight={600}>العملات</Typography>} />
               <Tab label={<Typography fontSize="1rem" fontWeight={600}>طرق الدفع</Typography>} />
+              <Tab label={<Typography fontSize="1rem" fontWeight={600}>المستخدمين</Typography>} />
             </Tabs>
 
             {/* Services Tab */}
@@ -1661,6 +1757,91 @@ export default function SettingsTab() {
                 </TableContainer>
               </CardContent>
             )}
+
+            {/* Users Tab */}
+            {tabValue === 4 && (
+              <CardContent sx={{ p: 3 }}>
+                {userSuccess && <Alert severity="success" sx={{ mb: 2, fontSize: '1rem' }} onClose={() => setUserSuccess('')}>{userSuccess}</Alert>}
+                {userError && <Alert severity="error" sx={{ mb: 2, fontSize: '1rem' }} onClose={() => setUserError('')}>{userError}</Alert>}
+
+                <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography variant="h6" fontWeight={700}>
+                    إدارة المستخدمين
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    startIcon={<PersonAddIcon />}
+                    onClick={() => {
+                      setEditingUser(null);
+                      setUserForm({ username: '', password: '', display_name: '' });
+                      setUserError('');
+                      setUserDialogOpen(true);
+                    }}
+                  >
+                    إضافة مستخدم
+                  </Button>
+                </Box>
+
+                <TableContainer component={Paper} variant="outlined">
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell><Typography fontWeight={700}>اسم المستخدم</Typography></TableCell>
+                        <TableCell><Typography fontWeight={700}>الاسم</Typography></TableCell>
+                        <TableCell><Typography fontWeight={700}>الحالة</Typography></TableCell>
+                        <TableCell><Typography fontWeight={700}>تاريخ الإنشاء</Typography></TableCell>
+                        <TableCell align="left"><Typography fontWeight={700}>إجراءات</Typography></TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {users.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell>
+                            <Typography fontWeight={600}>{user.username}</Typography>
+                          </TableCell>
+                          <TableCell>{user.display_name || '-'}</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={user.is_active ? 'نشط' : 'معطل'}
+                              color={user.is_active ? 'success' : 'default'}
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell>{user.created_at ? new Date(user.created_at).toLocaleDateString('ar-SY') : '-'}</TableCell>
+                          <TableCell align="left">
+                            <Tooltip title="تغيير كلمة المرور">
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  setEditingUser(user);
+                                  setNewPassword('');
+                                  setUserError('');
+                                  setPasswordDialogOpen(true);
+                                }}
+                              >
+                                <LockIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title={user.id === 1 ? 'لا يمكن حذف المستخدم الرئيسي' : 'حذف'}>
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  disabled={user.id === 1}
+                                  onClick={() => handleDeleteUser(user.id)}
+                                  color="error"
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </CardContent>
+            )}
           </Card>
         </Grid>
 
@@ -1735,6 +1916,77 @@ export default function SettingsTab() {
           {loading ? 'جاري الحفظ...' : 'حفظ الإعدادات'}
         </Button>
       </Box>
+
+      {/* Add User Dialog */}
+      <Dialog open={userDialogOpen} onClose={() => setUserDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>إضافة مستخدم جديد</DialogTitle>
+        <DialogContent>
+          {userError && <Alert severity="error" sx={{ mb: 2 }}>{userError}</Alert>}
+
+          <TextField
+            fullWidth
+            label="اسم المستخدم *"
+            value={userForm.username}
+            onChange={(e) => setUserForm({ ...userForm, username: e.target.value })}
+            sx={{ mt: 2, mb: 2 }}
+            autoFocus
+          />
+
+          <TextField
+            fullWidth
+            label="الاسم (اختياري)"
+            value={userForm.display_name}
+            onChange={(e) => setUserForm({ ...userForm, display_name: e.target.value })}
+            sx={{ mb: 2 }}
+          />
+
+          <TextField
+            fullWidth
+            type="password"
+            label="كلمة المرور *"
+            value={userForm.password}
+            onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setUserDialogOpen(false)}>إلغاء</Button>
+          <Button
+            variant="contained"
+            onClick={handleAddUser}
+            disabled={!userForm.username.trim() || !userForm.password}
+          >
+            إضافة
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Change Password Dialog */}
+      <Dialog open={passwordDialogOpen} onClose={() => setPasswordDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>تغيير كلمة المرور - {editingUser?.username}</DialogTitle>
+        <DialogContent>
+          {userError && <Alert severity="error" sx={{ mb: 2 }}>{userError}</Alert>}
+
+          <TextField
+            fullWidth
+            type="password"
+            label="كلمة المرور الجديدة *"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            sx={{ mt: 2 }}
+            autoFocus
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPasswordDialogOpen(false)}>إلغاء</Button>
+          <Button
+            variant="contained"
+            onClick={handleChangePassword}
+            disabled={!newPassword}
+          >
+            حفظ
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

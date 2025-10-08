@@ -1,5 +1,5 @@
 // src/utils/database/suppliers.js
-import { db, saveDatabase, lastId, safe } from './core.js';
+import { db, saveDatabase, lastId, safe, getCurrentUser } from './core.js';
 import { validators, parseDbError } from '../validators.js';
 import { insertSupplierTransactionInline } from './accounting.js';
 
@@ -50,10 +50,10 @@ export function addSupplier(data) {
       return { success: false, error: validationError };
     }
     
-    const stmt = db.prepare(`INSERT INTO suppliers 
-      (name, company_name, phone1, phone2, address, email, tax_number, notes) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
-    
+    const stmt = db.prepare(`INSERT INTO suppliers
+      (name, company_name, phone1, phone2, address, email, tax_number, notes, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+
     stmt.run([
       data.name.trim(),
       data.company_name ? data.company_name.trim() : null,
@@ -62,7 +62,8 @@ export function addSupplier(data) {
       data.address ? data.address.trim() : null,
       data.email ? data.email.trim() : null,
       data.tax_number ? data.tax_number.trim() : null,
-      data.notes ? data.notes.trim() : null
+      data.notes ? data.notes.trim() : null,
+      getCurrentUser()
     ]);
     stmt.free();
     
@@ -82,17 +83,18 @@ export function updateSupplier(supplierId, data) {
       return { success: false, error: validationError };
     }
     
-    const stmt = db.prepare(`UPDATE suppliers SET 
-      name = ?, 
-      company_name = ?, 
-      phone1 = ?, 
-      phone2 = ?, 
-      address = ?, 
-      email = ?, 
-      tax_number = ?, 
-      notes = ?
+    const stmt = db.prepare(`UPDATE suppliers SET
+      name = ?,
+      company_name = ?,
+      phone1 = ?,
+      phone2 = ?,
+      address = ?,
+      email = ?,
+      tax_number = ?,
+      notes = ?,
+      updated_by = ?
       WHERE id = ?`);
-    
+
     stmt.run([
       data.name.trim(),
       data.company_name ? data.company_name.trim() : null,
@@ -102,6 +104,7 @@ export function updateSupplier(supplierId, data) {
       data.email ? data.email.trim() : null,
       data.tax_number ? data.tax_number.trim() : null,
       data.notes ? data.notes.trim() : null,
+      getCurrentUser(),
       supplierId
     ]);
     stmt.free();

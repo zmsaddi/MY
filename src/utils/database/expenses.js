@@ -1,5 +1,5 @@
 // src/utils/database/expenses.js
-import { db, saveDatabase, safe, lastId } from './core.js';
+import { db, saveDatabase, safe, lastId, getCurrentUser } from './core.js';
 import { validators, parseDbError } from '../validators.js';
 
 /* ============================================
@@ -160,17 +160,18 @@ export function addExpense(data) {
     }
     
     const stmt = db.prepare(`
-      INSERT INTO expenses 
-      (category_id, amount, description, expense_date, notes) 
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO expenses
+      (category_id, amount, description, expense_date, notes, created_by)
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
-    
+
     stmt.run([
       data.category_id,
       safe(data.amount),
       data.description.trim(),
       data.expense_date,
-      data.notes ? data.notes.trim() : null
+      data.notes ? data.notes.trim() : null,
+      getCurrentUser()
     ]);
     stmt.free();
     
@@ -201,22 +202,24 @@ export function updateExpense(expenseId, data) {
     }
     
     const stmt = db.prepare(`
-      UPDATE expenses SET 
+      UPDATE expenses SET
         category_id = ?,
         amount = ?,
         description = ?,
         expense_date = ?,
         notes = ?,
+        updated_by = ?,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `);
-    
+
     stmt.run([
       data.category_id,
       safe(data.amount),
       data.description.trim(),
       data.expense_date,
       data.notes ? data.notes.trim() : null,
+      getCurrentUser(),
       expenseId
     ]);
     stmt.free();

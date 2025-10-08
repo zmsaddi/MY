@@ -1,5 +1,5 @@
 // src/utils/database/services.js
-import { db, saveDatabase, safe, lastId } from './core.js';
+import { db, saveDatabase, safe, lastId, getCurrentUser } from './core.js';
 import { validators, parseDbError } from '../validators.js';
 
 /* ============================================
@@ -45,13 +45,14 @@ export function addServiceType(data) {
       return { success: false, error: nameError };
     }
     
-    const stmt = db.prepare('INSERT INTO service_types (name_ar, name_en, default_cost, is_active, is_default) VALUES (?, ?, ?, ?, ?)');
+    const stmt = db.prepare('INSERT INTO service_types (name_ar, name_en, default_cost, is_active, is_default, created_by) VALUES (?, ?, ?, ?, ?, ?)');
     stmt.run([
       data.name_ar.trim(),
       data.name_en ? data.name_en.trim() : null,
       safe(data.default_cost, 0),
       data.is_active !== false ? 1 : 0,
-      data.is_default ? 1 : 0
+      data.is_default ? 1 : 0,
+      getCurrentUser()
     ]);
     stmt.free();
     
@@ -66,12 +67,13 @@ export function addServiceType(data) {
 
 export function updateServiceType(serviceId, data) {
   try {
-    const stmt = db.prepare('UPDATE service_types SET name_ar = ?, name_en = ?, default_cost = ?, is_active = ? WHERE id = ?');
+    const stmt = db.prepare('UPDATE service_types SET name_ar = ?, name_en = ?, default_cost = ?, is_active = ?, updated_by = ? WHERE id = ?');
     stmt.run([
       data.name_ar.trim(),
       data.name_en ? data.name_en.trim() : null,
       safe(data.default_cost, 0),
       data.is_active ? 1 : 0,
+      getCurrentUser(),
       serviceId
     ]);
     stmt.free();

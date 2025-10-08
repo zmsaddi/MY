@@ -1,5 +1,5 @@
 // src/utils/database/inventory.js
-import { db, tx, saveDatabase, safe, lastId, generateSheetCode } from './core.js';
+import { db, tx, saveDatabase, safe, lastId, generateSheetCode, getCurrentUser } from './core.js';
 import { validators, parseDbError } from '../validators.js';
 import { insertSupplierTransactionInline } from './accounting.js';
 
@@ -37,17 +37,19 @@ export function recordInventoryMovement(movementType, sheetId, batchId, quantity
 
 export function getAllSheets() {
   if (!db) return [];
-  
+
   try {
     const stmt = db.prepare(`
-      SELECT 
+      SELECT
         s.*,
         mt.name_ar as metal_name,
         mt.abbreviation as metal_abbr,
-        g.name_ar as grade_name,
+        g.name as grade_name,
         f.name_ar as finish_name,
         COALESCE(SUM(b.quantity_remaining), 0) as total_quantity,
-        COUNT(DISTINCT b.id) as batch_count
+        COUNT(DISTINCT b.id) as batch_count,
+        MIN(b.price_per_kg) as min_price,
+        MAX(b.price_per_kg) as max_price
       FROM sheets s
       LEFT JOIN metal_types mt ON s.metal_type_id = mt.id
       LEFT JOIN grades g ON s.grade_id = g.id
@@ -78,6 +80,8 @@ export function getAllSheets() {
         parent_sheet_id: row.parent_sheet_id,
         total_quantity: row.total_quantity || 0,
         batch_count: row.batch_count || 0,
+        min_price: row.min_price || 0,
+        max_price: row.max_price || 0,
         created_at: row.created_at
       });
     }
@@ -133,14 +137,14 @@ export function addSheetWithBatch(sheetData, batchData) {
       sheetId = existingStmt.getAsObject().id;
       isLinked = true;
       existingStmt.free();
-      
+
       const batchStmt = db.prepare(`
-        INSERT INTO batches 
-        (sheet_id, supplier_id, quantity_original, quantity_remaining, 
-         price_per_kg, total_cost, storage_location, received_date, notes) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO batches
+        (sheet_id, supplier_id, quantity_original, quantity_remaining,
+         price_per_kg, total_cost, storage_location, received_date, notes, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
-      
+
       batchStmt.run([
         sheetId,
         batchData.supplier_id || null,
@@ -150,12 +154,13 @@ export function addSheetWithBatch(sheetData, batchData) {
         batchData.total_cost ? safe(batchData.total_cost) : null,
         batchData.storage_location ? batchData.storage_location.trim() : null,
         batchData.received_date,
-        batchData.notes ? batchData.notes.trim() : null
+        batchData.notes ? batchData.notes.trim() : null,
+        getCurrentUser()
       ]);
       batchStmt.free();
-      
+
       const batchId = lastId();
-      
+
       recordInventoryMovement('IN', sheetId, batchId, safe(batchData.quantity, 0), 'purchase', null, 'إضافة دفعة لصفيحة موجودة');
       
       if (batchData.supplier_id && safe(batchData.total_cost, 0) > 0) {
@@ -179,12 +184,12 @@ export function addSheetWithBatch(sheetData, batchData) {
       existingStmt.free();
       
       const sheetStmt = db.prepare(`
-        INSERT INTO sheets 
-        (code, metal_type_id, grade_id, finish_id, length_mm, width_mm, thickness_mm, 
-         weight_per_sheet_kg, is_remnant, parent_sheet_id) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO sheets
+        (code, metal_type_id, grade_id, finish_id, length_mm, width_mm, thickness_mm,
+         weight_per_sheet_kg, is_remnant, parent_sheet_id, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
-      
+
       sheetStmt.run([
         sheetCode,
         sheetData.metal_type_id,
@@ -195,19 +200,20 @@ export function addSheetWithBatch(sheetData, batchData) {
         safe(sheetData.thickness_mm),
         sheetData.weight_per_sheet_kg ? safe(sheetData.weight_per_sheet_kg) : null,
         sheetData.is_remnant ? 1 : 0,
-        sheetData.parent_sheet_id || null
+        sheetData.parent_sheet_id || null,
+        getCurrentUser()
       ]);
       sheetStmt.free();
       
       sheetId = lastId();
       
       const batchStmt = db.prepare(`
-        INSERT INTO batches 
-        (sheet_id, supplier_id, quantity_original, quantity_remaining, 
-         price_per_kg, total_cost, storage_location, received_date, notes) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO batches
+        (sheet_id, supplier_id, quantity_original, quantity_remaining,
+         price_per_kg, total_cost, storage_location, received_date, notes, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
-      
+
       batchStmt.run([
         sheetId,
         batchData.supplier_id || null,
@@ -217,12 +223,13 @@ export function addSheetWithBatch(sheetData, batchData) {
         batchData.total_cost ? safe(batchData.total_cost) : null,
         batchData.storage_location ? batchData.storage_location.trim() : null,
         batchData.received_date,
-        batchData.notes ? batchData.notes.trim() : null
+        batchData.notes ? batchData.notes.trim() : null,
+        getCurrentUser()
       ]);
       batchStmt.free();
-      
+
       const batchId = lastId();
-      
+
       recordInventoryMovement('IN', sheetId, batchId, safe(batchData.quantity, 0), 'purchase', null, 'إضافة صفيحة جديدة مع دفعة');
       
       if (batchData.supplier_id && safe(batchData.total_cost, 0) > 0) {
@@ -360,11 +367,11 @@ export function addBatchToSheet(data) {
     
     const stmt = db.prepare(`
       INSERT INTO batches
-      (sheet_id, supplier_id, quantity_original, quantity_remaining, 
-       price_per_kg, total_cost, storage_location, received_date, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (sheet_id, supplier_id, quantity_original, quantity_remaining,
+       price_per_kg, total_cost, storage_location, received_date, notes, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    
+
     stmt.run([
       data.sheet_id,
       data.supplier_id || null,
@@ -374,7 +381,8 @@ export function addBatchToSheet(data) {
       data.total_cost ? safe(data.total_cost) : null,
       data.storage_location ? data.storage_location.trim() : null,
       data.received_date,
-      data.notes ? data.notes.trim() : null
+      data.notes ? data.notes.trim() : null,
+      getCurrentUser()
     ]);
     stmt.free();
     
@@ -439,12 +447,14 @@ export function updateBatch(batchId, updates) {
       fields.push('notes = ?');
       values.push(updates.notes ? updates.notes.trim() : null);
     }
-    
+
     if (fields.length === 0) {
       tx.rollback();
       return { success: false, error: 'لا توجد تحديثات' };
     }
-    
+
+    fields.push('updated_by = ?');
+    values.push(getCurrentUser());
     values.push(batchId);
     const sql = `UPDATE batches SET ${fields.join(', ')} WHERE id = ?`;
     
