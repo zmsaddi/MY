@@ -24,7 +24,7 @@ import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import RestoreIcon from '@mui/icons-material/Restore';
 import DownloadIcon from '@mui/icons-material/Download';
 import WarningIcon from '@mui/icons-material/Warning';
-import ConfirmDialog from '../../common/dialogs/ConfirmDialog';
+import ConfirmDialog from '../../common/ConfirmDialog';
 import {
   getDatabaseStats,
   clearTransactionalData,

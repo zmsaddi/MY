@@ -55,6 +55,7 @@ import {
 } from '../../utils/database';
 
 import { getCurrentUser } from '../../utils/auth';
+import DatabaseResetSection from '../features/settings/DatabaseResetSection';
 
 /* ---------------- Service Row ---------------- */
 function ServiceRow({ service, onUpdated }) {
@@ -1456,6 +1457,7 @@ export default function SettingsTab() {
               <Tab label={<Typography fontSize="1rem" fontWeight={600}>العملات</Typography>} />
               <Tab label={<Typography fontSize="1rem" fontWeight={600}>طرق الدفع</Typography>} />
               <Tab label={<Typography fontSize="1rem" fontWeight={600}>المستخدمين</Typography>} />
+              <Tab label={<Typography fontSize="1rem" fontWeight={600}>إدارة قاعدة البيانات</Typography>} />
             </Tabs>
 
             {/* Services Tab */}
@@ -1840,6 +1842,13 @@ export default function SettingsTab() {
                     </TableBody>
                   </Table>
                 </TableContainer>
+              </CardContent>
+            )}
+
+            {/* Database Management Tab */}
+            {tabValue === 5 && (
+              <CardContent sx={{ p: 3 }}>
+                <DatabaseResetSection />
               </CardContent>
             )}
           </Card>
