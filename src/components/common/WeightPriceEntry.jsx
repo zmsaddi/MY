@@ -244,21 +244,21 @@ export default function WeightPriceEntry({
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
-                    type="number"
                     label="وزن القطعة الواحدة (كغ) *"
                     value={formData.weight_per_sheet || ''}
-                    onChange={(e) => handleWeightChange('weight_per_sheet', e.target.value)}
-                    onWheel={(e) => e.target.blur()}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Allow empty, digits, and decimal point
+                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                        handleWeightChange('weight_per_sheet', value);
+                      }
+                    }}
                     error={!!errors.weight_per_sheet}
                     helperText={errors.weight_per_sheet}
-                    inputProps={{
-                      step: '0.001',
-                      min: '0',
-                      lang: 'en'
-                    }}
                     InputLabelProps={{ shrink: true }}
                     disabled={disabled}
                     size="small"
+                    placeholder="0.000"
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -279,21 +279,20 @@ export default function WeightPriceEntry({
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
-                    type="number"
                     label="الوزن الإجمالي (كغ) *"
                     value={formData.total_weight || ''}
-                    onChange={(e) => handleWeightChange('total_weight', e.target.value)}
-                    onWheel={(e) => e.target.blur()}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                        handleWeightChange('total_weight', value);
+                      }
+                    }}
                     error={!!errors.total_weight}
                     helperText={errors.total_weight}
-                    inputProps={{
-                      step: '0.001',
-                      min: '0',
-                      lang: 'en'
-                    }}
                     InputLabelProps={{ shrink: true }}
                     disabled={disabled}
                     size="small"
+                    placeholder="0.000"
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -350,72 +349,69 @@ export default function WeightPriceEntry({
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  type="number"
                   label="السعر لكل كيلو"
                   value={formData.price_per_kg || ''}
-                  onChange={(e) => handlePriceChange('price_per_kg', e.target.value)}
-                  onWheel={(e) => e.target.blur()}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                      handlePriceChange('price_per_kg', value);
+                    }
+                  }}
                   error={!!errors.price_per_kg}
                   helperText={errors.price_per_kg}
-                  inputProps={{
-                    step: '0.01',
-                    min: '0',
-                    lang: 'en'
-                  }}
                   InputProps={{
                     endAdornment: <InputAdornment position="end">{currencySymbol}/كغ</InputAdornment>
                   }}
                   InputLabelProps={{ shrink: true }}
                   disabled={disabled}
                   size="small"
+                  placeholder="0.00"
                 />
               </Grid>
             ) : formData.pricing_mode === 'per_piece' ? (
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  type="number"
                   label="السعر لكل قطعة"
                   value={formData.price_per_piece || ''}
-                  onChange={(e) => handlePriceChange('price_per_piece', e.target.value)}
-                  onWheel={(e) => e.target.blur()}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                      handlePriceChange('price_per_piece', value);
+                    }
+                  }}
                   error={!!errors.price_per_piece}
                   helperText={errors.price_per_piece}
-                  inputProps={{
-                    step: '0.01',
-                    min: '0',
-                    lang: 'en'
-                  }}
                   InputProps={{
                     endAdornment: <InputAdornment position="end">{currencySymbol}</InputAdornment>
                   }}
                   InputLabelProps={{ shrink: true }}
                   disabled={disabled}
                   size="small"
+                  placeholder="0.00"
                 />
               </Grid>
             ) : (
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  type="number"
                   label="التكلفة الإجمالية"
                   value={formData.total_cost || ''}
-                  onChange={(e) => handlePriceChange('total_cost', e.target.value)}
-                  onWheel={(e) => e.target.blur()}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                      handlePriceChange('total_cost', value);
+                    }
+                  }}
                   error={!!errors.total_cost}
                   helperText={errors.total_cost}
-                  inputProps={{
-                    step: '0.01',
-                    min: '0',
-                    lang: 'en'
-                  }}
                   InputProps={{
                     endAdornment: <InputAdornment position="end">{currencySymbol}</InputAdornment>
                   }}
                   InputLabelProps={{ shrink: true }}
                   disabled={disabled}
                   size="small"
+                  placeholder="0.00"
                 />
               </Grid>
             )}
