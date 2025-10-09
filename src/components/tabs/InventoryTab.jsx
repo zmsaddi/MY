@@ -320,7 +320,7 @@ export default function InventoryTab() {
       rows = rows.filter(s => {
         if (!s.parent_sheet_id) return false;
         const parentSheet = sheets.find(sh => sh.id === s.parent_sheet_id);
-        return parentSheet && parentSheet.code.toLowerCase().includes(remnantFilterParentSheet.toLowerCase());
+        return parentSheet && parentSheet.code && parentSheet.code.toLowerCase().includes(remnantFilterParentSheet.toLowerCase());
       });
     }
     return rows;
