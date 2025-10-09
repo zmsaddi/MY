@@ -71,27 +71,33 @@ export default function WeightPriceEntry({
     if (mode === 'weight') {
       if (data.weight_input_mode === 'per_sheet' && data.weight_per_sheet) {
         const total = Number(data.weight_per_sheet) * qty;
-        return { ...data, total_weight: total.toFixed(3) };
+        // Don't use toFixed - keep as number to allow free typing
+        return { ...data, total_weight: String(total) };
       } else if (data.weight_input_mode === 'total' && data.total_weight) {
         const perSheet = Number(data.total_weight) / qty;
-        return { ...data, weight_per_sheet: perSheet.toFixed(3) };
+        // Don't use toFixed - keep as number to allow free typing
+        return { ...data, weight_per_sheet: String(perSheet) };
       }
     }
 
     if (mode === 'price') {
       if (data.pricing_mode === 'per_kg' && data.price_per_kg && data.total_weight) {
         const total = Number(data.price_per_kg) * Number(data.total_weight);
-        return { ...data, total_cost: total.toFixed(2) };
+        // Don't use toFixed - keep as number to allow free typing
+        return { ...data, total_cost: String(total) };
       } else if (data.pricing_mode === 'per_piece' && data.price_per_piece) {
         const total = Number(data.price_per_piece) * qty;
-        return { ...data, total_cost: total.toFixed(2) };
+        // Don't use toFixed - keep as number to allow free typing
+        return { ...data, total_cost: String(total) };
       } else if (data.pricing_mode === 'total' && data.total_cost && qty > 0) {
         if (data.total_weight > 0) {
           const pricePerKg = Number(data.total_cost) / Number(data.total_weight);
-          return { ...data, price_per_kg: pricePerKg.toFixed(2) };
+          // Don't use toFixed - keep as number to allow free typing
+          return { ...data, price_per_kg: String(pricePerKg) };
         }
         const pricePerPiece = Number(data.total_cost) / qty;
-        return { ...data, price_per_piece: pricePerPiece.toFixed(2) };
+        // Don't use toFixed - keep as number to allow free typing
+        return { ...data, price_per_piece: String(pricePerPiece) };
       }
     }
 
