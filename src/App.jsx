@@ -20,6 +20,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 
 // Eager load critical components
 import ErrorBoundary from './components/ErrorBoundary';
+import TabErrorBoundary from './components/common/ErrorBoundary';
 import Login from './components/Login';
 import DashboardTab from './components/Dashboard';
 
@@ -168,16 +169,18 @@ function App() {
 
     return (
       <Suspense fallback={LoadingFallback}>
-        {selectedTab === 0 && <DashboardTab />}
-        {selectedTab === 1 && <SalesTab />}
-        {selectedTab === 2 && <CustomersTab />}
-        {selectedTab === 3 && <SuppliersTab />}
-        {selectedTab === 4 && <InventoryTab />}
-        {selectedTab === 5 && <RemnantsTab />}
-        {selectedTab === 6 && <ExpensesTab />}
-        {selectedTab === 7 && <PaymentsTab />}
-        {selectedTab === 8 && <ReportsTab />}
-        {selectedTab === 9 && <SettingsTab />}
+        <TabErrorBoundary>
+          {selectedTab === 0 && <DashboardTab />}
+          {selectedTab === 1 && <SalesTab />}
+          {selectedTab === 2 && <CustomersTab />}
+          {selectedTab === 3 && <SuppliersTab />}
+          {selectedTab === 4 && <InventoryTab />}
+          {selectedTab === 5 && <RemnantsTab />}
+          {selectedTab === 6 && <ExpensesTab />}
+          {selectedTab === 7 && <PaymentsTab />}
+          {selectedTab === 8 && <ReportsTab />}
+          {selectedTab === 9 && <SettingsTab />}
+        </TabErrorBoundary>
       </Suspense>
     );
   };

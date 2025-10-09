@@ -1,5 +1,6 @@
 // src/components/tabs/InventoryTab.jsx
 import { useState, useEffect, useMemo } from 'react';
+import { useDebounce } from '../../utils/useDebounce';
 import {
   Box, Card, CardContent, Grid, TextField, Button, Typography,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -74,6 +75,10 @@ export default function InventoryTab() {
   const [remnantFilterQtyMax, setRemnantFilterQtyMax] = useState('');
   const [remnantFilterParentSheet, setRemnantFilterParentSheet] = useState('');
   const [showRemnantAdvanced, setShowRemnantAdvanced] = useState(false);
+
+  // Debounced search values
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const debouncedRemnantSearchTerm = useDebounce(remnantSearchTerm, 300);
 
   // Dialogs
   const [openAddDialog, setOpenAddDialog] = useState(false);
@@ -222,7 +227,7 @@ export default function InventoryTab() {
 
   const filteredSheets = useMemo(() => {
     let rows = sheets;
-    const term = searchTerm.trim().toLowerCase();
+    const term = debouncedSearchTerm.trim().toLowerCase();
     if (term) {
       rows = rows.filter(s =>
         (s.code || '').toLowerCase().includes(term) ||
@@ -237,11 +242,11 @@ export default function InventoryTab() {
     if (filterQtyMin) rows = rows.filter(s => Number(s.total_quantity) >= Number(filterQtyMin));
     if (filterQtyMax) rows = rows.filter(s => Number(s.total_quantity) <= Number(filterQtyMax));
     return rows;
-  }, [sheets, searchTerm, filterMetalType, filterThkMin, filterThkMax, filterQtyMin, filterQtyMax]);
+  }, [sheets, debouncedSearchTerm, filterMetalType, filterThkMin, filterThkMax, filterQtyMin, filterQtyMax]);
 
   const filteredRemnants = useMemo(() => {
     let rows = remnants;
-    const term = remnantSearchTerm.trim().toLowerCase();
+    const term = debouncedRemnantSearchTerm.trim().toLowerCase();
     if (term) {
       rows = rows.filter(s =>
         (s.code || '').toLowerCase().includes(term) ||
@@ -263,7 +268,7 @@ export default function InventoryTab() {
       });
     }
     return rows;
-  }, [remnants, sheets, remnantSearchTerm, remnantFilterMetalType, remnantFilterThkMin, remnantFilterThkMax, remnantFilterQtyMin, remnantFilterQtyMax, remnantFilterParentSheet]);
+  }, [remnants, sheets, debouncedRemnantSearchTerm, remnantFilterMetalType, remnantFilterThkMin, remnantFilterThkMax, remnantFilterQtyMin, remnantFilterQtyMax, remnantFilterParentSheet]);
 
   // ──────────────────────────────────────────────────────────────
   // Helpers for pricing/weights
