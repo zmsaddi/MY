@@ -1,6 +1,7 @@
 // src/utils/database/core.js
 import initSqlJs from 'sql.js';
 import { validators, parseDbError } from '../validators.js';
+import { encryptData, decryptData, getSecurityStatus } from '../security/encryption.js';
 
 export let db = null;
 
@@ -142,8 +143,17 @@ export function saveDatabase() {
       console.warn(`⚠️ Database size: ${sizeInMB.toFixed(2)} MB - approaching limit!`);
     }
 
-    localStorage.setItem('metalsheets_database', serialized);
-    return { success: true, size: sizeInMB };
+    // Encrypt the database before storing
+    const encrypted = await encryptData(serialized);
+    localStorage.setItem('metalsheets_database', encrypted);
+
+    // Log encryption status (only in development)
+    if (process.env.NODE_ENV === 'development') {
+      const securityStatus = getSecurityStatus();
+      console.log('🔒 Database saved with encryption:', securityStatus.algorithm);
+    }
+
+    return { success: true, size: sizeInMB, encrypted: true };
 
   } catch (e) {
     if (e.name === 'QuotaExceededError') {

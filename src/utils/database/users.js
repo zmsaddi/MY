@@ -1,15 +1,22 @@
 // src/utils/database/users.js
 import { db, tx, saveDatabase, lastId } from './core.js';
 import bcrypt from 'bcryptjs';
+import {
+  validatePassword,
+  generateSecurePassword,
+  passwordNeedsChange,
+  isUsingDefaultPassword,
+  PASSWORD_REQUIREMENTS
+} from '../validation/passwordPolicy.js';
 
 /* ============================================
    PASSWORD HASHING
    ============================================ */
 
-const SALT_ROUNDS = 10;
+const SALT_ROUNDS = 12; // Increased from 10 for better security
 
 export function hashPassword(password) {
-  // Use bcrypt with salt rounds = 10 for secure password hashing
+  // Use bcrypt with salt rounds = 12 for secure password hashing
   return bcrypt.hashSync(password, SALT_ROUNDS);
 }
 
@@ -101,6 +108,34 @@ export function authenticateUser(username, password) {
     return { success: false, error: 'كلمة المرور غير صحيحة' };
   }
 
+  // Check if password needs to be changed
+  let requirePasswordChange = false;
+  let passwordWarnings = [];
+
+  // Check password strength
+  const passwordValidation = validatePassword(password, {
+    userInfo: { username: user.username }
+  });
+
+  if (!passwordValidation.valid || passwordValidation.strength.score < 60) {
+    requirePasswordChange = true;
+    passwordWarnings.push('كلمة المرور الحالية ضعيفة ويجب تغييرها');
+  }
+
+  // Check if using default password
+  if (user.is_default_password) {
+    requirePasswordChange = true;
+    passwordWarnings.push('يجب تغيير كلمة المرور الافتراضية');
+  }
+
+  // Check password age (if last_password_change column exists)
+  if (user.last_password_change) {
+    if (passwordNeedsChange(user.last_password_change)) {
+      requirePasswordChange = true;
+      passwordWarnings.push('انتهت صلاحية كلمة المرور ويجب تغييرها');
+    }
+  }
+
   // Return user without password hash
   return {
     success: true,
@@ -108,7 +143,9 @@ export function authenticateUser(username, password) {
       id: user.id,
       username: user.username,
       display_name: user.display_name
-    }
+    },
+    requirePasswordChange,
+    passwordWarnings
   };
 }
 
@@ -120,8 +157,20 @@ export function addUser(data, currentUser) {
     throw new Error('اسم المستخدم يجب أن يكون 3 أحرف على الأقل');
   }
 
-  if (!password || password.length < 4) {
-    throw new Error('كلمة المرور يجب أن تكون 4 أحرف على الأقل');
+  // Validate password against policy
+  const passwordValidation = validatePassword(password, {
+    userInfo: {
+      username: username.trim(),
+      fullName: display_name
+    }
+  });
+
+  if (!passwordValidation.valid) {
+    throw new Error(`كلمة المرور غير صالحة:\n${passwordValidation.errors.join('\n')}`);
+  }
+
+  if (passwordValidation.strength.score < 60) {
+    throw new Error('كلمة المرور ضعيفة جداً. يرجى اختيار كلمة مرور أقوى');
   }
 
   // Check if username exists
@@ -184,8 +233,26 @@ export function updateUser(userId, data, currentUser) {
 }
 
 export function changeUserPassword(userId, newPassword, currentUser) {
-  if (!newPassword || newPassword.length < 4) {
-    throw new Error('كلمة المرور يجب أن تكون 4 أحرف على الأقل');
+  // Get user info for validation
+  const user = getUserById(userId);
+  if (!user) {
+    throw new Error('المستخدم غير موجود');
+  }
+
+  // Validate password against policy
+  const passwordValidation = validatePassword(newPassword, {
+    userInfo: {
+      username: user.username,
+      fullName: user.display_name
+    }
+  });
+
+  if (!passwordValidation.valid) {
+    throw new Error(`كلمة المرور غير صالحة:\n${passwordValidation.errors.join('\n')}`);
+  }
+
+  if (passwordValidation.strength.score < 60) {
+    throw new Error('كلمة المرور ضعيفة جداً. يرجى اختيار كلمة مرور أقوى');
   }
 
   tx.begin();

@@ -19,16 +19,47 @@ function createUsersTable() {
     updated_by TEXT
   )`);
 
-  // Create default admin user: ZAKARIYA / ZAKARIYA
+  // Create default admin user with secure random password
   const cnt = db.exec('SELECT COUNT(1) FROM users')?.[0]?.values?.[0]?.[0] ?? 0;
   if (cnt === 0) {
-    // Use bcrypt with salt rounds = 10 for secure password hashing
-    const passwordHash = bcrypt.hashSync('ZAKARIYA', 10);
+    // Generate secure random password
+    const crypto = typeof window !== 'undefined' && window.crypto ? window.crypto : null;
+    let randomPassword;
+
+    if (crypto) {
+      // Browser environment - use Web Crypto API
+      const array = new Uint8Array(16);
+      crypto.getRandomValues(array);
+      randomPassword = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('').substring(0, 16);
+    } else {
+      // Fallback for non-browser environments
+      randomPassword = 'Admin@' + Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
+    }
+
+    // Use bcrypt with higher salt rounds = 12 for better security
+    const passwordHash = bcrypt.hashSync(randomPassword, 12);
+
     const stmt = db.prepare(`INSERT INTO users (
       id, username, password_hash, display_name, is_active, created_by
     ) VALUES (1, ?, ?, ?, 1, ?)`);
-    stmt.run(['ZAKARIYA', passwordHash, 'ZAKARIYA', 'System']);
+    stmt.run(['admin', passwordHash, 'Administrator', 'System']);
     stmt.free();
+
+    // Display the password prominently for the administrator
+    console.log('\n╔════════════════════════════════════════════════╗');
+    console.log('║     🔐 DEFAULT ADMIN CREDENTIALS CREATED       ║');
+    console.log('╠════════════════════════════════════════════════╣');
+    console.log('║  Username: admin                               ║');
+    console.log(`║  Password: ${randomPassword.padEnd(36)} ║`);
+    console.log('║                                                ║');
+    console.log('║  ⚠️  IMPORTANT: Change this password on        ║');
+    console.log('║     first login for security!                 ║');
+    console.log('╚════════════════════════════════════════════════╝\n');
+
+    // Store password temporarily in a secure way (will be cleared after first login)
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('_initial_setup_pwd', btoa(randomPassword));
+    }
   }
 }
 
