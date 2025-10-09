@@ -12,6 +12,8 @@ export {
   lastId,
   hasColumn,
   saveDatabase,
+  getAutoBackupInfo,
+  deleteAutoBackup,
   currencyHelpers,
   generateSheetCode,
   generateInvoiceNumber,
@@ -191,3 +193,16 @@ export {
   hashPassword,
   verifyPassword
 } from './users.js';
+
+/* ============================================
+   DATABASE RESET & BACKUP
+   ============================================ */
+export {
+  clearTransactionalData,
+  clearMasterData,
+  resetDatabaseToInitialState,
+  completelyWipeDatabase,
+  getDatabaseStats,
+  exportDatabaseToJSON,
+  deleteStoredDatabase
+} from './reset.js';

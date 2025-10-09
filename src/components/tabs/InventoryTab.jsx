@@ -6,7 +6,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, IconButton,
   Alert, Chip, Paper, InputAdornment, Divider, Tooltip,
   Accordion, AccordionSummary, AccordionDetails, Collapse, FormControlLabel, Switch,
-  Radio, RadioGroup, FormLabel
+  Radio, RadioGroup, FormLabel, Tabs, Tab
 } from '@mui/material';
 
 import AddIcon from '@mui/icons-material/Add';
@@ -45,6 +45,7 @@ const fmt = (n) => Number(n ?? 0).toLocaleString(undefined, { maximumFractionDig
 export default function InventoryTab() {
   // Data
   const [sheets, setSheets] = useState([]);
+  const [remnants, setRemnants] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [metalTypes, setMetalTypes] = useState([]);
   const [grades, setGrades] = useState([]);
@@ -52,7 +53,10 @@ export default function InventoryTab() {
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [baseCurrencyInfo, setBaseCurrencyInfo] = useState({ code: 'USD', symbol: '$' });
 
-  // Filters
+  // Tab State
+  const [currentTab, setCurrentTab] = useState(0);
+
+  // Filters for Full Sheets
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMetalType, setFilterMetalType] = useState('');
   const [filterThkMin, setFilterThkMin] = useState('');
@@ -60,6 +64,16 @@ export default function InventoryTab() {
   const [filterQtyMin, setFilterQtyMin] = useState('');
   const [filterQtyMax, setFilterQtyMax] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Filters for Remnants
+  const [remnantSearchTerm, setRemnantSearchTerm] = useState('');
+  const [remnantFilterMetalType, setRemnantFilterMetalType] = useState('');
+  const [remnantFilterThkMin, setRemnantFilterThkMin] = useState('');
+  const [remnantFilterThkMax, setRemnantFilterThkMax] = useState('');
+  const [remnantFilterQtyMin, setRemnantFilterQtyMin] = useState('');
+  const [remnantFilterQtyMax, setRemnantFilterQtyMax] = useState('');
+  const [remnantFilterParentSheet, setRemnantFilterParentSheet] = useState('');
+  const [showRemnantAdvanced, setShowRemnantAdvanced] = useState(false);
 
   // Dialogs
   const [openAddDialog, setOpenAddDialog] = useState(false);
@@ -141,16 +155,19 @@ export default function InventoryTab() {
 
   const refreshAll = () => {
     try { pruneEmptyBatches(); } catch {}
-    const all = getAllSheets().filter(s => !s.is_remnant);
-    setSheets(all);
+    const all = getAllSheets();
+    const fullSheets = all.filter(s => !s.is_remnant);
+    const remnantSheets = all.filter(s => s.is_remnant);
+    setSheets(fullSheets);
+    setRemnants(remnantSheets);
     setSuppliers(getSuppliers());
-    
+
     const types = getMetalTypes(false);
     setMetalTypes(types);
-    
+
     const currInfo = getBaseCurrencyInfo();
     setBaseCurrencyInfo(currInfo);
-    
+
     setPaymentMethods(getPaymentMethodsForUI(true));
   };
 
@@ -193,6 +210,16 @@ export default function InventoryTab() {
     setFilterQtyMax('');
   };
 
+  const resetRemnantFilters = () => {
+    setRemnantSearchTerm('');
+    setRemnantFilterMetalType('');
+    setRemnantFilterThkMin('');
+    setRemnantFilterThkMax('');
+    setRemnantFilterQtyMin('');
+    setRemnantFilterQtyMax('');
+    setRemnantFilterParentSheet('');
+  };
+
   const filteredSheets = useMemo(() => {
     let rows = sheets;
     const term = searchTerm.trim().toLowerCase();
@@ -211,6 +238,32 @@ export default function InventoryTab() {
     if (filterQtyMax) rows = rows.filter(s => Number(s.total_quantity) <= Number(filterQtyMax));
     return rows;
   }, [sheets, searchTerm, filterMetalType, filterThkMin, filterThkMax, filterQtyMin, filterQtyMax]);
+
+  const filteredRemnants = useMemo(() => {
+    let rows = remnants;
+    const term = remnantSearchTerm.trim().toLowerCase();
+    if (term) {
+      rows = rows.filter(s =>
+        (s.code || '').toLowerCase().includes(term) ||
+        (s.metal_name || '').toLowerCase().includes(term)
+      );
+    }
+    if (remnantFilterMetalType) {
+      rows = rows.filter(s => Number(s.metal_type_id) === Number(remnantFilterMetalType));
+    }
+    if (remnantFilterThkMin) rows = rows.filter(s => Number(s.thickness_mm) >= Number(remnantFilterThkMin));
+    if (remnantFilterThkMax) rows = rows.filter(s => Number(s.thickness_mm) <= Number(remnantFilterThkMax));
+    if (remnantFilterQtyMin) rows = rows.filter(s => Number(s.total_quantity) >= Number(remnantFilterQtyMin));
+    if (remnantFilterQtyMax) rows = rows.filter(s => Number(s.total_quantity) <= Number(remnantFilterQtyMax));
+    if (remnantFilterParentSheet) {
+      rows = rows.filter(s => {
+        if (!s.parent_sheet_id) return false;
+        const parentSheet = sheets.find(sh => sh.id === s.parent_sheet_id);
+        return parentSheet && parentSheet.code.toLowerCase().includes(remnantFilterParentSheet.toLowerCase());
+      });
+    }
+    return rows;
+  }, [remnants, sheets, remnantSearchTerm, remnantFilterMetalType, remnantFilterThkMin, remnantFilterThkMax, remnantFilterQtyMin, remnantFilterQtyMax, remnantFilterParentSheet]);
 
   // ──────────────────────────────────────────────────────────────
   // Helpers for pricing/weights
@@ -531,6 +584,13 @@ export default function InventoryTab() {
     setSelectedBatch(null);
   };
 
+  // Get parent sheet code
+  const getParentSheetCode = (parentSheetId) => {
+    if (!parentSheetId) return null;
+    const parentSheet = sheets.find(s => s.id === parentSheetId);
+    return parentSheet ? parentSheet.code : null;
+  };
+
   // ──────────────────────────────────────────────────────────────
   return (
     <Box>
@@ -546,187 +606,419 @@ export default function InventoryTab() {
       {success && <Alert severity="success" sx={{ mb: 3, fontSize: '1rem' }}>{success}</Alert>}
       {error && <Alert severity="error" sx={{ mb: 3, fontSize: '1rem' }} onClose={() => setError('')}>{error}</Alert>}
 
+      {/* Tabs */}
       <Card sx={{ borderRadius: 3, mb: 3 }}>
-        <CardContent>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                placeholder="بحث بالكود أو نوع المعدن..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon />
-                    </InputAdornment>
-                  )
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <TextField
-                select
-                fullWidth
-                label="نوع المعدن"
-                value={filterMetalType}
-                onChange={(e) => setFilterMetalType(e.target.value)}
-                SelectProps={{ native: true }}
-              >
-                <option value="">الكل</option>
-                {metalTypes.filter(m => m.is_active).map(metal => (
-                  <option key={metal.id} value={metal.id}>{metal.name_ar}</option>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={5} sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-              <Button
-                startIcon={<FilterAltIcon />}
-                onClick={() => setShowAdvanced(v => !v)}
-                size="large"
-              >
-                فلاتر متقدمة
-              </Button>
-              <Button
-                startIcon={<RestartAltIcon />}
-                onClick={resetFilters}
-                size="large"
-              >
-                إعادة ضبط
-              </Button>
-              <Button
-                variant="contained"
-                size="large"
-                startIcon={<AddIcon />}
-                onClick={handleOpenAddDialog}
-                sx={{ fontWeight: 700 }}
-              >
-                إضافة صفيحة جديدة
-              </Button>
-            </Grid>
-          </Grid>
-
-          <Collapse in={showAdvanced} timeout="auto" unmountOnExit>
-            <Divider sx={{ my: 2 }} />
-            <Grid container spacing={2}>
-              <Grid item xs={6} md={3}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="أدنى سماكة (مم)"
-                  value={filterThkMin}
-                  onChange={(e) => setFilterThkMin(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
-              <Grid item xs={6} md={3}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="أقصى سماكة (مم)"
-                  value={filterThkMax}
-                  onChange={(e) => setFilterThkMax(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
-              <Grid item xs={6} md={3}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="أدنى كمية"
-                  value={filterQtyMin}
-                  onChange={(e) => setFilterQtyMin(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
-              <Grid item xs={6} md={3}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="أقصى كمية"
-                  value={filterQtyMax}
-                  onChange={(e) => setFilterQtyMax(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
-            </Grid>
-          </Collapse>
-        </CardContent>
+        <Tabs
+          value={currentTab}
+          onChange={(e, newValue) => setCurrentTab(newValue)}
+          sx={{
+            borderBottom: 1,
+            borderColor: 'divider',
+            '& .MuiTab-root': {
+              fontSize: '1.0625rem',
+              fontWeight: 600,
+              minHeight: 60
+            }
+          }}
+        >
+          <Tab
+            label={`الصفائح الكاملة (${sheets.length})`}
+            icon={<InventoryIcon />}
+            iconPosition="start"
+          />
+          <Tab
+            label={`البواقي (${remnants.length})`}
+            icon={<AddBoxIcon />}
+            iconPosition="start"
+          />
+        </Tabs>
       </Card>
 
-      <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
-        <Table>
-          <TableHead sx={{ bgcolor: 'grey.100' }}>
-            <TableRow>
-              <TableCell><Typography fontWeight={700} fontSize="1rem">الكود</Typography></TableCell>
-              <TableCell><Typography fontWeight={700} fontSize="1rem">النوع</Typography></TableCell>
-              <TableCell><Typography fontWeight={700} fontSize="1rem">الأبعاد (مم)</Typography></TableCell>
-              <TableCell><Typography fontWeight={700} fontSize="1rem">السماكة</Typography></TableCell>
-              <TableCell><Typography fontWeight={700} fontSize="1rem">الوزن/ورقة</Typography></TableCell>
-              <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الكمية</Typography></TableCell>
-              <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">السعر/كغ</Typography></TableCell>
-              <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الإجراءات</Typography></TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredSheets.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} align="center">
-                  <Typography color="text.secondary" py={3} fontSize="1rem">لا توجد صفائح</Typography>
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredSheets.map((sheet) => (
-                <TableRow key={sheet.id} hover>
-                  <TableCell>
-                    <Typography fontWeight={600} fontSize="0.9375rem">{sheet.code}</Typography>
-                  </TableCell>
-                  <TableCell><Typography fontSize="0.9375rem">{sheet.metal_name}</Typography></TableCell>
-                  <TableCell><Typography fontSize="0.9375rem">{sheet.length_mm} × {sheet.width_mm}</Typography></TableCell>
-                  <TableCell><Typography fontSize="0.9375rem">{sheet.thickness_mm} مم</Typography></TableCell>
-                  <TableCell>
-                    <Typography fontSize="0.9375rem">
-                      {sheet.weight_per_sheet_kg ? `${fmt(sheet.weight_per_sheet_kg)} كغ` : '---'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="center">
-                    <Chip
-                      label={sheet.total_quantity}
-                      color={getStockColor(sheet.total_quantity)}
-                      size="small"
-                      sx={{ fontWeight: 700, fontSize: '0.875rem' }}
-                    />
-                  </TableCell>
-                  <TableCell align="center">
-                    {sheet.min_price ? (
-                      sheet.min_price === sheet.max_price ? (
-                        <Typography variant="body2" fontWeight={600} fontSize="0.9375rem">
-                          {fmt(sheet.min_price)} {baseCurrencyInfo.symbol}
-                        </Typography>
-                      ) : (
-                        <Typography variant="body2" fontWeight={600} fontSize="0.9375rem">
-                          {fmt(sheet.min_price)} - {fmt(sheet.max_price)} {baseCurrencyInfo.symbol}
-                        </Typography>
+      {/* Tab Content - Full Sheets */}
+      {currentTab === 0 && (
+        <>
+          <Card sx={{ borderRadius: 3, mb: 3 }}>
+            <CardContent>
+              <Grid container spacing={2} alignItems="center">
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    placeholder="بحث بالكود أو نوع المعدن..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon />
+                        </InputAdornment>
                       )
-                    ) : <Typography fontSize="0.9375rem">---</Typography>}
-                  </TableCell>
-                  <TableCell align="center">
-                    <Tooltip title="عرض الدفعات / إضافة دفعة">
-                      <IconButton
-                        size="small"
-                        color="primary"
-                        onClick={() => handleShowBatches(sheet)}
-                      >
-                        <InfoIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </TableCell>
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    select
+                    fullWidth
+                    label="نوع المعدن"
+                    value={filterMetalType}
+                    onChange={(e) => setFilterMetalType(e.target.value)}
+                    SelectProps={{ native: true }}
+                  >
+                    <option value="">الكل</option>
+                    {metalTypes.filter(m => m.is_active).map(metal => (
+                      <option key={metal.id} value={metal.id}>{metal.name_ar}</option>
+                    ))}
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} md={5} sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                  <Button
+                    startIcon={<FilterAltIcon />}
+                    onClick={() => setShowAdvanced(v => !v)}
+                    size="large"
+                  >
+                    فلاتر متقدمة
+                  </Button>
+                  <Button
+                    startIcon={<RestartAltIcon />}
+                    onClick={resetFilters}
+                    size="large"
+                  >
+                    إعادة ضبط
+                  </Button>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    startIcon={<AddIcon />}
+                    onClick={handleOpenAddDialog}
+                    sx={{ fontWeight: 700 }}
+                  >
+                    إضافة صفيحة جديدة
+                  </Button>
+                </Grid>
+              </Grid>
+
+              <Collapse in={showAdvanced} timeout="auto" unmountOnExit>
+                <Divider sx={{ my: 2 }} />
+                <Grid container spacing={2}>
+                  <Grid item xs={6} md={3}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="أدنى سماكة (مم)"
+                      value={filterThkMin}
+                      onChange={(e) => setFilterThkMin(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="أقصى سماكة (مم)"
+                      value={filterThkMax}
+                      onChange={(e) => setFilterThkMax(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="أدنى كمية"
+                      value={filterQtyMin}
+                      onChange={(e) => setFilterQtyMin(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="أقصى كمية"
+                      value={filterQtyMax}
+                      onChange={(e) => setFilterQtyMax(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                </Grid>
+              </Collapse>
+            </CardContent>
+          </Card>
+
+          <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
+            <Table>
+              <TableHead sx={{ bgcolor: 'grey.100' }}>
+                <TableRow>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">الكود</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">النوع</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">الأبعاد (مم)</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">السماكة</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">الوزن/ورقة</Typography></TableCell>
+                  <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الكمية</Typography></TableCell>
+                  <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">السعر/كغ</Typography></TableCell>
+                  <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الإجراءات</Typography></TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+              </TableHead>
+              <TableBody>
+                {filteredSheets.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} align="center">
+                      <Typography color="text.secondary" py={3} fontSize="1rem">لا توجد صفائح كاملة</Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredSheets.map((sheet) => (
+                    <TableRow key={sheet.id} hover>
+                      <TableCell>
+                        <Typography fontWeight={600} fontSize="0.9375rem">{sheet.code}</Typography>
+                      </TableCell>
+                      <TableCell><Typography fontSize="0.9375rem">{sheet.metal_name}</Typography></TableCell>
+                      <TableCell><Typography fontSize="0.9375rem">{sheet.length_mm} × {sheet.width_mm}</Typography></TableCell>
+                      <TableCell><Typography fontSize="0.9375rem">{sheet.thickness_mm} مم</Typography></TableCell>
+                      <TableCell>
+                        <Typography fontSize="0.9375rem">
+                          {sheet.weight_per_sheet_kg ? `${fmt(sheet.weight_per_sheet_kg)} كغ` : '---'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={sheet.total_quantity}
+                          color={getStockColor(sheet.total_quantity)}
+                          size="small"
+                          sx={{ fontWeight: 700, fontSize: '0.875rem' }}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        {sheet.min_price ? (
+                          sheet.min_price === sheet.max_price ? (
+                            <Typography variant="body2" fontWeight={600} fontSize="0.9375rem">
+                              {fmt(sheet.min_price)} {baseCurrencyInfo.symbol}
+                            </Typography>
+                          ) : (
+                            <Typography variant="body2" fontWeight={600} fontSize="0.9375rem">
+                              {fmt(sheet.min_price)} - {fmt(sheet.max_price)} {baseCurrencyInfo.symbol}
+                            </Typography>
+                          )
+                        ) : <Typography fontSize="0.9375rem">---</Typography>}
+                      </TableCell>
+                      <TableCell align="center">
+                        <Tooltip title="عرض الدفعات / إضافة دفعة">
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => handleShowBatches(sheet)}
+                          >
+                            <InfoIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </>
+      )}
+
+      {/* Tab Content - Remnants */}
+      {currentTab === 1 && (
+        <>
+          <Card sx={{ borderRadius: 3, mb: 3 }}>
+            <CardContent>
+              <Grid container spacing={2} alignItems="center">
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    placeholder="بحث بالكود أو نوع المعدن..."
+                    value={remnantSearchTerm}
+                    onChange={(e) => setRemnantSearchTerm(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon />
+                        </InputAdornment>
+                      )
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    select
+                    fullWidth
+                    label="نوع المعدن"
+                    value={remnantFilterMetalType}
+                    onChange={(e) => setRemnantFilterMetalType(e.target.value)}
+                    SelectProps={{ native: true }}
+                  >
+                    <option value="">الكل</option>
+                    {metalTypes.filter(m => m.is_active).map(metal => (
+                      <option key={metal.id} value={metal.id}>{metal.name_ar}</option>
+                    ))}
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} md={5} sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                  <Button
+                    startIcon={<FilterAltIcon />}
+                    onClick={() => setShowRemnantAdvanced(v => !v)}
+                    size="large"
+                  >
+                    فلاتر متقدمة
+                  </Button>
+                  <Button
+                    startIcon={<RestartAltIcon />}
+                    onClick={resetRemnantFilters}
+                    size="large"
+                  >
+                    إعادة ضبط
+                  </Button>
+                </Grid>
+              </Grid>
+
+              <Collapse in={showRemnantAdvanced} timeout="auto" unmountOnExit>
+                <Divider sx={{ my: 2 }} />
+                <Grid container spacing={2}>
+                  <Grid item xs={6} md={3}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="أدنى سماكة (مم)"
+                      value={remnantFilterThkMin}
+                      onChange={(e) => setRemnantFilterThkMin(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="أقصى سماكة (مم)"
+                      value={remnantFilterThkMax}
+                      onChange={(e) => setRemnantFilterThkMax(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="أدنى كمية"
+                      value={remnantFilterQtyMin}
+                      onChange={(e) => setRemnantFilterQtyMin(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={3}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="أقصى كمية"
+                      value={remnantFilterQtyMax}
+                      onChange={(e) => setRemnantFilterQtyMax(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="الصفيحة الأم"
+                      placeholder="ابحث بكود الصفيحة الأم..."
+                      value={remnantFilterParentSheet}
+                      onChange={(e) => setRemnantFilterParentSheet(e.target.value)}
+                    />
+                  </Grid>
+                </Grid>
+              </Collapse>
+            </CardContent>
+          </Card>
+
+          <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
+            <Table>
+              <TableHead sx={{ bgcolor: 'grey.100' }}>
+                <TableRow>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">الكود</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">النوع</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">الأبعاد (مم)</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">السماكة</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">الصفيحة الأم</Typography></TableCell>
+                  <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الكمية</Typography></TableCell>
+                  <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">السعر/كغ</Typography></TableCell>
+                  <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الإجراءات</Typography></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredRemnants.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} align="center">
+                      <Typography color="text.secondary" py={3} fontSize="1rem">لا توجد بواقي</Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredRemnants.map((sheet) => {
+                    const parentCode = getParentSheetCode(sheet.parent_sheet_id);
+                    return (
+                      <TableRow key={sheet.id} hover>
+                        <TableCell>
+                          <Typography fontWeight={600} fontSize="0.9375rem">{sheet.code}</Typography>
+                        </TableCell>
+                        <TableCell><Typography fontSize="0.9375rem">{sheet.metal_name}</Typography></TableCell>
+                        <TableCell><Typography fontSize="0.9375rem">{sheet.length_mm} × {sheet.width_mm}</Typography></TableCell>
+                        <TableCell><Typography fontSize="0.9375rem">{sheet.thickness_mm} مم</Typography></TableCell>
+                        <TableCell>
+                          {parentCode ? (
+                            <Tooltip title="الصفيحة الأم" arrow>
+                              <Chip
+                                label={parentCode}
+                                size="small"
+                                color="info"
+                                sx={{ fontWeight: 600, fontSize: '0.875rem' }}
+                              />
+                            </Tooltip>
+                          ) : (
+                            <Typography fontSize="0.9375rem" color="text.secondary">---</Typography>
+                          )}
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={sheet.total_quantity}
+                            color={getStockColor(sheet.total_quantity)}
+                            size="small"
+                            sx={{ fontWeight: 700, fontSize: '0.875rem' }}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          {sheet.min_price ? (
+                            sheet.min_price === sheet.max_price ? (
+                              <Typography variant="body2" fontWeight={600} fontSize="0.9375rem">
+                                {fmt(sheet.min_price)} {baseCurrencyInfo.symbol}
+                              </Typography>
+                            ) : (
+                              <Typography variant="body2" fontWeight={600} fontSize="0.9375rem">
+                                {fmt(sheet.min_price)} - {fmt(sheet.max_price)} {baseCurrencyInfo.symbol}
+                              </Typography>
+                            )
+                          ) : <Typography fontSize="0.9375rem">---</Typography>}
+                        </TableCell>
+                        <TableCell align="center">
+                          <Tooltip title="عرض الدفعات / إضافة دفعة">
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              onClick={() => handleShowBatches(sheet)}
+                            >
+                              <InfoIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </>
+      )}
 
       {/* Dialog: Add Sheet + Initial Batch */}
       <Dialog open={openAddDialog} onClose={handleCloseAddDialog} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>

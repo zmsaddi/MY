@@ -20,6 +20,7 @@
     "@mui/icons-material": "^5.14.19",
     "@mui/material": "^5.14.20",
     "@mui/styles": "^6.5.0",
+    "bcryptjs": "^3.0.2",
     "jss-rtl": "^0.3.0",
     "pdfmake": "^0.2.10",
     "prop-types": "^15.8.1",

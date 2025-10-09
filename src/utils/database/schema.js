@@ -1,6 +1,6 @@
 // src/utils/database/schema.js
 import { db, hasColumn, saveDatabase } from './core.js';
-import CryptoJS from 'crypto-js';
+import bcrypt from 'bcryptjs';
 
 /* ============================================
    TABLE CREATION FUNCTIONS
@@ -22,7 +22,8 @@ function createUsersTable() {
   // Create default admin user: ZAKARIYA / ZAKARIYA
   const cnt = db.exec('SELECT COUNT(1) FROM users')?.[0]?.values?.[0]?.[0] ?? 0;
   if (cnt === 0) {
-    const passwordHash = CryptoJS.SHA256('ZAKARIYA').toString();
+    // Use bcrypt with salt rounds = 10 for secure password hashing
+    const passwordHash = bcrypt.hashSync('ZAKARIYA', 10);
     const stmt = db.prepare(`INSERT INTO users (
       id, username, password_hash, display_name, is_active, created_by
     ) VALUES (1, ?, ?, ?, 1, ?)`);

@@ -1,17 +1,21 @@
 // src/utils/database/users.js
 import { db, tx, saveDatabase, lastId } from './core.js';
-import CryptoJS from 'crypto-js';
+import bcrypt from 'bcryptjs';
 
 /* ============================================
    PASSWORD HASHING
    ============================================ */
 
+const SALT_ROUNDS = 10;
+
 export function hashPassword(password) {
-  return CryptoJS.SHA256(password).toString();
+  // Use bcrypt with salt rounds = 10 for secure password hashing
+  return bcrypt.hashSync(password, SALT_ROUNDS);
 }
 
 export function verifyPassword(password, hash) {
-  return hashPassword(password) === hash;
+  // bcrypt handles salt internally, so we can compare directly
+  return bcrypt.compareSync(password, hash);
 }
 
 /* ============================================

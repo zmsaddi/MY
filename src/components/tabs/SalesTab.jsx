@@ -21,7 +21,7 @@ import InventoryIcon from '@mui/icons-material/Inventory2';
 import {
   getAllSales, getSaleById, processSale, generateInvoiceNumber, deleteSale,
   getCustomers, getAllSheets, getServiceTypes, getPaymentMethodsForUI,
-  getCompanyProfile, getBaseCurrencyInfo, getCurrencies
+  getCompanyProfile, getBaseCurrencyInfo, getCurrencies, addSheetWithBatch
 } from '../../utils/database';
 
 const fmt = (n) => Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -1240,10 +1240,81 @@ export default function SalesTab() {
             تخطي
           </Button>
           <Button
-            onClick={() => {
-              // TODO: Save remnants logic
-              setShowRemnantDialog(false);
-              setSuccess('تم حفظ البواقي بنجاح');
+            onClick={async () => {
+              try {
+                // Validate remnant pieces
+                const validPieces = remnantPieces.filter(p =>
+                  p.length && p.width && p.thickness && p.quantity
+                );
+
+                if (validPieces.length === 0) {
+                  setError('يجب إدخال بيانات صحيحة للبواقي');
+                  return;
+                }
+
+                // Get parent sheet info
+                const parentSheet = sheets.find(s => s.id === currentSaleData?.sheetId);
+                if (!parentSheet) {
+                  setError('لم يتم العثور على الصفيحة الأم');
+                  return;
+                }
+
+                // Save each remnant piece
+                let savedCount = 0;
+                let errorCount = 0;
+
+                for (const piece of validPieces) {
+                  const sheetData = {
+                    metal_type_id: parentSheet.metal_type_id,
+                    grade_id: parentSheet.grade_id,
+                    finish_id: parentSheet.finish_id,
+                    length_mm: parseFloat(piece.length),
+                    width_mm: parseFloat(piece.width),
+                    thickness_mm: parseFloat(piece.thickness),
+                    weight_per_sheet_kg: parentSheet.weight_per_sheet_kg,
+                    is_remnant: true,
+                    parent_sheet_id: currentSaleData.sheetId,
+                    autoGenerateCode: true
+                  };
+
+                  const batchData = {
+                    quantity: parseInt(piece.quantity, 10),
+                    supplier_id: null,
+                    price_per_kg: parentSheet.min_price || 0,
+                    total_cost: 0,
+                    storage_location: 'بواقي',
+                    received_date: new Date().toISOString().split('T')[0],
+                    notes: `بقية من ${currentSaleData.sheetCode} - القطعة المباعة: ${currentSaleData.soldDimensions}`
+                  };
+
+                  const result = addSheetWithBatch(sheetData, batchData);
+
+                  if (result.success) {
+                    savedCount++;
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log('✓ Remnant saved:', result.code);
+                    }
+                  } else {
+                    errorCount++;
+                    console.error('Failed to save remnant:', result.error);
+                  }
+                }
+
+                setShowRemnantDialog(false);
+
+                if (savedCount > 0) {
+                  setSuccess(`تم حفظ ${savedCount} قطعة بواقي بنجاح`);
+                  loadData(); // Reload data to show new remnants
+                  setTimeout(() => setSuccess(''), 3000);
+                }
+
+                if (errorCount > 0) {
+                  setError(`فشل حفظ ${errorCount} قطعة`);
+                }
+              } catch (err) {
+                setError('خطأ في حفظ البواقي: ' + err.message);
+                console.error('Save remnants error:', err);
+              }
             }}
             variant="contained"
             size="large"

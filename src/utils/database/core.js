@@ -63,30 +63,133 @@ export function hasColumn(table, col) {
    DATABASE PERSISTENCE
    ============================================ */
 
+// Auto backup when database exceeds this size (in MB)
+const AUTO_BACKUP_SIZE_MB = 4.0;
+
 export function saveDatabase() {
   if (!db) return { success: false, error: 'No database' };
-  
+
   try {
     const data = db.export();
     const serialized = JSON.stringify(Array.from(data));
-    
+
     const sizeInMB = new Blob([serialized]).size / (1024 * 1024);
-    
+
+    // Auto backup if size exceeds threshold
+    if (sizeInMB >= AUTO_BACKUP_SIZE_MB) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`📦 Database size: ${sizeInMB.toFixed(2)} MB - Creating auto backup...`);
+      }
+
+      try {
+        // Create automatic backup using exportDatabaseToJSON
+        // We need to dynamically import it to avoid circular dependency
+        import('./reset.js').then(({ exportDatabaseToJSON }) => {
+          const exportResult = exportDatabaseToJSON();
+
+          if (exportResult.success) {
+            const backupData = {
+              timestamp: new Date().toISOString(),
+              size: sizeInMB.toFixed(2) + ' MB',
+              data: exportResult.data
+            };
+
+            // Save to separate localStorage key
+            const backupKey = 'metalsheets_auto_backup';
+            const backupSerialized = JSON.stringify(backupData);
+
+            try {
+              localStorage.setItem(backupKey, backupSerialized);
+
+              // Show notification in console
+              console.info(
+                `✅ نسخة احتياطية تلقائية تم إنشاؤها بنجاح!\n` +
+                `📊 الحجم: ${sizeInMB.toFixed(2)} MB\n` +
+                `📅 التاريخ: ${new Date().toLocaleString('ar')}\n` +
+                `💾 المفتاح: ${backupKey}`
+              );
+
+              // Try to show user notification if in browser environment
+              if (typeof window !== 'undefined' && window.alert) {
+                // Use setTimeout to not block the save operation
+                setTimeout(() => {
+                  const message =
+                    `تنبيه: قاعدة البيانات تجاوزت ${AUTO_BACKUP_SIZE_MB} ميجابايت!\n\n` +
+                    `✅ تم إنشاء نسخة احتياطية تلقائية بنجاح\n` +
+                    `الحجم: ${sizeInMB.toFixed(2)} MB\n` +
+                    `التاريخ: ${new Date().toLocaleString('ar')}\n\n` +
+                    `يُنصح بتصدير البيانات القديمة وأرشفتها للحفاظ على الأداء.`;
+
+                  // Check if user is on the page (not a background save)
+                  if (document.visibilityState === 'visible') {
+                    console.warn(message);
+                  }
+                }, 100);
+              }
+            } catch (backupError) {
+              console.error('Failed to save auto backup:', backupError);
+            }
+          }
+        }).catch(err => {
+          console.error('Failed to create auto backup:', err);
+        });
+      } catch (backupError) {
+        console.error('Auto backup error:', backupError);
+      }
+    }
+
     if (sizeInMB > 4.5) {
       console.warn(`⚠️ Database size: ${sizeInMB.toFixed(2)} MB - approaching limit!`);
     }
-    
+
     localStorage.setItem('metalsheets_database', serialized);
     return { success: true, size: sizeInMB };
-    
+
   } catch (e) {
     if (e.name === 'QuotaExceededError') {
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: 'تجاوز حد التخزين! يرجى تصدير البيانات وأرشفة القديمة.',
         quotaExceeded: true
       };
     }
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Get the latest auto backup info (if exists)
+ */
+export function getAutoBackupInfo() {
+  try {
+    const backupKey = 'metalsheets_auto_backup';
+    const backupData = localStorage.getItem(backupKey);
+
+    if (!backupData) {
+      return { exists: false };
+    }
+
+    const backup = JSON.parse(backupData);
+    return {
+      exists: true,
+      timestamp: backup.timestamp,
+      size: backup.size,
+      date: new Date(backup.timestamp).toLocaleString('ar')
+    };
+  } catch (e) {
+    console.error('Get auto backup info error:', e);
+    return { exists: false, error: e.message };
+  }
+}
+
+/**
+ * Delete the auto backup
+ */
+export function deleteAutoBackup() {
+  try {
+    localStorage.removeItem('metalsheets_auto_backup');
+    return { success: true };
+  } catch (e) {
     return { success: false, error: e.message };
   }
 }
