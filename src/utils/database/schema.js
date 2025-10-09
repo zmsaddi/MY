@@ -360,7 +360,89 @@ function createExpensesTable() {
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_by TEXT,
+    updated_by TEXT,
     FOREIGN KEY (category_id) REFERENCES expense_categories(id)
+  )`);
+
+  // Enhanced Expenses Table - Professional Accounting
+  db.run(`CREATE TABLE IF NOT EXISTS expenses_enhanced (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category_code TEXT NOT NULL,
+    expense_type TEXT NOT NULL, -- OPERATING, COGS, ADMINISTRATIVE, FINANCIAL, OTHER
+    amount REAL NOT NULL,
+    vat_amount REAL DEFAULT 0,
+    net_amount REAL NOT NULL,
+    currency_code TEXT DEFAULT 'USD',
+    exchange_rate REAL DEFAULT 1.0,
+    amount_base REAL NOT NULL, -- Amount in base currency
+    description TEXT NOT NULL,
+    expense_date DATE NOT NULL,
+    payment_method TEXT DEFAULT 'cash', -- cash, bank_transfer, check, credit_card, petty_cash
+    payment_reference TEXT,
+    vendor_name TEXT,
+    invoice_number TEXT,
+    approval_status TEXT DEFAULT 'draft', -- draft, pending, approved, rejected, paid
+    approved_by TEXT,
+    approved_at DATETIME,
+    approval_notes TEXT,
+    rejected_by TEXT,
+    rejected_at DATETIME,
+    rejection_reason TEXT,
+    paid_status BOOLEAN DEFAULT 0,
+    paid_date DATE,
+    paid_by TEXT,
+    receipt_url TEXT,
+    notes TEXT,
+    is_recurring BOOLEAN DEFAULT 0,
+    recurrence_pattern TEXT, -- daily, weekly, monthly, quarterly, yearly
+    next_occurrence DATE,
+    budget_category TEXT,
+    cost_center TEXT,
+    project_id INTEGER,
+    tax_deductible BOOLEAN DEFAULT 1,
+    created_by TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // General Ledger for Double-Entry Bookkeeping
+  db.run(`CREATE TABLE IF NOT EXISTS general_ledger (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    transaction_type TEXT NOT NULL,
+    transaction_id INTEGER NOT NULL,
+    account_code TEXT NOT NULL,
+    account_name TEXT NOT NULL,
+    debit REAL DEFAULT 0,
+    credit REAL DEFAULT 0,
+    description TEXT,
+    transaction_date DATE NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // Expense Budgets
+  db.run(`CREATE TABLE IF NOT EXISTS expense_budgets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category_code TEXT NOT NULL,
+    budget_year INTEGER NOT NULL,
+    budget_month INTEGER,
+    budget_amount REAL NOT NULL,
+    alert_threshold REAL DEFAULT 0.8,
+    notes TEXT,
+    created_by TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(category_code, budget_year, budget_month)
+  )`);
+
+  // Recurring Expense Schedule
+  db.run(`CREATE TABLE IF NOT EXISTS recurring_expense_schedule (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    original_expense_id INTEGER NOT NULL,
+    next_date DATE NOT NULL,
+    pattern TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (original_expense_id) REFERENCES expenses_enhanced(id)
   )`);
 }
 
@@ -408,6 +490,24 @@ function createIndexes() {
     // Expense indexes
     'CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(expense_date)',
     'CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category_id)',
+
+    // Enhanced Expenses indexes
+    'CREATE INDEX IF NOT EXISTS idx_expenses_enh_date ON expenses_enhanced(expense_date)',
+    'CREATE INDEX IF NOT EXISTS idx_expenses_enh_category ON expenses_enhanced(category_code)',
+    'CREATE INDEX IF NOT EXISTS idx_expenses_enh_approval ON expenses_enhanced(approval_status)',
+    'CREATE INDEX IF NOT EXISTS idx_expenses_enh_vendor ON expenses_enhanced(vendor_name)',
+    'CREATE INDEX IF NOT EXISTS idx_expenses_enh_recurring ON expenses_enhanced(is_recurring)',
+
+    // General Ledger indexes
+    'CREATE INDEX IF NOT EXISTS idx_gl_transaction ON general_ledger(transaction_type, transaction_id)',
+    'CREATE INDEX IF NOT EXISTS idx_gl_account ON general_ledger(account_code)',
+    'CREATE INDEX IF NOT EXISTS idx_gl_date ON general_ledger(transaction_date)',
+
+    // Budget indexes
+    'CREATE INDEX IF NOT EXISTS idx_budget_category ON expense_budgets(category_code, budget_year)',
+
+    // Recurring Schedule indexes
+    'CREATE INDEX IF NOT EXISTS idx_recurring_next ON recurring_expense_schedule(next_date)',
 
     // Inventory movement indexes
     'CREATE INDEX IF NOT EXISTS idx_inventory_movements_sheet_id ON inventory_movements(sheet_id)', // NEW
