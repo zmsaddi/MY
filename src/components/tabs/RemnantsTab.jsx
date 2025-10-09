@@ -412,7 +412,6 @@ export default function RemnantsTab() {
       </Box>
 
       {success && <Alert severity="success" sx={{ mb: 3, fontSize: '1rem' }}>{success}</Alert>}
-      {error && <Alert severity="error" sx={{ mb: 3, fontSize: '1rem' }} onClose={() => setError('')}>{error}</Alert>}
 
       <Card sx={{ borderRadius: 3, mb: 3 }}>
         <CardContent>
@@ -630,6 +629,7 @@ export default function RemnantsTab() {
           <Typography variant="h5" fontWeight={700}>إضافة بقية جديدة</Typography>
         </DialogTitle>
         <DialogContent>
+          {error && <Alert severity="error" sx={{ mt: 2, mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
           <Box sx={{ mt: 2 }}>
             <Accordion defaultExpanded>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
