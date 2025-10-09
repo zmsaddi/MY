@@ -17,7 +17,12 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import UnifiedFormField from '../common/forms/UnifiedFormField';
 import UnifiedFormDialog from '../common/forms/UnifiedFormDialog';
 import UnifiedConfirmDialog from '../common/dialogs/UnifiedConfirmDialog';
+import PrintConfirmDialog from '../common/print/PrintConfirmDialog';
+import PrintButtons from '../common/print/PrintButtons';
 import { confirmationMessages } from '../../theme/designSystem';
+
+import { usePrint } from '../../hooks/usePrint';
+import { generateInvoicePDF } from '../../utils/pdf/templates/invoicePDF';
 
 import {
   getAllSales, getSaleById, processSale, generateInvoiceNumber, deleteSale,
@@ -92,6 +97,16 @@ export default function SalesTab() {
   const [error, setError] = useState('');
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+
+  // Print functionality
+  const {
+    isPrinting,
+    showConfirmDialog: showPrintDialog,
+    pendingDocument,
+    requestPrint,
+    executePrint,
+    cancelPrint
+  } = usePrint();
 
   // Confirmation Dialog
   const [confirmDialog, setConfirmDialog] = useState({
@@ -490,6 +505,53 @@ export default function SalesTab() {
     if (!price || !minPrice) return 'inherit';
     if (price < minPrice) return 'error.main';
     return 'success.main';
+  };
+
+  // Print handlers
+  const handlePrintInvoice = () => {
+    if (!selectedSale) return;
+
+    const docDefinition = generateInvoicePDF(
+      {
+        ...selectedSale,
+        currency_symbol: baseCurrencyInfo.symbol
+      },
+      {
+        orientation: 'portrait',
+        includeLogo: true,
+        margins: 'normal'
+      }
+    );
+
+    requestPrint(docDefinition, {
+      name: `فاتورة ${selectedSale.invoice_number}`,
+      type: 'فاتورة بيع',
+      estimatedPages: 1,
+      defaultAction: 'print'
+    });
+  };
+
+  const handleExportInvoicePDF = () => {
+    if (!selectedSale) return;
+
+    const docDefinition = generateInvoicePDF(
+      {
+        ...selectedSale,
+        currency_symbol: baseCurrencyInfo.symbol
+      },
+      {
+        orientation: 'portrait',
+        includeLogo: true,
+        margins: 'normal'
+      }
+    );
+
+    requestPrint(docDefinition, {
+      name: `فاتورة ${selectedSale.invoice_number}`,
+      type: 'فاتورة بيع',
+      estimatedPages: 1,
+      defaultAction: 'pdf'
+    });
   };
 
   // ─────────────────────────────────────────────────────────────
@@ -1498,12 +1560,31 @@ export default function SalesTab() {
                 )}
               </Grid>
             </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 3 }}>
+            <DialogActions sx={{ px: 3, pb: 3, justifyContent: 'space-between' }}>
+              <PrintButtons
+                onPrint={handlePrintInvoice}
+                onPDF={handleExportInvoicePDF}
+                isPrinting={isPrinting}
+                variant="outlined"
+                size="large"
+              />
               <Button onClick={() => setOpenViewDialog(false)} size="large">إغلاق</Button>
             </DialogActions>
           </>
         )}
       </Dialog>
+
+      {/* Print Confirmation Dialog */}
+      <PrintConfirmDialog
+        open={showPrintDialog}
+        onClose={cancelPrint}
+        onConfirm={executePrint}
+        title="تأكيد طباعة الفاتورة"
+        documentName={pendingDocument?.metadata?.name || 'الفاتورة'}
+        documentType={pendingDocument?.metadata?.type || 'فاتورة'}
+        estimatedPages={pendingDocument?.metadata?.estimatedPages || 1}
+        defaultAction={pendingDocument?.metadata?.defaultAction || 'print'}
+      />
 
       {/* Confirmation Dialog */}
       <UnifiedConfirmDialog

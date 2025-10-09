@@ -28,7 +28,12 @@ import WeightPriceEntry from '../common/WeightPriceEntry';
 import UnifiedFormField from '../common/forms/UnifiedFormField';
 import UnifiedFormDialog from '../common/forms/UnifiedFormDialog';
 import UnifiedConfirmDialog from '../common/dialogs/UnifiedConfirmDialog';
+import PrintConfirmDialog from '../common/print/PrintConfirmDialog';
+import PrintButtons from '../common/print/PrintButtons';
 import { confirmationMessages } from '../../theme/designSystem';
+
+import { usePrint } from '../../hooks/usePrint';
+import { generateBatchPDF } from '../../utils/pdf/templates/batchPDF';
 
 import {
   getAllSheets,
@@ -193,6 +198,16 @@ export default function InventoryTab() {
   const [remnantErrors, setRemnantErrors] = useState({});
   const [remnantBatchErrors, setRemnantBatchErrors] = useState({});
   const [loading, setLoading] = useState(false);
+
+  // Print functionality
+  const {
+    isPrinting,
+    showConfirmDialog: showPrintDialog,
+    pendingDocument,
+    requestPrint,
+    executePrint,
+    cancelPrint
+  } = usePrint();
 
   // Confirmation Dialog
   const [confirmDialog, setConfirmDialog] = useState({
@@ -815,6 +830,50 @@ export default function InventoryTab() {
     if (quantity === 0) return 'error';
     if (quantity < 10) return 'warning';
     return 'success';
+  };
+
+  // ──────────────────────────────────────────────────────────────
+  // Print handlers
+  const handlePrintBatch = () => {
+    if (!selectedBatch || !selectedSheet) return;
+
+    const docDefinition = generateBatchPDF(
+      selectedBatch,
+      selectedSheet,
+      {
+        orientation: 'portrait',
+        includeLogo: true,
+        margins: 'normal'
+      }
+    );
+
+    requestPrint(docDefinition, {
+      name: `دفعة ${selectedSheet.code}`,
+      type: 'تفاصيل دفعة',
+      estimatedPages: 1,
+      defaultAction: 'print'
+    });
+  };
+
+  const handleExportBatchPDF = () => {
+    if (!selectedBatch || !selectedSheet) return;
+
+    const docDefinition = generateBatchPDF(
+      selectedBatch,
+      selectedSheet,
+      {
+        orientation: 'portrait',
+        includeLogo: true,
+        margins: 'normal'
+      }
+    );
+
+    requestPrint(docDefinition, {
+      name: `دفعة ${selectedSheet.code}`,
+      type: 'تفاصيل دفعة',
+      estimatedPages: 1,
+      defaultAction: 'pdf'
+    });
   };
 
   // ──────────────────────────────────────────────────────────────
@@ -2610,6 +2669,19 @@ export default function InventoryTab() {
 
               <Grid item xs={12}>
                 <Divider sx={{ my: 1 }} />
+
+                {/* Print Buttons */}
+                <Box sx={{ mb: 2 }}>
+                  <PrintButtons
+                    onPrint={handlePrintBatch}
+                    onPDF={handleExportBatchPDF}
+                    isPrinting={isPrinting}
+                    variant="outlined"
+                    size="medium"
+                  />
+                </Box>
+
+                {/* Edit/Delete Buttons */}
                 <Box sx={{ display: 'flex', gap: 1 }}>
                   <Button
                     variant="outlined"
@@ -2705,6 +2777,18 @@ export default function InventoryTab() {
           )}
         </Box>
       </UnifiedFormDialog>
+
+      {/* Print Confirmation Dialog */}
+      <PrintConfirmDialog
+        open={showPrintDialog}
+        onClose={cancelPrint}
+        onConfirm={executePrint}
+        title="تأكيد طباعة تفاصيل الدفعة"
+        documentName={pendingDocument?.metadata?.name || 'الدفعة'}
+        documentType={pendingDocument?.metadata?.type || 'تفاصيل دفعة'}
+        estimatedPages={pendingDocument?.metadata?.estimatedPages || 1}
+        defaultAction={pendingDocument?.metadata?.defaultAction || 'print'}
+      />
 
       {/* Confirmation Dialog */}
       <UnifiedConfirmDialog
