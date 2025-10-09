@@ -1,5 +1,5 @@
 // src/utils/database/accounting.js
-import { db, tx, saveDatabase, safe, round2, lastId, getCurrentUser } from './core.js';
+import { db, tx, saveDatabase, safe, round2, lastId, getCurrentUser, hasColumn } from './core.js';
 import { validators, parseDbError } from '../validators.js';
 
 /* ============================================
@@ -183,18 +183,31 @@ export function getSupplierStatement(supplierId, fromDate = null, toDate = null)
    ============================================ */
 
 export function insertCustomerTransactionInline(data) {
-  const stmt = db.prepare(`
-    INSERT INTO customer_transactions
-    (customer_id, transaction_type, amount, reference_type, reference_id,
-     balance_after, notes, transaction_date, created_by)
-    VALUES (?, ?, ?, ?, ?, (
-      SELECT COALESCE(SUM(amount), 0) + ?
-      FROM customer_transactions
-      WHERE customer_id = ?
-    ), ?, ?, ?)
-  `);
+  const hasCreatedBy = hasColumn('customer_transactions', 'created_by');
 
-  stmt.run([
+  const stmt = hasCreatedBy
+    ? db.prepare(`
+        INSERT INTO customer_transactions
+        (customer_id, transaction_type, amount, reference_type, reference_id,
+         balance_after, notes, transaction_date, created_by)
+        VALUES (?, ?, ?, ?, ?, (
+          SELECT COALESCE(SUM(amount), 0) + ?
+          FROM customer_transactions
+          WHERE customer_id = ?
+        ), ?, ?, ?)
+      `)
+    : db.prepare(`
+        INSERT INTO customer_transactions
+        (customer_id, transaction_type, amount, reference_type, reference_id,
+         balance_after, notes, transaction_date)
+        VALUES (?, ?, ?, ?, ?, (
+          SELECT COALESCE(SUM(amount), 0) + ?
+          FROM customer_transactions
+          WHERE customer_id = ?
+        ), ?, ?)
+      `);
+
+  const values = [
     data.customer_id,
     data.transaction_type,
     safe(data.amount),
@@ -203,25 +216,43 @@ export function insertCustomerTransactionInline(data) {
     safe(data.amount),
     data.customer_id,
     data.notes || null,
-    data.transaction_date,
-    getCurrentUser()
-  ]);
+    data.transaction_date
+  ];
+
+  if (hasCreatedBy) {
+    values.push(getCurrentUser());
+  }
+
+  stmt.run(values);
   stmt.free();
 }
 
 export function insertSupplierTransactionInline(data) {
-  const stmt = db.prepare(`
-    INSERT INTO supplier_transactions
-    (supplier_id, transaction_type, amount, reference_type, reference_id,
-     balance_after, notes, transaction_date, created_by)
-    VALUES (?, ?, ?, ?, ?, (
-      SELECT COALESCE(SUM(amount), 0) + ?
-      FROM supplier_transactions
-      WHERE supplier_id = ?
-    ), ?, ?, ?)
-  `);
+  const hasCreatedBy = hasColumn('supplier_transactions', 'created_by');
 
-  stmt.run([
+  const stmt = hasCreatedBy
+    ? db.prepare(`
+        INSERT INTO supplier_transactions
+        (supplier_id, transaction_type, amount, reference_type, reference_id,
+         balance_after, notes, transaction_date, created_by)
+        VALUES (?, ?, ?, ?, ?, (
+          SELECT COALESCE(SUM(amount), 0) + ?
+          FROM supplier_transactions
+          WHERE supplier_id = ?
+        ), ?, ?, ?)
+      `)
+    : db.prepare(`
+        INSERT INTO supplier_transactions
+        (supplier_id, transaction_type, amount, reference_type, reference_id,
+         balance_after, notes, transaction_date)
+        VALUES (?, ?, ?, ?, ?, (
+          SELECT COALESCE(SUM(amount), 0) + ?
+          FROM supplier_transactions
+          WHERE supplier_id = ?
+        ), ?, ?)
+      `);
+
+  const values = [
     data.supplier_id,
     data.transaction_type,
     safe(data.amount),
@@ -230,9 +261,14 @@ export function insertSupplierTransactionInline(data) {
     safe(data.amount),
     data.supplier_id,
     data.notes || null,
-    data.transaction_date,
-    getCurrentUser()
-  ]);
+    data.transaction_date
+  ];
+
+  if (hasCreatedBy) {
+    values.push(getCurrentUser());
+  }
+
+  stmt.run(values);
   stmt.free();
 }
 
