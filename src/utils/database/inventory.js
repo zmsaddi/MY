@@ -1,5 +1,5 @@
 // src/utils/database/inventory.js
-import { db, tx, saveDatabase, safe, lastId, generateSheetCode, getCurrentUser } from './core.js';
+import { db, tx, saveDatabase, safe, lastId, generateSheetCode, getCurrentUser, hasColumn } from './core.js';
 import { validators, parseDbError } from '../validators.js';
 import { insertSupplierTransactionInline } from './accounting.js';
 import { withErrorHandler } from './errorHandler.js';
@@ -139,14 +139,24 @@ export function addSheetWithBatch(sheetData, batchData) {
       isLinked = true;
       existingStmt.free();
 
-      const batchStmt = db.prepare(`
-        INSERT INTO batches
-        (sheet_id, supplier_id, quantity_original, quantity_remaining,
-         price_per_kg, total_cost, storage_location, received_date, notes, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
+      // Check if created_by column exists
+      const hasCreatedBy = hasColumn('batches', 'created_by');
 
-      batchStmt.run([
+      const batchStmt = hasCreatedBy
+        ? db.prepare(`
+            INSERT INTO batches
+            (sheet_id, supplier_id, quantity_original, quantity_remaining,
+             price_per_kg, total_cost, storage_location, received_date, notes, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `)
+        : db.prepare(`
+            INSERT INTO batches
+            (sheet_id, supplier_id, quantity_original, quantity_remaining,
+             price_per_kg, total_cost, storage_location, received_date, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `);
+
+      const batchValues = [
         sheetId,
         batchData.supplier_id || null,
         safe(batchData.quantity, 0),
@@ -155,9 +165,14 @@ export function addSheetWithBatch(sheetData, batchData) {
         batchData.total_cost ? safe(batchData.total_cost) : null,
         batchData.storage_location ? batchData.storage_location.trim() : null,
         batchData.received_date,
-        batchData.notes ? batchData.notes.trim() : null,
-        getCurrentUser()
-      ]);
+        batchData.notes ? batchData.notes.trim() : null
+      ];
+
+      if (hasCreatedBy) {
+        batchValues.push(getCurrentUser());
+      }
+
+      batchStmt.run(batchValues);
       batchStmt.free();
 
       const batchId = lastId();
@@ -208,14 +223,24 @@ export function addSheetWithBatch(sheetData, batchData) {
       
       sheetId = lastId();
       
-      const batchStmt = db.prepare(`
-        INSERT INTO batches
-        (sheet_id, supplier_id, quantity_original, quantity_remaining,
-         price_per_kg, total_cost, storage_location, received_date, notes, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
+      // Check if created_by column exists
+      const hasCreatedBy = hasColumn('batches', 'created_by');
 
-      batchStmt.run([
+      const batchStmt = hasCreatedBy
+        ? db.prepare(`
+            INSERT INTO batches
+            (sheet_id, supplier_id, quantity_original, quantity_remaining,
+             price_per_kg, total_cost, storage_location, received_date, notes, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `)
+        : db.prepare(`
+            INSERT INTO batches
+            (sheet_id, supplier_id, quantity_original, quantity_remaining,
+             price_per_kg, total_cost, storage_location, received_date, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `);
+
+      const batchValues = [
         sheetId,
         batchData.supplier_id || null,
         safe(batchData.quantity, 0),
@@ -224,9 +249,14 @@ export function addSheetWithBatch(sheetData, batchData) {
         batchData.total_cost ? safe(batchData.total_cost) : null,
         batchData.storage_location ? batchData.storage_location.trim() : null,
         batchData.received_date,
-        batchData.notes ? batchData.notes.trim() : null,
-        getCurrentUser()
-      ]);
+        batchData.notes ? batchData.notes.trim() : null
+      ];
+
+      if (hasCreatedBy) {
+        batchValues.push(getCurrentUser());
+      }
+
+      batchStmt.run(batchValues);
       batchStmt.free();
 
       const batchId = lastId();
@@ -374,14 +404,24 @@ export function addBatchToSheet(data) {
       return { success: false, error: validationError };
     }
     
-    const stmt = db.prepare(`
-      INSERT INTO batches
-      (sheet_id, supplier_id, quantity_original, quantity_remaining,
-       price_per_kg, total_cost, storage_location, received_date, notes, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+    // Check if created_by column exists
+    const hasCreatedBy = hasColumn('batches', 'created_by');
 
-    stmt.run([
+    const stmt = hasCreatedBy
+      ? db.prepare(`
+          INSERT INTO batches
+          (sheet_id, supplier_id, quantity_original, quantity_remaining,
+           price_per_kg, total_cost, storage_location, received_date, notes, created_by)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `)
+      : db.prepare(`
+          INSERT INTO batches
+          (sheet_id, supplier_id, quantity_original, quantity_remaining,
+           price_per_kg, total_cost, storage_location, received_date, notes)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+
+    const values = [
       data.sheet_id,
       data.supplier_id || null,
       safe(data.quantity, 0),
@@ -390,9 +430,14 @@ export function addBatchToSheet(data) {
       data.total_cost ? safe(data.total_cost) : null,
       data.storage_location ? data.storage_location.trim() : null,
       data.received_date,
-      data.notes ? data.notes.trim() : null,
-      getCurrentUser()
-    ]);
+      data.notes ? data.notes.trim() : null
+    ];
+
+    if (hasCreatedBy) {
+      values.push(getCurrentUser());
+    }
+
+    stmt.run(values);
     stmt.free();
     
     const batchId = lastId();
