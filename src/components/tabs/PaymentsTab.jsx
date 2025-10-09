@@ -480,6 +480,7 @@ export default function PaymentsTab() {
                     </InputAdornment>
                   )
                 }}
+                InputLabelProps={{ shrink: true }}
               />
             </Grid>
 

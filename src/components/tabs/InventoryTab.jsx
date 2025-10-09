@@ -522,6 +522,7 @@ export default function InventoryTab() {
                   label="أدنى سماكة (مم)"
                   value={filterThkMin}
                   onChange={(e) => setFilterThkMin(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
                 />
               </Grid>
               <Grid item xs={6} md={3}>
@@ -531,6 +532,7 @@ export default function InventoryTab() {
                   label="أقصى سماكة (مم)"
                   value={filterThkMax}
                   onChange={(e) => setFilterThkMax(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
                 />
               </Grid>
               <Grid item xs={6} md={3}>
@@ -540,6 +542,7 @@ export default function InventoryTab() {
                   label="أدنى كمية"
                   value={filterQtyMin}
                   onChange={(e) => setFilterQtyMin(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
                 />
               </Grid>
               <Grid item xs={6} md={3}>
@@ -549,6 +552,7 @@ export default function InventoryTab() {
                   label="أقصى كمية"
                   value={filterQtyMax}
                   onChange={(e) => setFilterQtyMax(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
                 />
               </Grid>
             </Grid>
@@ -751,6 +755,7 @@ export default function InventoryTab() {
                       value={sheetForm.length_mm}
                       onChange={(e) => setSheetForm({ ...sheetForm, length_mm: e.target.value })}
                       inputProps={{ min: 1 }}
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                   <Grid item xs={12} md={4}>
@@ -761,6 +766,7 @@ export default function InventoryTab() {
                       value={sheetForm.width_mm}
                       onChange={(e) => setSheetForm({ ...sheetForm, width_mm: e.target.value })}
                       inputProps={{ min: 1 }}
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                   <Grid item xs={12} md={4}>
@@ -771,6 +777,7 @@ export default function InventoryTab() {
                       value={sheetForm.thickness_mm}
                       onChange={(e) => setSheetForm({ ...sheetForm, thickness_mm: e.target.value })}
                       inputProps={{ step: 0.1, min: 0.1 }}
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                   <Grid item xs={12}>
@@ -782,6 +789,7 @@ export default function InventoryTab() {
                       onChange={(e) => setSheetForm({ ...sheetForm, weight_per_sheet_kg: e.target.value })}
                       inputProps={{ step: 0.001, min: 0 }}
                       helperText="أدخل الوزن يدويًا (بدون حساب تلقائي)"
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                 </Grid>
@@ -821,6 +829,7 @@ export default function InventoryTab() {
                       value={batchForm.quantity}
                       onChange={(e) => setBatchForm({ ...batchForm, quantity: e.target.value })}
                       inputProps={{ min: 1 }}
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
 
@@ -847,6 +856,7 @@ export default function InventoryTab() {
                       onChange={(e) => setBatchForm({ ...batchForm, batch_weight_kg: e.target.value })}
                       inputProps={{ step: 0.001, min: 0 }}
                       helperText="إذا لم يُدخل، سيتم استخدام (الكمية × وزن الورقة)"
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
 
@@ -862,6 +872,7 @@ export default function InventoryTab() {
                         InputProps={{
                           endAdornment: <InputAdornment position="end">{baseCurrencyInfo.symbol}</InputAdornment>
                         }}
+                        InputLabelProps={{ shrink: true }}
                       />
                     </Grid>
                   ) : (
@@ -876,6 +887,7 @@ export default function InventoryTab() {
                         InputProps={{
                           endAdornment: <InputAdornment position="end">{baseCurrencyInfo.symbol}</InputAdornment>
                         }}
+                        InputLabelProps={{ shrink: true }}
                       />
                     </Grid>
                   )}
@@ -975,6 +987,7 @@ export default function InventoryTab() {
                           InputProps={{
                             startAdornment: <InputAdornment position="start">{baseCurrencyInfo.symbol}</InputAdornment>
                           }}
+                          InputLabelProps={{ shrink: true }}
                         />
                       </Grid>
                     )}
@@ -1059,6 +1072,7 @@ export default function InventoryTab() {
                   value={existingBatchForm.quantity}
                   onChange={(e) => setExistingBatchForm({ ...existingBatchForm, quantity: e.target.value })}
                   inputProps={{ min: 1 }}
+                  InputLabelProps={{ shrink: true }}
                 />
               </Grid>
               <Grid item xs={12} md={4}>
@@ -1087,6 +1101,7 @@ export default function InventoryTab() {
                     InputProps={{
                       endAdornment: <InputAdornment position="end">{baseCurrencyInfo.symbol}</InputAdornment>
                     }}
+                    InputLabelProps={{ shrink: true }}
                   />
                 </Grid>
               ) : (
@@ -1101,6 +1116,7 @@ export default function InventoryTab() {
                     InputProps={{
                       endAdornment: <InputAdornment position="end">{baseCurrencyInfo.symbol}</InputAdornment>
                     }}
+                    InputLabelProps={{ shrink: true }}
                   />
                 </Grid>
               )}
@@ -1153,6 +1169,7 @@ export default function InventoryTab() {
                         InputProps={{
                           startAdornment: <InputAdornment position="start">{baseCurrencyInfo.symbol}</InputAdornment>
                         }}
+                        InputLabelProps={{ shrink: true }}
                       />
                     </Grid>
                   )}

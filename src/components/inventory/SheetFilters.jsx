@@ -122,6 +122,7 @@ function SheetFilters({
                 label="السماكة - من (mm)"
                 value={filterThkMin}
                 onChange={(e) => onThkMinChange(e.target.value)}
+                InputLabelProps={{ shrink: true }}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
@@ -132,6 +133,7 @@ function SheetFilters({
                 label="السماكة - إلى (mm)"
                 value={filterThkMax}
                 onChange={(e) => onThkMaxChange(e.target.value)}
+                InputLabelProps={{ shrink: true }}
               />
             </Grid>
 
@@ -144,6 +146,7 @@ function SheetFilters({
                 label="الكمية - من"
                 value={filterQtyMin}
                 onChange={(e) => onQtyMinChange(e.target.value)}
+                InputLabelProps={{ shrink: true }}
               />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
@@ -154,6 +157,7 @@ function SheetFilters({
                 label="الكمية - إلى"
                 value={filterQtyMax}
                 onChange={(e) => onQtyMaxChange(e.target.value)}
+                InputLabelProps={{ shrink: true }}
               />
             </Grid>
           </Grid>

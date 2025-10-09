@@ -553,6 +553,7 @@ export default function SalesTab() {
                           onChange={(e) => setItemQuantity(e.target.value)}
                           inputProps={{ min: 1 }}
                           helperText={selectedSheet ? `المتاح: ${selectedSheet.total_quantity}` : ' '}
+                          InputLabelProps={{ shrink: true }}
                         />
                       </Grid>
                       <Grid item xs={12} md={3}>
@@ -566,6 +567,7 @@ export default function SalesTab() {
                           InputProps={{
                             endAdornment: <InputAdornment position="end">{getCurrencySymbol(saleCurrency)}</InputAdornment>
                           }}
+                          InputLabelProps={{ shrink: true }}
                         />
                       </Grid>
                     </>
@@ -598,6 +600,7 @@ export default function SalesTab() {
                           onChange={(e) => setItemQuantity(e.target.value)}
                           inputProps={{ min: 1 }}
                           placeholder="1"
+                          InputLabelProps={{ shrink: true }}
                         />
                       </Grid>
                       <Grid item xs={12} md={2}>
@@ -611,6 +614,7 @@ export default function SalesTab() {
                           InputProps={{
                             endAdornment: <InputAdornment position="end">{getCurrencySymbol(saleCurrency)}</InputAdornment>
                           }}
+                          InputLabelProps={{ shrink: true }}
                         />
                       </Grid>
                       <Grid item xs={12}>
@@ -713,9 +717,10 @@ export default function SalesTab() {
                       value={discount}
                       onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
                       inputProps={{ step: 0.01, min: 0 }}
-                      InputProps={{ 
-                        endAdornment: <InputAdornment position="end">{getCurrencySymbol(saleCurrency)}</InputAdornment> 
+                      InputProps={{
+                        endAdornment: <InputAdornment position="end">{getCurrencySymbol(saleCurrency)}</InputAdornment>
                       }}
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
 
@@ -749,9 +754,10 @@ export default function SalesTab() {
                       value={amountPaid}
                       onChange={(e) => setAmountPaid(parseFloat(e.target.value) || 0)}
                       inputProps={{ step: 0.01, min: 0 }}
-                      InputProps={{ 
-                        endAdornment: <InputAdornment position="end">{getCurrencySymbol(saleCurrency)}</InputAdornment> 
+                      InputProps={{
+                        endAdornment: <InputAdornment position="end">{getCurrencySymbol(saleCurrency)}</InputAdornment>
                       }}
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
 
