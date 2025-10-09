@@ -1,5 +1,5 @@
 // src/utils/database/customers.js
-import { db, saveDatabase, lastId, getCurrentUser } from './core.js';
+import { db, saveDatabase, lastId, getCurrentUser, hasColumn } from './core.js';
 import { validators, parseDbError } from '../validators.js';
 import { withErrorHandler } from './errorHandler.js';
 
@@ -50,21 +50,44 @@ export function addCustomer(data) {
       return { success: false, error: validationError };
     }
 
-    const stmt = db.prepare(`INSERT INTO customers
-      (name, company_name, phone1, phone2, address, email, tax_number, notes, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    // Check if created_by column exists
+    const hasCreatedBy = hasColumn('customers', 'created_by');
 
-    stmt.run([
-      data.name.trim(),
-      data.company_name ? data.company_name.trim() : null,
-      data.phone1 ? data.phone1.trim() : null,
-      data.phone2 ? data.phone2.trim() : null,
-      data.address ? data.address.trim() : null,
-      data.email ? data.email.trim() : null,
-      data.tax_number ? data.tax_number.trim() : null,
-      data.notes ? data.notes.trim() : null,
-      getCurrentUser()
-    ]);
+    let stmt, values;
+    if (hasCreatedBy) {
+      stmt = db.prepare(`INSERT INTO customers
+        (name, company_name, phone1, phone2, address, email, tax_number, notes, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+
+      values = [
+        data.name.trim(),
+        data.company_name ? data.company_name.trim() : null,
+        data.phone1 ? data.phone1.trim() : null,
+        data.phone2 ? data.phone2.trim() : null,
+        data.address ? data.address.trim() : null,
+        data.email ? data.email.trim() : null,
+        data.tax_number ? data.tax_number.trim() : null,
+        data.notes ? data.notes.trim() : null,
+        getCurrentUser()
+      ];
+    } else {
+      stmt = db.prepare(`INSERT INTO customers
+        (name, company_name, phone1, phone2, address, email, tax_number, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+
+      values = [
+        data.name.trim(),
+        data.company_name ? data.company_name.trim() : null,
+        data.phone1 ? data.phone1.trim() : null,
+        data.phone2 ? data.phone2.trim() : null,
+        data.address ? data.address.trim() : null,
+        data.email ? data.email.trim() : null,
+        data.tax_number ? data.tax_number.trim() : null,
+        data.notes ? data.notes.trim() : null
+      ];
+    }
+
+    stmt.run(values);
     stmt.free();
 
     saveDatabase();

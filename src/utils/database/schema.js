@@ -681,6 +681,7 @@ function addAuditColumns() {
   ];
 
   let columnsAdded = false;
+  const tablesModified = [];
 
   tables.forEach(table => {
     try {
@@ -691,25 +692,42 @@ function addAuditColumns() {
         return;
       }
 
+      let tableModified = false;
+
       if (!hasColumn(table, 'created_by')) {
         db.run(`ALTER TABLE ${table} ADD COLUMN created_by TEXT`);
-        console.log(`Added created_by column to ${table}`);
+        console.log(`✓ Added created_by column to ${table}`);
         columnsAdded = true;
+        tableModified = true;
       }
       if (!hasColumn(table, 'updated_by')) {
         db.run(`ALTER TABLE ${table} ADD COLUMN updated_by TEXT`);
-        console.log(`Added updated_by column to ${table}`);
+        console.log(`✓ Added updated_by column to ${table}`);
         columnsAdded = true;
+        tableModified = true;
+      }
+
+      if (tableModified) {
+        tablesModified.push(table);
       }
     } catch (e) {
-      console.error(`Failed to add audit columns to ${table}:`, e);
+      console.error(`❌ Failed to add audit columns to ${table}:`, e);
     }
   });
 
   // Save database if columns were added
   if (columnsAdded) {
-    console.log('Audit columns added, saving database...');
+    console.log(`📊 Audit columns migration completed for ${tablesModified.length} tables:`, tablesModified.join(', '));
     saveDatabase();
+    console.log('💾 Database saved successfully with audit columns');
+
+    // Alert user that migration happened
+    alert('تم تحديث قاعدة البيانات بنجاح!\nDatabase updated successfully!\n\nتمت إضافة أعمدة التدقيق لجميع الجداول.\nAudit columns added to all tables.\n\nسيتم إعادة تحميل الصفحة.\nPage will reload.');
+
+    // Force reload to ensure fresh state
+    window.location.reload();
+  } else {
+    console.log('✓ All audit columns already exist');
   }
 }
 
