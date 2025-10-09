@@ -680,18 +680,37 @@ function addAuditColumns() {
     'customer_transactions', 'supplier_transactions', 'expense_categories', 'expenses'
   ];
 
+  let columnsAdded = false;
+
   tables.forEach(table => {
     try {
+      // Check if table exists first
+      const tableExists = db.exec(`SELECT name FROM sqlite_master WHERE type='table' AND name='${table}'`);
+      if (!tableExists.length || !tableExists[0].values.length) {
+        console.warn(`Table ${table} does not exist, skipping audit columns`);
+        return;
+      }
+
       if (!hasColumn(table, 'created_by')) {
         db.run(`ALTER TABLE ${table} ADD COLUMN created_by TEXT`);
+        console.log(`Added created_by column to ${table}`);
+        columnsAdded = true;
       }
       if (!hasColumn(table, 'updated_by')) {
         db.run(`ALTER TABLE ${table} ADD COLUMN updated_by TEXT`);
+        console.log(`Added updated_by column to ${table}`);
+        columnsAdded = true;
       }
     } catch (e) {
       console.error(`Failed to add audit columns to ${table}:`, e);
     }
   });
+
+  // Save database if columns were added
+  if (columnsAdded) {
+    console.log('Audit columns added, saving database...');
+    saveDatabase();
+  }
 }
 
 /* ============================================
