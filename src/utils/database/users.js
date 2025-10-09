@@ -104,6 +104,30 @@ export function authenticateUser(username, password) {
     return { success: false, error: 'هذا الحساب معطل' };
   }
 
+  // Check if user has no password set (initial setup)
+  const hasNoPassword = !user.password_hash || user.password_hash === '';
+
+  if (hasNoPassword) {
+    // Allow login without password for initial setup
+    if (password && password !== '') {
+      return { success: false, error: 'لم يتم تعيين كلمة مرور بعد. اترك حقل كلمة المرور فارغاً' };
+    }
+
+    // Force password change on first login
+    return {
+      success: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        display_name: user.display_name
+      },
+      requirePasswordChange: true,
+      passwordWarnings: ['يجب تعيين كلمة مرور للحساب'],
+      isInitialSetup: true
+    };
+  }
+
+  // Normal password verification for users with passwords
   if (!verifyPassword(password, user.password_hash)) {
     return { success: false, error: 'كلمة المرور غير صحيحة' };
   }

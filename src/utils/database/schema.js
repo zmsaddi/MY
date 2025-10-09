@@ -19,38 +19,25 @@ function createUsersTable() {
     updated_by TEXT
   )`);
 
-  // Create default admin user with secure random password
+  // Create default admin user WITHOUT password for initial setup
   const cnt = db.exec('SELECT COUNT(1) FROM users')?.[0]?.values?.[0]?.[0] ?? 0;
   if (cnt === 0) {
-    // Generate secure random password
-    const crypto = typeof window !== 'undefined' && window.crypto ? window.crypto : null;
-    let randomPassword;
-
-    if (crypto) {
-      // Browser environment - use Web Crypto API
-      const array = new Uint8Array(16);
-      crypto.getRandomValues(array);
-      randomPassword = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('').substring(0, 16);
-    } else {
-      // Fallback for non-browser environments
-      randomPassword = 'Admin@' + Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
-    }
-
-    // Use bcrypt with higher salt rounds = 12 for better security
-    const passwordHash = bcrypt.hashSync(randomPassword, 12);
+    // Create admin with empty password - requires setup on first login
+    // Empty string password hash indicates password needs to be set
+    const emptyPasswordHash = ''; // Empty hash = no password set yet
 
     const stmt = db.prepare(`INSERT INTO users (
       id, username, password_hash, display_name, is_active, created_by
     ) VALUES (1, ?, ?, ?, 1, ?)`);
-    stmt.run(['admin', passwordHash, 'Administrator', 'System']);
+    stmt.run(['admin', emptyPasswordHash, 'Administrator', 'System']);
     stmt.free();
 
-    // Display the password prominently for the administrator
+    // Display setup instructions
     console.log('\n╔════════════════════════════════════════════════╗');
-    console.log('║     🔐 DEFAULT ADMIN CREDENTIALS CREATED       ║');
+    console.log('║     🔐 INITIAL SETUP REQUIRED                  ║');
     console.log('╠════════════════════════════════════════════════╣');
     console.log('║  Username: admin                               ║');
-    console.log(`║  Password: ${randomPassword.padEnd(36)} ║`);
+    console.log('║  Password: (not set - leave blank)            ║');
     console.log('║                                                ║');
     console.log('║  ⚠️  IMPORTANT: Change this password on        ║');
     console.log('║     first login for security!                 ║');
