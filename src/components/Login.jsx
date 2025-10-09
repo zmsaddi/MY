@@ -49,7 +49,8 @@ function Login({ onLogin }) {
       return;
     }
 
-    if (!password) {
+    // Allow empty password for admin initial setup
+    if (!password && username.trim().toLowerCase() !== 'admin') {
       setError('يرجى إدخال كلمة المرور');
       return;
     }
@@ -173,6 +174,8 @@ function Login({ onLogin }) {
               fullWidth
               type={showPassword ? 'text' : 'password'}
               label="كلمة المرور"
+              placeholder={username.toLowerCase() === 'admin' ? 'اتركها فارغة للإعداد الأولي' : ''}
+              helperText={username.toLowerCase() === 'admin' && !password ? 'للإعداد الأولي، اترك كلمة المرور فارغة' : ''}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={loading}
