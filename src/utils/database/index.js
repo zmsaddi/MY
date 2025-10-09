@@ -141,8 +141,21 @@ export {
   insertCustomerTransactionInline,
   insertSupplierTransactionInline,
   settleCustomerPayment,
-  settleSupplierPayment
+  settleSupplierPayment,
+  getSupplierBalanceFromTransactions
 } from './accounting.js';
+
+/* ============================================
+   ACCOUNTING RECONCILIATION
+   ============================================ */
+export {
+  recalculateAllSupplierBalances,
+  recalculateSupplierBalance,
+  recalculateAllCustomerBalances,
+  recalculateCustomerBalance,
+  performCompleteReconciliation,
+  getAccountingSummary
+} from './accounting-reconciliation.js';
 
 /* ============================================
    EXPENSES

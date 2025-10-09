@@ -33,29 +33,29 @@ export function getCustomerBalance(customerId) {
   }
 }
 
-export function getSupplierBalance(supplierId) {
+export function getSupplierBalanceFromTransactions(supplierId) {
   if (!db) return 0;
-  
+
   try {
     const stmt = db.prepare(`
-      SELECT balance_after 
-      FROM supplier_transactions 
+      SELECT balance_after
+      FROM supplier_transactions
       WHERE supplier_id = ?
-      ORDER BY id DESC 
+      ORDER BY id DESC
       LIMIT 1
     `);
     stmt.bind([supplierId]);
-    
+
     let balance = 0;
     if (stmt.step()) {
       const row = stmt.getAsObject();
       balance = safe(row.balance_after, 0);
     }
     stmt.free();
-    
+
     return balance;
   } catch (e) {
-    console.error('Get supplier balance error:', e);
+    console.error('Get supplier balance from transactions error:', e);
     return 0;
   }
 }
@@ -208,7 +208,7 @@ export function insertCustomerTransactionInline(data) {
 }
 
 export function insertSupplierTransactionInline(data) {
-  const currentBalance = getSupplierBalance(data.supplier_id);
+  const currentBalance = getSupplierBalanceFromTransactions(data.supplier_id);
   const newBalance = round2(currentBalance + safe(data.amount));
 
   const stmt = db.prepare(`
@@ -290,8 +290,8 @@ export function settleSupplierPayment(supplierId, paymentAmount, paymentDate, pa
     
     tx.commit();
     saveDatabase();
-    
-    return { success: true, balance: getSupplierBalance(supplierId) };
+
+    return { success: true, balance: getSupplierBalanceFromTransactions(supplierId) };
     
   } catch (e) {
     tx.rollback();

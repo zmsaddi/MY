@@ -24,6 +24,7 @@ import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import RestoreIcon from '@mui/icons-material/Restore';
 import DownloadIcon from '@mui/icons-material/Download';
 import WarningIcon from '@mui/icons-material/Warning';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import ConfirmDialog from '../../common/ConfirmDialog';
 import {
   getDatabaseStats,
@@ -33,6 +34,7 @@ import {
   exportDatabaseToJSON,
   deleteStoredDatabase,
 } from '../../../utils/database/reset';
+import { performCompleteReconciliation } from '../../../utils/database';
 
 /**
  * Database Reset & Maintenance Section
@@ -94,6 +96,10 @@ function DatabaseResetSection({ onDataReset }) {
     }
   };
 
+  const handleReconcileAccounts = () => {
+    setConfirmDialog({ open: true, type: 'reconcile' });
+  };
+
   const handleConfirm = () => {
     const { type } = confirmDialog;
     let result;
@@ -110,6 +116,9 @@ function DatabaseResetSection({ onDataReset }) {
         break;
       case 'storage':
         result = deleteStoredDatabase();
+        break;
+      case 'reconcile':
+        result = performCompleteReconciliation();
         break;
       default:
         return;
@@ -160,6 +169,12 @@ function DatabaseResetSection({ onDataReset }) {
           title: 'حذف قاعدة البيانات من التخزين',
           message: 'هل أنت متأكد؟ سيتم حذف قاعدة البيانات بالكامل وإنشاء قاعدة جديدة عند إعادة تحميل الصفحة. تأكد من أخذ نسخة احتياطية!',
           confirmColor: 'error',
+        };
+      case 'reconcile':
+        return {
+          title: 'تسوية الحسابات',
+          message: 'سيتم إعادة حساب جميع أرصدة العملاء والموردين من البداية بناءً على المعاملات المسجلة. هذا سيصلح أي أخطاء في الأرصدة.',
+          confirmColor: 'info',
         };
       default:
         return { title: '', message: '', confirmColor: 'error' };
@@ -231,6 +246,30 @@ function DatabaseResetSection({ onDataReset }) {
             تصدير نسخة احتياطية (JSON)
           </Button>
         </Box>
+
+        <Divider sx={{ my: 3 }} />
+
+        {/* Accounting Reconciliation */}
+        <Card variant="outlined" sx={{ mb: 3, borderColor: 'info.main' }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom color="info.main" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <AccountBalanceIcon />
+              تسوية الحسابات
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              إذا كانت هناك أخطاء في أرصدة العملاء أو الموردين، يمكنك إعادة حساب جميع الأرصدة من البداية بناءً على المعاملات المسجلة.
+              هذا سيصلح أي تناقضات في الأرصدة الحالية.
+            </Typography>
+            <Button
+              variant="contained"
+              color="info"
+              startIcon={<AccountBalanceIcon />}
+              onClick={handleReconcileAccounts}
+            >
+              إعادة حساب جميع الأرصدة
+            </Button>
+          </CardContent>
+        </Card>
 
         <Divider sx={{ my: 3 }} />
 

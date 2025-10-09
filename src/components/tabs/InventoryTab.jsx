@@ -7,7 +7,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, IconButton,
   Alert, Chip, Paper, InputAdornment, Divider, Tooltip,
   Accordion, AccordionSummary, AccordionDetails, Collapse, FormControlLabel, Switch,
-  Radio, RadioGroup, FormLabel, Tabs, Tab
+  Radio, RadioGroup, FormLabel, Tabs, Tab, FormControl
 } from '@mui/material';
 
 import AddIcon from '@mui/icons-material/Add';
@@ -113,7 +113,11 @@ export default function InventoryTab() {
     pricing_mode: 'per_kg',
     price_per_kg: '',
     total_cost: '',
-    batch_weight_kg: '',
+    // نظام الوزن الجديد
+    weight_input_mode: 'per_sheet', // 'per_sheet' أو 'total'
+    weight_per_sheet: '', // وزن القطعة الواحدة
+    total_weight: '', // الوزن الإجمالي
+    batch_weight_kg: '', // للتوافق مع الكود القديم
     storage_location: '',
     received_date: new Date().toISOString().split('T')[0],
     notes: '',
@@ -352,17 +356,30 @@ export default function InventoryTab() {
       return setError('الأبعاد مطلوبة');
     if (!batchForm.quantity || Number(batchForm.quantity) <= 0)
       return setError('الكمية يجب أن تكون أكبر من صفر');
-    if (!batchForm.batch_weight_kg || Number(batchForm.batch_weight_kg) <= 0)
-      return setError('الوزن لكل قطعة مطلوب ويجب أن يكون أكبر من صفر');
 
-    const preview = computeTotalsPreview(
-      batchForm.pricing_mode,
-      batchForm.price_per_kg,
-      batchForm.total_cost,
-      batchForm.quantity,
-      sheetForm.weight_per_sheet_kg,
-      batchForm.batch_weight_kg
-    );
+    // التحقق من الوزن
+    const weightPerSheet = Number(batchForm.weight_per_sheet) || 0;
+    const totalWeight = Number(batchForm.total_weight) || 0;
+
+    if (weightPerSheet <= 0 && totalWeight <= 0) {
+      return setError('يجب إدخال الوزن (لكل قطعة أو الإجمالي)');
+    }
+
+    // حساب التكلفة والأسعار
+    const qty = Number(batchForm.quantity);
+    const finalWeightPerSheet = weightPerSheet || (totalWeight / qty);
+    const finalTotalWeight = totalWeight || (weightPerSheet * qty);
+
+    let finalPricePerKg = 0;
+    let finalTotalCost = 0;
+
+    if (batchForm.pricing_mode === 'per_kg') {
+      finalPricePerKg = Number(batchForm.price_per_kg) || 0;
+      finalTotalCost = finalTotalWeight * finalPricePerKg;
+    } else {
+      finalTotalCost = Number(batchForm.total_cost) || 0;
+      finalPricePerKg = finalTotalWeight > 0 ? finalTotalCost / finalTotalWeight : 0;
+    }
 
     const sheetData = {
       code: sheetForm.code.trim(),
@@ -372,15 +389,15 @@ export default function InventoryTab() {
       length_mm: Number(sheetForm.length_mm),
       width_mm: Number(sheetForm.width_mm),
       thickness_mm: Number(sheetForm.thickness_mm),
-      weight_per_sheet_kg: sheetForm.weight_per_sheet_kg ? Number(sheetForm.weight_per_sheet_kg) : null,
+      weight_per_sheet_kg: finalWeightPerSheet,
       is_remnant: false
     };
 
     const batchData = {
       supplier_id: batchForm.supplier_id || null,
       quantity: Number(batchForm.quantity),
-      price_per_kg: preview.price_per_kg != null ? Number(preview.price_per_kg) : null,
-      total_cost: preview.total_cost != null ? Number(preview.total_cost.toFixed(2)) : null,
+      price_per_kg: finalPricePerKg,
+      total_cost: finalTotalCost,
       storage_location: batchForm.storage_location || null,
       received_date: batchForm.received_date,
       notes: batchForm.notes || null
@@ -1171,18 +1188,7 @@ export default function InventoryTab() {
                       InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="الوزن لكل ورقة (كغ) — إدخال يدوي"
-                      value={sheetForm.weight_per_sheet_kg}
-                      onChange={(e) => setSheetForm({ ...sheetForm, weight_per_sheet_kg: e.target.value })}
-                      inputProps={{ step: 0.001, min: 0 }}
-                      helperText="أدخل الوزن يدويًا (بدون حساب تلقائي)"
-                      InputLabelProps={{ shrink: true }}
-                    />
-                  </Grid>
+                  {/* تم حذف حقل الوزن من هنا - سيكون في قسم الدفعة فقط */}
                 </Grid>
               </AccordionDetails>
             </Accordion>
@@ -1224,6 +1230,100 @@ export default function InventoryTab() {
                     />
                   </Grid>
 
+                  {/* اختيار طريقة إدخال الوزن */}
+                  <Grid item xs={12}>
+                    <FormLabel component="legend">طريقة إدخال الوزن</FormLabel>
+                    <RadioGroup
+                      row
+                      value={batchForm.weight_input_mode || 'per_sheet'}
+                      onChange={(e) => {
+                        const mode = e.target.value;
+                        setBatchForm({ ...batchForm, weight_input_mode: mode });
+                        // حساب تلقائي عند تغيير الوضع
+                        if (mode === 'total' && batchForm.weight_per_sheet && batchForm.quantity) {
+                          const totalWeight = Number(batchForm.weight_per_sheet) * Number(batchForm.quantity);
+                          setBatchForm(prev => ({ ...prev, total_weight: totalWeight.toFixed(3) }));
+                        } else if (mode === 'per_sheet' && batchForm.total_weight && batchForm.quantity) {
+                          const perSheet = Number(batchForm.total_weight) / Number(batchForm.quantity);
+                          setBatchForm(prev => ({ ...prev, weight_per_sheet: perSheet.toFixed(3) }));
+                        }
+                      }}
+                    >
+                      <FormControlLabel value="per_sheet" control={<Radio />} label="وزن القطعة الواحدة" />
+                      <FormControlLabel value="total" control={<Radio />} label="الوزن الإجمالي للدفعة" />
+                    </RadioGroup>
+                  </Grid>
+
+                  {/* حقول الوزن حسب الاختيار */}
+                  {batchForm.weight_input_mode === 'per_sheet' || !batchForm.weight_input_mode ? (
+                    <>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          fullWidth
+                          type="number"
+                          label="وزن القطعة الواحدة (كغ) *"
+                          value={batchForm.weight_per_sheet || ''}
+                          onChange={(e) => {
+                            const weight = e.target.value;
+                            setBatchForm({ ...batchForm, weight_per_sheet: weight });
+                            // حساب الوزن الإجمالي تلقائياً
+                            if (weight && batchForm.quantity) {
+                              const total = Number(weight) * Number(batchForm.quantity);
+                              setBatchForm(prev => ({ ...prev, total_weight: total.toFixed(3) }));
+                            }
+                          }}
+                          inputProps={{ step: 0.001, min: 0 }}
+                          InputLabelProps={{ shrink: true }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          fullWidth
+                          type="number"
+                          label="الوزن الإجمالي (كغ)"
+                          value={batchForm.total_weight || ''}
+                          disabled
+                          helperText="يُحسب تلقائياً"
+                          InputLabelProps={{ shrink: true }}
+                        />
+                      </Grid>
+                    </>
+                  ) : (
+                    <>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          fullWidth
+                          type="number"
+                          label="الوزن الإجمالي للدفعة (كغ) *"
+                          value={batchForm.total_weight || ''}
+                          onChange={(e) => {
+                            const totalWeight = e.target.value;
+                            setBatchForm({ ...batchForm, total_weight: totalWeight });
+                            // حساب وزن القطعة تلقائياً
+                            if (totalWeight && batchForm.quantity) {
+                              const perSheet = Number(totalWeight) / Number(batchForm.quantity);
+                              setBatchForm(prev => ({ ...prev, weight_per_sheet: perSheet.toFixed(3) }));
+                            }
+                          }}
+                          inputProps={{ step: 0.001, min: 0 }}
+                          InputLabelProps={{ shrink: true }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          fullWidth
+                          type="number"
+                          label="وزن القطعة الواحدة (كغ)"
+                          value={batchForm.weight_per_sheet || ''}
+                          disabled
+                          helperText="يُحسب تلقائياً"
+                          InputLabelProps={{ shrink: true }}
+                        />
+                      </Grid>
+                    </>
+                  )}
+
+                  {/* طريقة التسعير */}
                   <Grid item xs={12} md={6}>
                     <TextField
                       select
@@ -1233,38 +1333,9 @@ export default function InventoryTab() {
                       onChange={(e) => setBatchForm({ ...batchForm, pricing_mode: e.target.value })}
                       SelectProps={{ native: true }}
                     >
-                      <option value="per_kg">بالكيلو (price/kg)</option>
-                      <option value="per_batch">بالدفعة (total cost)</option>
+                      <option value="per_kg">بالكيلو</option>
+                      <option value="per_batch">بالدفعة الكاملة</option>
                     </TextField>
-                  </Grid>
-
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="الوزن لكل قطعة (كغ) *"
-                      value={batchForm.batch_weight_kg}
-                      onChange={(e) => setBatchForm({ ...batchForm, batch_weight_kg: e.target.value })}
-                      inputProps={{ step: 0.001, min: 0 }}
-                      helperText="الوزن لكل قطعة واحدة"
-                      InputLabelProps={{ shrink: true }}
-                    />
-                  </Grid>
-
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="الوزن الإجمالي (كغ)"
-                      value={
-                        batchForm.quantity && batchForm.batch_weight_kg
-                          ? (Number(batchForm.quantity) * Number(batchForm.batch_weight_kg)).toFixed(3)
-                          : ''
-                      }
-                      disabled
-                      helperText="يُحسب تلقائياً: الكمية × الوزن لكل قطعة"
-                      InputLabelProps={{ shrink: true }}
-                    />
                   </Grid>
 
                   {batchForm.pricing_mode === 'per_kg' ? (
@@ -1328,31 +1399,56 @@ export default function InventoryTab() {
                     />
                   </Grid>
 
+                  {/* عرض الأسعار المحسوبة */}
                   <Grid item xs={12}>
-                    {(() => {
-                      const p = computeTotalsPreview(
-                        batchForm.pricing_mode,
-                        batchForm.price_per_kg,
-                        batchForm.total_cost,
-                        batchForm.quantity,
-                        sheetForm.weight_per_sheet_kg,
-                        batchForm.batch_weight_kg
-                      );
-                      return (
-                        <Typography variant="caption" color="text.secondary" fontSize="0.9375rem">
-                          الوزن المُستخدم للحساب: <b>{p.weight_used ? fmt(p.weight_used) : 'غير مُحدد'} كغ</b> —{' '}
-                          {batchForm.pricing_mode === 'per_kg' ? (
+                    <Alert severity="info" sx={{ mt: 1 }}>
+                      <Grid container spacing={2}>
+                        {/* حساب وعرض الأسعار */}
+                        {(() => {
+                          const qty = Number(batchForm.quantity) || 0;
+                          const weightPerSheet = Number(batchForm.weight_per_sheet) || 0;
+                          const totalWeight = Number(batchForm.total_weight) || (qty * weightPerSheet);
+                          const pricePerKg = Number(batchForm.price_per_kg) || 0;
+                          const totalCost = Number(batchForm.total_cost) || 0;
+
+                          let pricePerSheet = 0;
+                          let calculatedTotalCost = 0;
+                          let calculatedPricePerKg = 0;
+
+                          if (batchForm.pricing_mode === 'per_kg') {
+                            // التسعير بالكيلو
+                            calculatedTotalCost = totalWeight * pricePerKg;
+                            pricePerSheet = weightPerSheet * pricePerKg;
+                            calculatedPricePerKg = pricePerKg;
+                          } else {
+                            // التسعير بالدفعة
+                            calculatedPricePerKg = totalWeight > 0 ? totalCost / totalWeight : 0;
+                            pricePerSheet = qty > 0 ? totalCost / qty : 0;
+                            calculatedTotalCost = totalCost;
+                          }
+
+                          return (
                             <>
-                              التكلفة المتوقعة: <b>{p.total_cost != null ? fmt(p.total_cost) : '—'} {baseCurrencyInfo.symbol}</b>
+                              <Grid item xs={12} md={4}>
+                                <Typography variant="body2">
+                                  <strong>السعر لكل قطعة:</strong> {fmt(pricePerSheet)} {baseCurrencyInfo.symbol}
+                                </Typography>
+                              </Grid>
+                              <Grid item xs={12} md={4}>
+                                <Typography variant="body2">
+                                  <strong>السعر لكل كيلو:</strong> {fmt(calculatedPricePerKg)} {baseCurrencyInfo.symbol}
+                                </Typography>
+                              </Grid>
+                              <Grid item xs={12} md={4}>
+                                <Typography variant="body2">
+                                  <strong>التكلفة الإجمالية:</strong> {fmt(calculatedTotalCost)} {baseCurrencyInfo.symbol}
+                                </Typography>
+                              </Grid>
                             </>
-                          ) : (
-                            <>
-                              السعر/كغ المتوقع: <b>{p.price_per_kg != null ? fmt(p.price_per_kg) : '—'} {baseCurrencyInfo.symbol}</b>
-                            </>
-                          )}
-                        </Typography>
-                      );
-                    })()}
+                          );
+                        })()}
+                      </Grid>
+                    </Alert>
                   </Grid>
                 </Grid>
               </AccordionDetails>

@@ -238,46 +238,77 @@ export function getSupplierPayments(supplierId) {
 }
 
 export function getSupplierBalance(supplierId) {
-  if (!db) return { total_purchases: 0, total_payments: 0, balance: 0 };
-  
+  if (!db) return 0;
+
   try {
-    const purchasesStmt = db.prepare(`
-      SELECT COALESCE(SUM(total_cost), 0) as total_purchases
-      FROM batches
+    // Get balance from transactions table (most accurate)
+    const stmt = db.prepare(`
+      SELECT balance_after
+      FROM supplier_transactions
       WHERE supplier_id = ?
+      ORDER BY id DESC
+      LIMIT 1
+    `);
+    stmt.bind([supplierId]);
+
+    let balance = 0;
+    if (stmt.step()) {
+      const row = stmt.getAsObject();
+      balance = row.balance_after || 0;
+    }
+    stmt.free();
+
+    return balance;
+  } catch (e) {
+    console.error('Get supplier balance error:', e);
+    return 0;
+  }
+}
+
+export function getSupplierBalanceDetails(supplierId) {
+  if (!db) return { total_purchases: 0, total_payments: 0, balance: 0 };
+
+  try {
+    // Calculate total purchases from transactions
+    const purchasesStmt = db.prepare(`
+      SELECT COALESCE(SUM(amount), 0) as total_purchases
+      FROM supplier_transactions
+      WHERE supplier_id = ? AND transaction_type = 'purchase' AND amount > 0
     `);
     purchasesStmt.bind([supplierId]);
-    
+
     let totalPurchases = 0;
     if (purchasesStmt.step()) {
       const row = purchasesStmt.getAsObject();
       totalPurchases = row.total_purchases || 0;
     }
     purchasesStmt.free();
-    
+
+    // Calculate total payments from transactions
     const paymentsStmt = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total_payments
-      FROM supplier_payments
-      WHERE supplier_id = ?
+      SELECT COALESCE(ABS(SUM(amount)), 0) as total_payments
+      FROM supplier_transactions
+      WHERE supplier_id = ? AND transaction_type = 'payment' AND amount < 0
     `);
     paymentsStmt.bind([supplierId]);
-    
+
     let totalPayments = 0;
     if (paymentsStmt.step()) {
       const row = paymentsStmt.getAsObject();
       totalPayments = row.total_payments || 0;
     }
     paymentsStmt.free();
-    
-    const balance = totalPurchases - totalPayments;
-    
+
+    // Get current balance from last transaction
+    const balance = getSupplierBalance(supplierId);
+
     return {
       total_purchases: totalPurchases,
       total_payments: totalPayments,
       balance: balance
     };
   } catch (e) {
-    console.error('Get supplier balance error:', e);
+    console.error('Get supplier balance details error:', e);
     return { total_purchases: 0, total_payments: 0, balance: 0 };
   }
 }
