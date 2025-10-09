@@ -47,7 +47,6 @@ const menuItems = [
   { label: 'الزبائن', icon: <PeopleIcon /> },
   { label: 'الموردين', icon: <LocalShippingIcon /> },
   { label: 'المخزون', icon: <InventoryIcon /> },
-  { label: 'البقايا', icon: <ContentCutIcon /> },
   { label: 'المصروفات', icon: <MoneyOffIcon /> },
   { label: 'الدفعات', icon: <PaymentIcon /> },
   { label: 'التقارير', icon: <AssessmentIcon /> },
