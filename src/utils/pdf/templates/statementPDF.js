@@ -1,4 +1,3 @@
-// src/utils/pdf/templates/statementPDF.js
 import {
   forceLatinNumbers,
   formatDateLatin,
@@ -7,14 +6,12 @@ import {
   createRTLTable
 } from '../pdfService';
 
-/**
- * Generate customer/supplier statement PDF
- * @param {object} entity - Customer or supplier data
- * @param {array} transactions - Transaction history
- * @param {string} type - 'customer' or 'supplier'
- * @param {object} options - PDF generation options
- * @returns {object} PDF document definition
- */
+const MARGIN_MAP = {
+  narrow: [20, 40, 20, 40],
+  normal: [40, 60, 40, 60],
+  wide: [60, 80, 60, 80]
+};
+
 export function generateStatementPDF(entity, transactions, type = 'customer', options = {}) {
   const {
     orientation = 'portrait',
@@ -25,18 +22,11 @@ export function generateStatementPDF(entity, transactions, type = 'customer', op
     currencySymbol = ''
   } = options;
 
-  const marginMap = {
-    narrow: [20, 40, 20, 40],
-    normal: [40, 60, 40, 60],
-    wide: [60, 80, 60, 80]
-  };
-
-  const pageMargins = marginMap[margins] || marginMap.normal;
+  const pageMargins = MARGIN_MAP[margins] || MARGIN_MAP.normal;
 
   const entityType = type === 'customer' ? 'العميل' : 'المورد';
   const title = `كشف حساب ${entityType}`;
 
-  // Entity information
   const entityInfo = [
     {
       columns: [
@@ -77,7 +67,6 @@ export function generateStatementPDF(entity, transactions, type = 'customer', op
     }
   ];
 
-  // Date range if specified
   const dateRange = (fromDate || toDate) ? [
     {
       text: `الفترة: من ${formatDateLatin(fromDate || 'البداية')} إلى ${formatDateLatin(toDate || 'الآن')}`,
@@ -87,7 +76,6 @@ export function generateStatementPDF(entity, transactions, type = 'customer', op
     }
   ] : [];
 
-  // Prepare transactions table
   const tableHeaders = ['الرصيد بعد', 'المبلغ', 'النوع', 'الملاحظات', 'التاريخ'];
   const tableData = transactions.map(tx => {
     let txType = '';
@@ -117,7 +105,6 @@ export function generateStatementPDF(entity, transactions, type = 'customer', op
     ['20%', '20%', '15%', '30%', '15%']
   );
 
-  // Summary section
   const finalBalance = transactions.length > 0
     ? transactions[transactions.length - 1].balance_after || 0
     : 0;
@@ -169,7 +156,6 @@ export function generateStatementPDF(entity, transactions, type = 'customer', op
     }
   ];
 
-  // Build document definition
   const docDefinition = {
     pageOrientation: orientation,
     pageMargins,

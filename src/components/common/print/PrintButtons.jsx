@@ -1,12 +1,7 @@
-// src/components/common/print/PrintButtons.jsx
 import { Box, Button, Tooltip, CircularProgress } from '@mui/material';
 import PrintIcon from '@mui/icons-material/Print';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 
-/**
- * Reusable Print and PDF buttons component
- * Automatically appears in appropriate contexts
- */
 export default function PrintButtons({
   onPrint,
   onPDF,

@@ -1,4 +1,3 @@
-// src/utils/pdf/templates/batchPDF.js
 import {
   forceLatinNumbers,
   formatDateLatin,
@@ -6,13 +5,12 @@ import {
   generateHeader
 } from '../pdfService';
 
-/**
- * Generate batch details PDF document definition
- * @param {object} batch - Batch data
- * @param {object} sheet - Sheet data
- * @param {object} options - PDF generation options
- * @returns {object} PDF document definition
- */
+const MARGIN_MAP = {
+  narrow: [20, 40, 20, 40],
+  normal: [40, 60, 40, 60],
+  wide: [60, 80, 60, 80]
+};
+
 export function generateBatchPDF(batch, sheet, options = {}) {
   const {
     orientation = 'portrait',
@@ -20,15 +18,7 @@ export function generateBatchPDF(batch, sheet, options = {}) {
     margins = 'normal'
   } = options;
 
-  const marginMap = {
-    narrow: [20, 40, 20, 40],
-    normal: [40, 60, 40, 60],
-    wide: [60, 80, 60, 80]
-  };
-
-  const pageMargins = marginMap[margins] || marginMap.normal;
-
-  // Sheet information section
+  const pageMargins = MARGIN_MAP[margins] || MARGIN_MAP.normal;
   const sheetInfo = [
     {
       text: 'معلومات الصفيحة',
@@ -96,7 +86,6 @@ export function generateBatchPDF(batch, sheet, options = {}) {
     }
   ];
 
-  // Batch information section
   const batchInfo = [
     {
       text: 'معلومات الدفعة',
@@ -195,7 +184,6 @@ export function generateBatchPDF(batch, sheet, options = {}) {
     }
   ];
 
-  // Notes section
   const notesSection = batch.notes ? [
     {
       text: 'ملاحظات:',
@@ -209,7 +197,6 @@ export function generateBatchPDF(batch, sheet, options = {}) {
     }
   ] : [];
 
-  // Audit trail
   const auditSection = [];
   if (batch.created_by) {
     auditSection.push({
@@ -245,7 +232,6 @@ export function generateBatchPDF(batch, sheet, options = {}) {
     });
   }
 
-  // Build document definition
   const docDefinition = {
     pageOrientation: orientation,
     pageMargins,

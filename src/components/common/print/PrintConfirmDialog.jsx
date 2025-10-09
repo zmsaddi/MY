@@ -1,4 +1,3 @@
-// src/components/common/print/PrintConfirmDialog.jsx
 import { useState } from 'react';
 import {
   Dialog,
@@ -20,10 +19,6 @@ import {
 import PrintIcon from '@mui/icons-material/Print';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 
-/**
- * Print Confirmation Dialog Component
- * Shows before any print/PDF operation with customization options
- */
 export default function PrintConfirmDialog({
   open,
   onClose,
@@ -53,7 +48,6 @@ export default function PrintConfirmDialog({
   };
 
   const handleClose = () => {
-    // Reset to defaults
     setAction(defaultAction);
     setOrientation('portrait');
     setIncludeLogo(showLogo);
@@ -81,7 +75,6 @@ export default function PrintConfirmDialog({
       </DialogTitle>
 
       <DialogContent>
-        {/* Document Summary */}
         <Alert severity="info" sx={{ mb: 3 }}>
           <Typography variant="body2" gutterBottom>
             <strong>اسم المستند:</strong> {documentName}
@@ -96,7 +89,6 @@ export default function PrintConfirmDialog({
 
         <Divider sx={{ my: 2 }} />
 
-        {/* Action Selection */}
         <FormControl component="fieldset" fullWidth sx={{ mb: 3 }}>
           <FormLabel component="legend" sx={{ fontWeight: 600, mb: 1 }}>
             الإجراء
@@ -123,7 +115,6 @@ export default function PrintConfirmDialog({
           </RadioGroup>
         </FormControl>
 
-        {/* Orientation Selection */}
         {showOrientation && (
           <FormControl component="fieldset" fullWidth sx={{ mb: 3 }}>
             <FormLabel component="legend" sx={{ fontWeight: 600, mb: 1 }}>
@@ -148,7 +139,6 @@ export default function PrintConfirmDialog({
           </FormControl>
         )}
 
-        {/* Margins Selection */}
         {showMargins && (
           <FormControl component="fieldset" fullWidth sx={{ mb: 3 }}>
             <FormLabel component="legend" sx={{ fontWeight: 600, mb: 1 }}>
@@ -178,7 +168,6 @@ export default function PrintConfirmDialog({
           </FormControl>
         )}
 
-        {/* Logo Option */}
         <FormControl fullWidth>
           <FormControlLabel
             control={

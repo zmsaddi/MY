@@ -1,4 +1,3 @@
-// src/utils/pdf/templates/invoicePDF.js
 import {
   forceLatinNumbers,
   formatDateLatin,
@@ -7,12 +6,12 @@ import {
   createRTLTable
 } from '../pdfService';
 
-/**
- * Generate invoice PDF document definition
- * @param {object} sale - Sale data with items
- * @param {object} options - PDF generation options
- * @returns {object} PDF document definition
- */
+const MARGIN_MAP = {
+  narrow: [20, 40, 20, 40],
+  normal: [40, 60, 40, 60],
+  wide: [60, 80, 60, 80]
+};
+
 export function generateInvoicePDF(sale, options = {}) {
   const {
     orientation = 'portrait',
@@ -20,16 +19,7 @@ export function generateInvoicePDF(sale, options = {}) {
     margins = 'normal'
   } = options;
 
-  // Calculate margins
-  const marginMap = {
-    narrow: [20, 40, 20, 40],
-    normal: [40, 60, 40, 60],
-    wide: [60, 80, 60, 80]
-  };
-
-  const pageMargins = marginMap[margins] || marginMap.normal;
-
-  // Prepare invoice header info
+  const pageMargins = MARGIN_MAP[margins] || MARGIN_MAP.normal;
   const invoiceInfo = [
     {
       columns: [
@@ -72,7 +62,6 @@ export function generateInvoicePDF(sale, options = {}) {
     }
   ];
 
-  // Prepare items table
   const tableHeaders = ['الإجمالي', 'السعر', 'الكمية', 'الوصف', 'النوع'];
   const tableData = (sale.items || []).map(item => {
     const description = item.item_type === 'material'
@@ -94,7 +83,6 @@ export function generateInvoicePDF(sale, options = {}) {
     ['20%', '20%', '15%', '30%', '15%']
   );
 
-  // Prepare summary
   const summary = [
     {
       columns: [
@@ -232,7 +220,6 @@ export function generateInvoicePDF(sale, options = {}) {
     });
   }
 
-  // Notes section
   const notesSection = sale.notes ? [
     {
       text: 'ملاحظات:',
@@ -246,7 +233,6 @@ export function generateInvoicePDF(sale, options = {}) {
     }
   ] : [];
 
-  // Audit trail
   const auditSection = [];
   if (sale.created_by) {
     auditSection.push({
@@ -269,7 +255,6 @@ export function generateInvoicePDF(sale, options = {}) {
     });
   }
 
-  // Build document definition
   const docDefinition = {
     pageOrientation: orientation,
     pageMargins,
