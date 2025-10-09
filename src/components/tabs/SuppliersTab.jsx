@@ -3,8 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Box, Card, CardContent, Grid, TextField, Button, Typography,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Dialog, DialogTitle, DialogContent, DialogActions,
-  Alert, Paper, IconButton, Tooltip, InputAdornment, Chip, Divider, Tabs, Tab
+  Alert, Paper, IconButton, Tooltip, InputAdornment, Chip, Divider, Tabs, Tab, MenuItem
 } from '@mui/material';
 
 import AddIcon from '@mui/icons-material/Add';
@@ -17,12 +16,18 @@ import PaymentIcon from '@mui/icons-material/Payment';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 
+import UnifiedFormField from '../common/forms/UnifiedFormField';
+import UnifiedFormDialog from '../common/forms/UnifiedFormDialog';
+import UnifiedConfirmDialog from '../common/dialogs/UnifiedConfirmDialog';
+import { confirmationMessages } from '../../theme/designSystem';
+
 import {
   getSuppliers, addSupplier, updateSupplier,
   getSupplierBalance, getSupplierStatement,
   settleSupplierPayment, getPaymentMethodsForUI,
   getBaseCurrencyInfo, getBatchById
 } from '../../utils/database';
+import { safeText, safeNotes, safeAddress, safeCompanyName } from '../../utils/displayHelpers';
 
 const emptyForm = {
   name: '',
@@ -53,7 +58,7 @@ export default function SuppliersTab() {
   const [openStatementDialog, setOpenStatementDialog] = useState(false);
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
   const [openBatchDialog, setOpenBatchDialog] = useState(false);
-  
+
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [selectedSupplier, setSelectedSupplier] = useState(null);
@@ -68,6 +73,16 @@ export default function SuppliersTab() {
     payment_method: '',
     notes: ''
   });
+
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    type: 'save',
+    data: null,
+    action: null
+  });
+  const [errors, setErrors] = useState({});
+  const [paymentErrors, setPaymentErrors] = useState({});
+  const [loading, setLoading] = useState(false);
 
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [baseCurrencyInfo, setBaseCurrencyInfo] = useState({ code: 'USD', symbol: '$' });
@@ -84,7 +99,7 @@ export default function SuppliersTab() {
         balance: Number(getSupplierBalance(s.id)) || 0,
       }));
       setSuppliers(enriched);
-      
+
       const methods = getPaymentMethodsForUI(true);
       setPaymentMethods(methods);
 
@@ -105,10 +120,19 @@ export default function SuppliersTab() {
     );
   }, [suppliers, filter]);
 
+  const openConfirm = (type, data = null, action = null) => {
+    setConfirmDialog({ open: true, type, data, action });
+  };
+
+  const closeConfirm = () => {
+    setConfirmDialog({ ...confirmDialog, open: false });
+  };
+
   const openCreate = () => {
     setEditingId(null);
     setForm(emptyForm);
     setError('');
+    setErrors({});
     setOpen(true);
   };
 
@@ -125,47 +149,83 @@ export default function SuppliersTab() {
       notes: s.notes || ''
     });
     setError('');
+    setErrors({});
     setOpen(true);
   };
 
   const closeDialog = () => {
     setOpen(false);
-  };
-
-  const handleChange = (field, value) => {
-    setForm(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleSubmit = () => {
+    setErrors({});
     setError('');
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) {
+      setErrors({ ...errors, [name]: null });
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+
     if (!form.name.trim()) {
-      setError('اسم المورد مطلوب');
+      newErrors.name = 'اسم المورد مطلوب';
+    }
+
+    if (!form.phone1.trim()) {
+      newErrors.phone1 = 'رقم الهاتف الأول مطلوب';
+    }
+
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      newErrors.email = 'البريد الإلكتروني غير صحيح';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleActualSave = async () => {
+    if (!validateForm()) {
+      closeConfirm();
       return;
     }
 
-    const payload = {
-      name: form.name.trim(),
-      company_name: form.company_name || null,
-      phone1: form.phone1 || null,
-      phone2: form.phone2 || null,
-      address: form.address || null,
-      email: form.email || null,
-      tax_number: form.tax_number || null,
-      notes: form.notes || null
-    };
+    setLoading(true);
+    try {
+      const payload = {
+        name: form.name.trim(),
+        company_name: form.company_name || null,
+        phone1: form.phone1 || null,
+        phone2: form.phone2 || null,
+        address: form.address || null,
+        email: form.email || null,
+        tax_number: form.tax_number || null,
+        notes: form.notes || null
+      };
 
-    const res = editingId
-      ? updateSupplier(editingId, payload)
-      : addSupplier(payload);
+      const res = editingId
+        ? updateSupplier(editingId, payload)
+        : addSupplier(payload);
 
-    if (res.success) {
-      setSuccess(editingId ? '✓ تم تحديث المورد بنجاح' : '✓ تم إضافة المورد بنجاح');
-      setTimeout(() => setSuccess(''), 3000);
-      setOpen(false);
-      load();
-    } else {
-      setError('فشل الحفظ: ' + res.error);
+      if (res.success) {
+        setSuccess(editingId ? '✓ تم تحديث المورد بنجاح' : '✓ تم إضافة المورد بنجاح');
+        setTimeout(() => setSuccess(''), 3000);
+        setOpen(false);
+        load();
+      } else {
+        setError('فشل الحفظ: ' + res.error);
+      }
+    } catch (err) {
+      setError('حدث خطأ: ' + err.message);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleFormSubmit = () => {
+    openConfirm(editingId ? 'update' : 'save', form, handleActualSave);
   };
 
   const handleOpenStatement = (supplier) => {
@@ -199,31 +259,67 @@ export default function SuppliersTab() {
       notes: ''
     });
     setError('');
+    setPaymentErrors({});
     setOpenPaymentDialog(true);
   };
 
-  const handleSavePayment = () => {
+  const validatePayment = () => {
+    const newErrors = {};
     const amount = parseFloat(paymentData.amount);
+
     if (!amount || amount <= 0) {
-      setError('المبلغ يجب أن يكون أكبر من صفر');
+      newErrors.amount = 'المبلغ يجب أن يكون أكبر من صفر';
+    }
+
+    if (!paymentData.payment_date) {
+      newErrors.payment_date = 'تاريخ الدفع مطلوب';
+    }
+
+    setPaymentErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleActualSavePayment = async () => {
+    if (!validatePayment()) {
+      closeConfirm();
       return;
     }
 
-    const result = settleSupplierPayment(
-      selectedSupplier.id,
-      amount,
-      paymentData.payment_date,
-      paymentData.payment_method || paymentMethods[0]?.name || 'Cash',
-      paymentData.notes
-    );
+    setLoading(true);
+    try {
+      const amount = parseFloat(paymentData.amount);
+      const result = settleSupplierPayment(
+        selectedSupplier.id,
+        amount,
+        paymentData.payment_date,
+        paymentData.payment_method || paymentMethods[0]?.name || 'Cash',
+        paymentData.notes
+      );
 
-    if (result.success) {
-      setSuccess(`✓ تم تسجيل الدفعة بنجاح. الرصيد الجديد: ${fmt(result.balance)} ${baseCurrencyInfo.symbol}`);
-      setTimeout(() => setSuccess(''), 4000);
-      setOpenPaymentDialog(false);
-      load();
-    } else {
-      setError('فشل تسجيل الدفعة: ' + result.error);
+      if (result.success) {
+        setSuccess(`✓ تم تسجيل الدفعة بنجاح. الرصيد الجديد: ${fmt(result.balance)} ${baseCurrencyInfo.symbol}`);
+        setTimeout(() => setSuccess(''), 4000);
+        setOpenPaymentDialog(false);
+        load();
+      } else {
+        setError('فشل تسجيل الدفعة: ' + result.error);
+      }
+    } catch (err) {
+      setError('حدث خطأ: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePaymentSubmit = () => {
+    openConfirm('payment', paymentData, handleActualSavePayment);
+  };
+
+  const handlePaymentChange = (e) => {
+    const { name, value } = e.target;
+    setPaymentData({ ...paymentData, [name]: value });
+    if (paymentErrors[name]) {
+      setPaymentErrors({ ...paymentErrors, [name]: null });
     }
   };
 
@@ -258,14 +354,14 @@ export default function SuppliersTab() {
       {error && <Alert severity="error" sx={{ mb: 3, fontSize: '1rem' }} onClose={() => setError('')}>{error}</Alert>}
 
       <Tabs value={currentTab} onChange={(e, v) => setCurrentTab(v)} sx={{ mb: 3 }}>
-        <Tab 
-          icon={<BusinessIcon />} 
-          iconPosition="start" 
+        <Tab
+          icon={<BusinessIcon />}
+          iconPosition="start"
           label={<Typography fontSize="1rem" fontWeight={600}>قائمة الموردين</Typography>}
         />
-        <Tab 
-          icon={<AccountBalanceIcon />} 
-          iconPosition="start" 
+        <Tab
+          icon={<AccountBalanceIcon />}
+          iconPosition="start"
           label={<Typography fontSize="1rem" fontWeight={600}>ملخص الحسابات</Typography>}
         />
       </Tabs>
@@ -333,7 +429,7 @@ export default function SuppliersTab() {
                         <Typography variant="caption" color="text.secondary" fontSize="0.8125rem">{s.email}</Typography>
                       )}
                     </TableCell>
-                    <TableCell><Typography fontSize="0.9375rem">{s.company_name || '—'}</Typography></TableCell>
+                    <TableCell><Typography fontSize="0.9375rem">{safeCompanyName(s.company_name) || '—'}</Typography></TableCell>
                     <TableCell>
                       <Typography variant="body2" fontSize="0.9375rem">
                         {s.phone1 || '—'}{s.phone2 ? ` / ${s.phone2}` : ''}
@@ -383,7 +479,7 @@ export default function SuppliersTab() {
                   </Typography>
                   {supplier.company_name && (
                     <Typography variant="body2" color="text.secondary" gutterBottom fontSize="0.9375rem">
-                      {supplier.company_name}
+                      {safeCompanyName(supplier.company_name)}
                     </Typography>
                   )}
 
@@ -431,397 +527,388 @@ export default function SuppliersTab() {
       </TabPanel>
 
       {/* Dialog: Create / Edit */}
-      <Dialog
+      <UnifiedFormDialog
         open={open}
         onClose={closeDialog}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{ sx: { borderRadius: 3 } }}
+        onSubmit={handleFormSubmit}
+        title={editingId ? 'تعديل بيانات المورد' : 'إضافة مورد جديد'}
+        subtitle="أدخل البيانات المطلوبة أدناه"
+        submitText={editingId ? 'تحديث' : 'حفظ'}
+        loading={loading}
       >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            {editingId ? <BusinessIcon color="primary" /> : <AddIcon color="primary" />}
-            <Typography variant="h6" fontWeight={700}>
-              {editingId ? 'تعديل مورد' : 'إضافة مورد'}
-            </Typography>
-          </Box>
-        </DialogTitle>
-
-        <DialogContent sx={{ mt: 1 }}>
-          <Grid container spacing={2.5}>
-            <Grid item xs={12} md={6}>
-              <TextField
-                label="اسم المورد *"
-                fullWidth
-                value={form.name}
-                onChange={(e) => handleChange('name', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                label="اسم الشركة"
-                fullWidth
-                value={form.company_name}
-                onChange={(e) => handleChange('company_name', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                label="الهاتف 1"
-                fullWidth
-                value={form.phone1}
-                onChange={(e) => handleChange('phone1', e.target.value)}
-                InputProps={{ startAdornment: <InputAdornment position="start"><PhoneIphoneIcon fontSize="small" /></InputAdornment> }}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                label="الهاتف 2"
-                fullWidth
-                value={form.phone2}
-                onChange={(e) => handleChange('phone2', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12}>
-              <TextField
-                label="العنوان"
-                fullWidth
-                value={form.address}
-                onChange={(e) => handleChange('address', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                label="البريد الإلكتروني"
-                type="email"
-                fullWidth
-                value={form.email}
-                onChange={(e) => handleChange('email', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                label="الرقم الضريبي"
-                fullWidth
-                value={form.tax_number}
-                onChange={(e) => handleChange('tax_number', e.target.value)}
-              />
-            </Grid>
-
-            <Grid item xs={12}>
-              <TextField
-                label="ملاحظات"
-                fullWidth
-                multiline
-                rows={2}
-                value={form.notes}
-                onChange={(e) => handleChange('notes', e.target.value)}
-              />
-            </Grid>
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={6}>
+            <UnifiedFormField
+              label="اسم المورد"
+              value={form.name}
+              onChange={handleChange}
+              name="name"
+              required
+              error={errors.name}
+              autoFocus
+            />
           </Grid>
-        </DialogContent>
 
-        <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button onClick={closeDialog} size="large">إلغاء</Button>
-          <Button variant="contained" onClick={handleSubmit} size="large">
-            {editingId ? 'حفظ التعديلات' : 'إضافة المورد'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+          <Grid item xs={12} md={6}>
+            <UnifiedFormField
+              label="اسم الشركة"
+              value={form.company_name}
+              onChange={handleChange}
+              name="company_name"
+              helperText="اختياري - للشركات فقط"
+            />
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <UnifiedFormField
+              label="رقم الهاتف الأول"
+              value={form.phone1}
+              onChange={handleChange}
+              name="phone1"
+              type="tel"
+              required
+              error={errors.phone1}
+            />
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <UnifiedFormField
+              label="رقم الهاتف الثاني"
+              value={form.phone2}
+              onChange={handleChange}
+              name="phone2"
+              type="tel"
+              helperText="اختياري"
+            />
+          </Grid>
+
+          <Grid item xs={12}>
+            <UnifiedFormField
+              label="العنوان"
+              value={form.address}
+              onChange={handleChange}
+              name="address"
+              multiline
+              rows={2}
+            />
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <UnifiedFormField
+              label="البريد الإلكتروني"
+              value={form.email}
+              onChange={handleChange}
+              name="email"
+              type="email"
+              error={errors.email}
+            />
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <UnifiedFormField
+              label="الرقم الضريبي"
+              value={form.tax_number}
+              onChange={handleChange}
+              name="tax_number"
+              helperText="اختياري - للشركات المسجلة"
+            />
+          </Grid>
+
+          <Grid item xs={12}>
+            <UnifiedFormField
+              label="ملاحظات"
+              value={form.notes}
+              onChange={handleChange}
+              name="notes"
+              multiline
+              rows={3}
+            />
+          </Grid>
+        </Grid>
+      </UnifiedFormDialog>
 
       {/* Dialog: Payment */}
-      <Dialog 
-        open={openPaymentDialog} 
-        onClose={() => setOpenPaymentDialog(false)} 
-        maxWidth="sm" 
-        fullWidth
-        PaperProps={{ sx: { borderRadius: 3 } }}
+      <UnifiedFormDialog
+        open={openPaymentDialog}
+        onClose={() => setOpenPaymentDialog(false)}
+        onSubmit={handlePaymentSubmit}
+        title="تسجيل دفعة جديدة"
+        subtitle={`للمورد: ${selectedSupplier?.name}`}
+        submitText="تسجيل الدفعة"
+        loading={loading}
       >
-        <DialogTitle>
-          <Typography variant="h5" fontWeight={700}>
-            تسديد دفعة - {selectedSupplier?.name}
-          </Typography>
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ mt: 2 }}>
-            <Alert severity="info" sx={{ mb: 3, fontSize: '1rem' }}>
-              الرصيد الحالي: <strong>{fmt(selectedSupplier?.balance)} {baseCurrencyInfo.symbol}</strong>
-            </Alert>
+        <Alert severity="info" sx={{ mb: 3, fontSize: '1rem' }}>
+          الرصيد الحالي: <strong>{fmt(selectedSupplier?.balance)} {baseCurrencyInfo.symbol}</strong>
+        </Alert>
 
-            <Grid container spacing={2.5}>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="المبلغ المدفوع"
-                  value={paymentData.amount}
-                  onChange={(e) => setPaymentData({ ...paymentData, amount: e.target.value })}
-                  inputProps={{ step: 0.01, min: 0.01 }}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSavePayment()}
-                  InputProps={{
-                    endAdornment: <InputAdornment position="end">{baseCurrencyInfo.symbol}</InputAdornment>
-                  }}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
+        <UnifiedFormField
+          label="المبلغ المدفوع"
+          value={paymentData.amount}
+          onChange={handlePaymentChange}
+          name="amount"
+          type="number"
+          required
+          error={paymentErrors.amount}
+          helperText={`الرصيد الحالي: ${fmt(selectedSupplier?.balance)} ${baseCurrencyInfo.symbol}`}
+          inputProps={{ step: 0.01, min: 0.01 }}
+          InputProps={{
+            endAdornment: <InputAdornment position="end">{baseCurrencyInfo.symbol}</InputAdornment>
+          }}
+        />
 
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  type="date"
-                  label="تاريخ الدفع"
-                  value={paymentData.payment_date}
-                  onChange={(e) => setPaymentData({ ...paymentData, payment_date: e.target.value })}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  select
-                  fullWidth
-                  label="طريقة الدفع"
-                  value={paymentData.payment_method}
-                  onChange={(e) => setPaymentData({ ...paymentData, payment_method: e.target.value })}
-                  SelectProps={{ native: true }}
-                >
-                  {paymentMethods.map((method) => (
-                    <option key={method.id} value={method.name}>{method.name}</option>
-                  ))}
-                </TextField>
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={2}
-                  label="ملاحظات"
-                  value={paymentData.notes}
-                  onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
-                />
-              </Grid>
-            </Grid>
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button onClick={() => setOpenPaymentDialog(false)} size="large">إلغاء</Button>
-          <Button onClick={handleSavePayment} variant="contained" color="success" size="large">تسديد</Button>
-        </DialogActions>
-      </Dialog>
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={6}>
+            <UnifiedFormField
+              label="تاريخ الدفع"
+              value={paymentData.payment_date}
+              onChange={handlePaymentChange}
+              name="payment_date"
+              type="date"
+              required
+              error={paymentErrors.payment_date}
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <UnifiedFormField
+              label="طريقة الدفع"
+              value={paymentData.payment_method}
+              onChange={handlePaymentChange}
+              name="payment_method"
+              select
+              required
+            >
+              {paymentMethods.map((method) => (
+                <MenuItem key={method.id} value={method.name}>
+                  {method.name}
+                </MenuItem>
+              ))}
+            </UnifiedFormField>
+          </Grid>
+        </Grid>
+
+        <UnifiedFormField
+          label="ملاحظات"
+          value={paymentData.notes}
+          onChange={handlePaymentChange}
+          name="notes"
+          multiline
+          rows={2}
+        />
+      </UnifiedFormDialog>
+
+      {/* Confirmation Dialog */}
+      <UnifiedConfirmDialog
+        open={confirmDialog.open}
+        onClose={closeConfirm}
+        onConfirm={async () => {
+          await confirmDialog.action();
+          closeConfirm();
+        }}
+        {...confirmationMessages[confirmDialog.type]}
+        message={
+          confirmDialog.type === 'payment'
+            ? `تسجيل دفعة بمبلغ ${fmt(paymentData.amount)} ${baseCurrencyInfo.symbol}؟`
+            : confirmationMessages[confirmDialog.type]?.message
+        }
+        loading={loading}
+      />
 
       {/* Dialog: Statement */}
-      <Dialog 
-        open={openStatementDialog} 
-        onClose={() => setOpenStatementDialog(false)} 
-        maxWidth="lg" 
-        fullWidth
-        PaperProps={{ sx: { borderRadius: 3 } }}
+      <UnifiedFormDialog
+        open={openStatementDialog}
+        onClose={() => setOpenStatementDialog(false)}
+        onSubmit={() => setOpenStatementDialog(false)}
+        title={`كشف حساب - ${selectedSupplier?.name}`}
+        submitText="إغلاق"
+        cancelText=""
+        maxWidth="lg"
       >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="h5" fontWeight={700}>
-              كشف حساب - {selectedSupplier?.name}
-            </Typography>
-            <Chip
-              label={`الرصيد: ${fmt(selectedSupplier?.balance)} ${baseCurrencyInfo.symbol}`}
-              color={getBalanceColor(selectedSupplier?.balance || 0)}
-              sx={{ fontWeight: 700 }}
-            />
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                type="date"
-                label="من تاريخ"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                type="date"
-                label="إلى تاريخ"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Button
-                fullWidth
-                variant="contained"
-                size="large"
-                onClick={handleFilterStatement}
-              >
-                تطبيق الفلتر
-              </Button>
-            </Grid>
-          </Grid>
+        <Box sx={{ mb: 3 }}>
+          <Chip
+            label={`الرصيد: ${fmt(selectedSupplier?.balance)} ${baseCurrencyInfo.symbol}`}
+            color={getBalanceColor(selectedSupplier?.balance || 0)}
+            sx={{ fontWeight: 700 }}
+          />
+        </Box>
 
-          <TableContainer>
-            <Table size="small">
-              <TableHead sx={{ bgcolor: 'grey.100' }}>
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid item xs={12} md={4}>
+            <TextField
+              fullWidth
+              type="date"
+              label="من تاريخ"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <TextField
+              fullWidth
+              type="date"
+              label="إلى تاريخ"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Button
+              fullWidth
+              variant="contained"
+              size="large"
+              onClick={handleFilterStatement}
+            >
+              تطبيق الفلتر
+            </Button>
+          </Grid>
+        </Grid>
+
+        <TableContainer>
+          <Table size="small">
+            <TableHead sx={{ bgcolor: 'grey.100' }}>
+              <TableRow>
+                <TableCell><Typography fontWeight={700} fontSize="1rem">التاريخ</Typography></TableCell>
+                <TableCell><Typography fontWeight={700} fontSize="1rem">النوع</Typography></TableCell>
+                <TableCell><Typography fontWeight={700} fontSize="1rem">الملاحظات</Typography></TableCell>
+                <TableCell align="right"><Typography fontWeight={700} fontSize="1rem">المبلغ</Typography></TableCell>
+                <TableCell align="right"><Typography fontWeight={700} fontSize="1rem">الرصيد</Typography></TableCell>
+                <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">إجراءات</Typography></TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {statement.length === 0 ? (
                 <TableRow>
-                  <TableCell><Typography fontWeight={700} fontSize="1rem">التاريخ</Typography></TableCell>
-                  <TableCell><Typography fontWeight={700} fontSize="1rem">النوع</Typography></TableCell>
-                  <TableCell><Typography fontWeight={700} fontSize="1rem">الملاحظات</Typography></TableCell>
-                  <TableCell align="right"><Typography fontWeight={700} fontSize="1rem">المبلغ</Typography></TableCell>
-                  <TableCell align="right"><Typography fontWeight={700} fontSize="1rem">الرصيد</Typography></TableCell>
-                  <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">إجراءات</Typography></TableCell>
+                  <TableCell colSpan={6} align="center">
+                    <Typography color="text.secondary" py={2} fontSize="1rem">لا توجد حركات</Typography>
+                  </TableCell>
                 </TableRow>
-              </TableHead>
-              <TableBody>
-                {statement.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} align="center">
-                      <Typography color="text.secondary" py={2} fontSize="1rem">لا توجد حركات</Typography>
+              ) : (
+                statement.map((trans) => (
+                  <TableRow key={trans.id} hover>
+                    <TableCell><Typography fontSize="0.9375rem">{trans.transaction_date}</Typography></TableCell>
+                    <TableCell>
+                      <Chip
+                        label={trans.transaction_type === 'purchase' ? 'مشتريات' : 'دفعة'}
+                        color={trans.transaction_type === 'purchase' ? 'primary' : 'success'}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Typography fontSize="0.9375rem">
+                        {safeNotes(trans.notes) || '---'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography
+                        color={trans.amount > 0 ? 'error.main' : 'success.main'}
+                        fontWeight={600}
+                        fontSize="0.9375rem"
+                      >
+                        {trans.amount > 0 ? '+' : ''}{fmt(trans.amount)} {baseCurrencyInfo.symbol}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography fontWeight={600} fontSize="0.9375rem">
+                        {fmt(trans.balance_after)} {baseCurrencyInfo.symbol}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      {trans.transaction_type === 'purchase' && trans.reference_id && (
+                        <Tooltip title="عرض تفاصيل الدفعة">
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => handleViewBatch(trans.reference_id)}
+                          >
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </TableCell>
                   </TableRow>
-                ) : (
-                  statement.map((trans) => (
-                    <TableRow key={trans.id} hover>
-                      <TableCell><Typography fontSize="0.9375rem">{trans.transaction_date}</Typography></TableCell>
-                      <TableCell>
-                        <Chip
-                          label={trans.transaction_type === 'purchase' ? 'مشتريات' : 'دفعة'}
-                          color={trans.transaction_type === 'purchase' ? 'primary' : 'success'}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell><Typography fontSize="0.9375rem">{trans.notes || '---'}</Typography></TableCell>
-                      <TableCell align="right">
-                        <Typography 
-                          color={trans.amount > 0 ? 'error.main' : 'success.main'} 
-                          fontWeight={600}
-                          fontSize="0.9375rem"
-                        >
-                          {trans.amount > 0 ? '+' : ''}{fmt(trans.amount)} {baseCurrencyInfo.symbol}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography fontWeight={600} fontSize="0.9375rem">
-                          {fmt(trans.balance_after)} {baseCurrencyInfo.symbol}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="center">
-                        {trans.transaction_type === 'purchase' && trans.reference_id && (
-                          <Tooltip title="عرض تفاصيل الدفعة">
-                            <IconButton 
-                              size="small" 
-                              color="primary"
-                              onClick={() => handleViewBatch(trans.reference_id)}
-                            >
-                              <VisibilityIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button onClick={() => setOpenStatementDialog(false)} size="large">إغلاق</Button>
-        </DialogActions>
-      </Dialog>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </UnifiedFormDialog>
 
       {/* Dialog: Batch Details */}
-      <Dialog 
-        open={openBatchDialog} 
-        onClose={() => setOpenBatchDialog(false)} 
-        maxWidth="sm" 
-        fullWidth
-        PaperProps={{ sx: { borderRadius: 3 } }}
+      <UnifiedFormDialog
+        open={openBatchDialog}
+        onClose={() => setOpenBatchDialog(false)}
+        onSubmit={() => setOpenBatchDialog(false)}
+        title={`تفاصيل الدفعة ${selectedBatch ? `#${selectedBatch.id}` : ''}`}
+        submitText="إغلاق"
+        cancelText=""
+        maxWidth="md"
       >
         {selectedBatch && (
-          <>
-            <DialogTitle>
-              <Typography variant="h5" fontWeight={700}>
-                تفاصيل الدفعة #{selectedBatch.id}
+          <Grid container spacing={2}>
+            <Grid item xs={6}>
+              <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">الصفيحة:</Typography>
+              <Typography variant="body1" fontWeight={600} fontSize="1.0625rem">
+                {selectedBatch.sheet_code || 'غير محدد'}
               </Typography>
-            </DialogTitle>
-            <DialogContent>
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">الصفيحة:</Typography>
-                  <Typography variant="body1" fontWeight={600} fontSize="1.0625rem">
-                    {selectedBatch.sheet_code || 'غير محدد'}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">التاريخ:</Typography>
-                  <Typography variant="body1" fontWeight={600} fontSize="1.0625rem">
-                    {selectedBatch.received_date}
-                  </Typography>
-                </Grid>
+            </Grid>
+            <Grid item xs={6}>
+              <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">التاريخ:</Typography>
+              <Typography variant="body1" fontWeight={600} fontSize="1.0625rem">
+                {selectedBatch.received_date}
+              </Typography>
+            </Grid>
 
+            <Grid item xs={12}><Divider /></Grid>
+
+            <Grid item xs={6}>
+              <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">الكمية الأصلية:</Typography>
+              <Typography variant="body1" fontWeight={600} fontSize="1.0625rem">
+                {selectedBatch.quantity_original}
+              </Typography>
+            </Grid>
+            <Grid item xs={6}>
+              <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">المتبقي:</Typography>
+              <Typography variant="body1" fontWeight={600} fontSize="1.0625rem">
+                {selectedBatch.quantity_remaining}
+              </Typography>
+            </Grid>
+
+            <Grid item xs={6}>
+              <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">السعر/كغ:</Typography>
+              <Typography variant="body1" fontWeight={600} fontSize="1.0625rem">
+                {selectedBatch.price_per_kg ? `${fmt(selectedBatch.price_per_kg)} ${baseCurrencyInfo.symbol}` : '---'}
+              </Typography>
+            </Grid>
+            <Grid item xs={6}>
+              <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">التكلفة الكلية:</Typography>
+              <Typography variant="body1" fontWeight={600} fontSize="1.0625rem">
+                {selectedBatch.total_cost ? `${fmt(selectedBatch.total_cost)} ${baseCurrencyInfo.symbol}` : '---'}
+              </Typography>
+            </Grid>
+
+            {selectedBatch.storage_location && (
+              <>
                 <Grid item xs={12}><Divider /></Grid>
-
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">الكمية الأصلية:</Typography>
-                  <Typography variant="body1" fontWeight={600} fontSize="1.0625rem">
-                    {selectedBatch.quantity_original}
-                  </Typography>
+                <Grid item xs={12}>
+                  <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">موقع التخزين:</Typography>
+                  <Typography variant="body1" fontSize="1rem">{selectedBatch.storage_location}</Typography>
                 </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">المتبقي:</Typography>
-                  <Typography variant="body1" fontWeight={600} fontSize="1.0625rem">
-                    {selectedBatch.quantity_remaining}
-                  </Typography>
-                </Grid>
+              </>
+            )}
 
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">السعر/كغ:</Typography>
-                  <Typography variant="body1" fontWeight={600} fontSize="1.0625rem">
-                    {selectedBatch.price_per_kg ? `${fmt(selectedBatch.price_per_kg)} ${baseCurrencyInfo.symbol}` : '---'}
-                  </Typography>
+            {selectedBatch.notes && (
+              <>
+                <Grid item xs={12}><Divider /></Grid>
+                <Grid item xs={12}>
+                  <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">ملاحظات:</Typography>
+                  <Typography variant="body1" fontSize="1rem">{safeNotes(selectedBatch.notes)}</Typography>
                 </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">التكلفة الكلية:</Typography>
-                  <Typography variant="body1" fontWeight={600} fontSize="1.0625rem">
-                    {selectedBatch.total_cost ? `${fmt(selectedBatch.total_cost)} ${baseCurrencyInfo.symbol}` : '---'}
-                  </Typography>
-                </Grid>
-
-                {selectedBatch.storage_location && (
-                  <>
-                    <Grid item xs={12}><Divider /></Grid>
-                    <Grid item xs={12}>
-                      <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">موقع التخزين:</Typography>
-                      <Typography variant="body1" fontSize="1rem">{selectedBatch.storage_location}</Typography>
-                    </Grid>
-                  </>
-                )}
-
-                {selectedBatch.notes && (
-                  <>
-                    <Grid item xs={12}><Divider /></Grid>
-                    <Grid item xs={12}>
-                      <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">ملاحظات:</Typography>
-                      <Typography variant="body1" fontSize="1rem">{selectedBatch.notes}</Typography>
-                    </Grid>
-                  </>
-                )}
-              </Grid>
-            </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 3 }}>
-              <Button onClick={() => setOpenBatchDialog(false)} size="large">إغلاق</Button>
-            </DialogActions>
-          </>
+              </>
+            )}
+          </Grid>
         )}
-      </Dialog>
+      </UnifiedFormDialog>
     </Box>
   );
 }

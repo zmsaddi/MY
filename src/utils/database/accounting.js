@@ -183,14 +183,15 @@ export function getSupplierStatement(supplierId, fromDate = null, toDate = null)
    ============================================ */
 
 export function insertCustomerTransactionInline(data) {
-  const currentBalance = getCustomerBalance(data.customer_id);
-  const newBalance = round2(currentBalance + safe(data.amount));
-
   const stmt = db.prepare(`
     INSERT INTO customer_transactions
     (customer_id, transaction_type, amount, reference_type, reference_id,
      balance_after, notes, transaction_date, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, (
+      SELECT COALESCE(SUM(amount), 0) + ?
+      FROM customer_transactions
+      WHERE customer_id = ?
+    ), ?, ?, ?)
   `);
 
   stmt.run([
@@ -199,7 +200,8 @@ export function insertCustomerTransactionInline(data) {
     safe(data.amount),
     data.reference_type || null,
     data.reference_id || null,
-    newBalance,
+    safe(data.amount),
+    data.customer_id,
     data.notes || null,
     data.transaction_date,
     getCurrentUser()
@@ -208,14 +210,15 @@ export function insertCustomerTransactionInline(data) {
 }
 
 export function insertSupplierTransactionInline(data) {
-  const currentBalance = getSupplierBalanceFromTransactions(data.supplier_id);
-  const newBalance = round2(currentBalance + safe(data.amount));
-
   const stmt = db.prepare(`
     INSERT INTO supplier_transactions
     (supplier_id, transaction_type, amount, reference_type, reference_id,
      balance_after, notes, transaction_date, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, (
+      SELECT COALESCE(SUM(amount), 0) + ?
+      FROM supplier_transactions
+      WHERE supplier_id = ?
+    ), ?, ?, ?)
   `);
 
   stmt.run([
@@ -224,7 +227,8 @@ export function insertSupplierTransactionInline(data) {
     safe(data.amount),
     data.reference_type || null,
     data.reference_id || null,
-    newBalance,
+    safe(data.amount),
+    data.supplier_id,
     data.notes || null,
     data.transaction_date,
     getCurrentUser()

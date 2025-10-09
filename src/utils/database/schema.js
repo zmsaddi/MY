@@ -250,14 +250,13 @@ function createSalesTables() {
     payment_status TEXT DEFAULT 'unpaid',
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (customer_id) REFERENCES customers(id)
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL
   )`);
-  
+
   db.run(`CREATE TABLE IF NOT EXISTS sale_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sale_id INTEGER NOT NULL,
     item_type TEXT DEFAULT 'material',
-    
     sheet_id INTEGER,
     batch_id INTEGER,
     quantity_sold INTEGER,
@@ -266,23 +265,20 @@ function createSalesTables() {
     sold_dimensions TEXT,
     sold_weight REAL,
     is_custom_size INTEGER DEFAULT 0,
-    
     service_type_id INTEGER,
     material_description TEXT,
     service_price REAL,
     notes TEXT,
-    
     cogs_per_unit REAL,
     cogs_total REAL,
     service_cost REAL,
     service_cost_total REAL,
     service_notes TEXT,
-    
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
-    FOREIGN KEY (sheet_id) REFERENCES sheets(id),
-    FOREIGN KEY (batch_id) REFERENCES batches(id),
-    FOREIGN KEY (service_type_id) REFERENCES service_types(id)
+    FOREIGN KEY (sheet_id) REFERENCES sheets(id) ON DELETE SET NULL,
+    FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE SET NULL,
+    FOREIGN KEY (service_type_id) REFERENCES service_types(id) ON DELETE SET NULL
   )`);
 }
 
@@ -297,9 +293,9 @@ function createPaymentsTables() {
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
-    FOREIGN KEY (customer_id) REFERENCES customers(id)
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
   )`);
-  
+
   db.run(`CREATE TABLE IF NOT EXISTS supplier_payments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     supplier_id INTEGER NOT NULL,
@@ -310,8 +306,8 @@ function createPaymentsTables() {
     payment_date DATE NOT NULL,
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
-    FOREIGN KEY (batch_id) REFERENCES batches(id)
+    FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE,
+    FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE SET NULL
   )`);
 }
 
@@ -353,7 +349,7 @@ function createExpensesTable() {
     is_active INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
-  
+
   db.run(`CREATE TABLE IF NOT EXISTS expenses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     category_id INTEGER NOT NULL,
@@ -365,159 +361,45 @@ function createExpensesTable() {
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     created_by TEXT,
     updated_by TEXT,
-    FOREIGN KEY (category_id) REFERENCES expense_categories(id)
-  )`);
-
-  // Enhanced Expenses Table - Professional Accounting
-  db.run(`CREATE TABLE IF NOT EXISTS expenses_enhanced (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    category_code TEXT NOT NULL,
-    expense_type TEXT NOT NULL, -- OPERATING, COGS, ADMINISTRATIVE, FINANCIAL, OTHER
-    amount REAL NOT NULL,
-    vat_amount REAL DEFAULT 0,
-    net_amount REAL NOT NULL,
-    currency_code TEXT DEFAULT 'USD',
-    exchange_rate REAL DEFAULT 1.0,
-    amount_base REAL NOT NULL, -- Amount in base currency
-    description TEXT NOT NULL,
-    expense_date DATE NOT NULL,
-    payment_method TEXT DEFAULT 'cash', -- cash, bank_transfer, check, credit_card, petty_cash
-    payment_reference TEXT,
-    vendor_name TEXT,
-    invoice_number TEXT,
-    approval_status TEXT DEFAULT 'draft', -- draft, pending, approved, rejected, paid
-    approved_by TEXT,
-    approved_at DATETIME,
-    approval_notes TEXT,
-    rejected_by TEXT,
-    rejected_at DATETIME,
-    rejection_reason TEXT,
-    paid_status BOOLEAN DEFAULT 0,
-    paid_date DATE,
-    paid_by TEXT,
-    receipt_url TEXT,
-    notes TEXT,
-    is_recurring BOOLEAN DEFAULT 0,
-    recurrence_pattern TEXT, -- daily, weekly, monthly, quarterly, yearly
-    next_occurrence DATE,
-    budget_category TEXT,
-    cost_center TEXT,
-    project_id INTEGER,
-    tax_deductible BOOLEAN DEFAULT 1,
-    created_by TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  // General Ledger for Double-Entry Bookkeeping
-  db.run(`CREATE TABLE IF NOT EXISTS general_ledger (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    transaction_type TEXT NOT NULL,
-    transaction_id INTEGER NOT NULL,
-    account_code TEXT NOT NULL,
-    account_name TEXT NOT NULL,
-    debit REAL DEFAULT 0,
-    credit REAL DEFAULT 0,
-    description TEXT,
-    transaction_date DATE NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  // Expense Budgets
-  db.run(`CREATE TABLE IF NOT EXISTS expense_budgets (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    category_code TEXT NOT NULL,
-    budget_year INTEGER NOT NULL,
-    budget_month INTEGER,
-    budget_amount REAL NOT NULL,
-    alert_threshold REAL DEFAULT 0.8,
-    notes TEXT,
-    created_by TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(category_code, budget_year, budget_month)
-  )`);
-
-  // Recurring Expense Schedule
-  db.run(`CREATE TABLE IF NOT EXISTS recurring_expense_schedule (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    original_expense_id INTEGER NOT NULL,
-    next_date DATE NOT NULL,
-    pattern TEXT NOT NULL,
-    is_active BOOLEAN DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (original_expense_id) REFERENCES expenses_enhanced(id)
+    FOREIGN KEY (category_id) REFERENCES expense_categories(id) ON DELETE RESTRICT
   )`);
 }
 
 function createIndexes() {
   const indexes = [
-    // Batch indexes
     'CREATE INDEX IF NOT EXISTS idx_batches_sheet_id ON batches(sheet_id)',
     'CREATE INDEX IF NOT EXISTS idx_batches_supplier_id ON batches(supplier_id)',
-
-    // Sheet indexes
+    'CREATE INDEX IF NOT EXISTS idx_batches_received_date ON batches(received_date)',
     'CREATE INDEX IF NOT EXISTS idx_sheets_code ON sheets(code)',
-    'CREATE INDEX IF NOT EXISTS idx_sheets_metal_type_id ON sheets(metal_type_id)', // NEW - Critical for filtering
+    'CREATE INDEX IF NOT EXISTS idx_sheets_metal_type_id ON sheets(metal_type_id)',
     'CREATE INDEX IF NOT EXISTS idx_sheets_grade_id ON sheets(grade_id)',
     'CREATE INDEX IF NOT EXISTS idx_sheets_finish_id ON sheets(finish_id)',
-    'CREATE INDEX IF NOT EXISTS idx_sheets_is_remnant ON sheets(is_remnant)', // NEW - For remnants tab
-
-    // Sale indexes
-    'CREATE INDEX IF NOT EXISTS idx_sales_customer_id ON sales(customer_id)', // NEW - Critical for customer queries
-    'CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(sale_date)', // NEW - For date filtering
-    'CREATE INDEX IF NOT EXISTS idx_sales_payment_status ON sales(payment_status)', // NEW - For filtering
-
-    // Sale items indexes
+    'CREATE INDEX IF NOT EXISTS idx_sheets_is_remnant ON sheets(is_remnant)',
+    'CREATE INDEX IF NOT EXISTS idx_sales_customer_id ON sales(customer_id)',
+    'CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(sale_date)',
+    'CREATE INDEX IF NOT EXISTS idx_sales_payment_status ON sales(payment_status)',
     'CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sale_items(sale_id)',
     'CREATE INDEX IF NOT EXISTS idx_sale_items_item_type ON sale_items(item_type)',
-    'CREATE INDEX IF NOT EXISTS idx_sale_items_sheet_id ON sale_items(sheet_id)', // NEW
-    'CREATE INDEX IF NOT EXISTS idx_sale_items_batch_id ON sale_items(batch_id)', // NEW
+    'CREATE INDEX IF NOT EXISTS idx_sale_items_sheet_id ON sale_items(sheet_id)',
+    'CREATE INDEX IF NOT EXISTS idx_sale_items_batch_id ON sale_items(batch_id)',
     'CREATE INDEX IF NOT EXISTS idx_sale_items_service_type_id ON sale_items(service_type_id)',
-
-    // Payment indexes
     'CREATE INDEX IF NOT EXISTS idx_payments_sale_id ON payments(sale_id)',
-    'CREATE INDEX IF NOT EXISTS idx_payments_customer_id ON payments(customer_id)', // NEW
-    'CREATE INDEX IF NOT EXISTS idx_payments_date ON payments(payment_date)', // NEW
-
-    // Supplier payment indexes
+    'CREATE INDEX IF NOT EXISTS idx_payments_customer_id ON payments(customer_id)',
+    'CREATE INDEX IF NOT EXISTS idx_payments_date ON payments(payment_date)',
     'CREATE INDEX IF NOT EXISTS idx_supplier_payments_supplier_id ON supplier_payments(supplier_id)',
     'CREATE INDEX IF NOT EXISTS idx_supplier_payments_batch_id ON supplier_payments(batch_id)',
-    'CREATE INDEX IF NOT EXISTS idx_supplier_payments_date ON supplier_payments(payment_date)', // NEW
-
-    // Transaction indexes
+    'CREATE INDEX IF NOT EXISTS idx_supplier_payments_date ON supplier_payments(payment_date)',
     'CREATE INDEX IF NOT EXISTS idx_customer_trans_customer_id ON customer_transactions(customer_id)',
     'CREATE INDEX IF NOT EXISTS idx_customer_trans_date ON customer_transactions(transaction_date)',
     'CREATE INDEX IF NOT EXISTS idx_supplier_trans_supplier_id ON supplier_transactions(supplier_id)',
     'CREATE INDEX IF NOT EXISTS idx_supplier_trans_date ON supplier_transactions(transaction_date)',
-
-    // Expense indexes
     'CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(expense_date)',
     'CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category_id)',
-
-    // Enhanced Expenses indexes
-    'CREATE INDEX IF NOT EXISTS idx_expenses_enh_date ON expenses_enhanced(expense_date)',
-    'CREATE INDEX IF NOT EXISTS idx_expenses_enh_category ON expenses_enhanced(category_code)',
-    'CREATE INDEX IF NOT EXISTS idx_expenses_enh_approval ON expenses_enhanced(approval_status)',
-    'CREATE INDEX IF NOT EXISTS idx_expenses_enh_vendor ON expenses_enhanced(vendor_name)',
-    'CREATE INDEX IF NOT EXISTS idx_expenses_enh_recurring ON expenses_enhanced(is_recurring)',
-
-    // General Ledger indexes
-    'CREATE INDEX IF NOT EXISTS idx_gl_transaction ON general_ledger(transaction_type, transaction_id)',
-    'CREATE INDEX IF NOT EXISTS idx_gl_account ON general_ledger(account_code)',
-    'CREATE INDEX IF NOT EXISTS idx_gl_date ON general_ledger(transaction_date)',
-
-    // Budget indexes
-    'CREATE INDEX IF NOT EXISTS idx_budget_category ON expense_budgets(category_code, budget_year)',
-
-    // Recurring Schedule indexes
-    'CREATE INDEX IF NOT EXISTS idx_recurring_next ON recurring_expense_schedule(next_date)',
-
-    // Inventory movement indexes
-    'CREATE INDEX IF NOT EXISTS idx_inventory_movements_sheet_id ON inventory_movements(sheet_id)', // NEW
-    'CREATE INDEX IF NOT EXISTS idx_inventory_movements_batch_id ON inventory_movements(batch_id)', // NEW
-    'CREATE INDEX IF NOT EXISTS idx_inventory_movements_type ON inventory_movements(movement_type)' // NEW
+    'CREATE INDEX IF NOT EXISTS idx_inventory_movements_sheet_id ON inventory_movements(sheet_id)',
+    'CREATE INDEX IF NOT EXISTS idx_inventory_movements_batch_id ON inventory_movements(batch_id)',
+    'CREATE INDEX IF NOT EXISTS idx_inventory_movements_type ON inventory_movements(movement_type)'
   ];
-  
+
   indexes.forEach(sql => {
     try { db.run(sql); } catch (e) { console.error('Index creation error:', e); }
   });

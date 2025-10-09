@@ -21,17 +21,24 @@ export function getCurrentUser() {
    ============================================ */
 
 export const tx = {
-  begin() { 
-    try { db.run('BEGIN'); } 
-    catch (e) { console.error('Begin transaction failed:', e); }
+  begin(mode = 'DEFERRED') {
+    try {
+      db.run(`BEGIN ${mode}`);
+    } catch (e) {
+      console.error('Begin transaction failed:', e);
+    }
   },
-  commit() { 
-    try { db.run('COMMIT'); } 
-    catch (e) { console.error('Commit failed:', e); }
+  commit() {
+    try {
+      db.run('COMMIT');
+    } catch (e) {
+      console.error('Commit failed:', e);
+    }
   },
-  rollback() { 
-    try { db.run('ROLLBACK'); } 
-    catch (e) { /* silent */ }
+  rollback() {
+    try {
+      db.run('ROLLBACK');
+    } catch (e) {}
   },
 };
 
@@ -64,94 +71,56 @@ export function hasColumn(table, col) {
    DATABASE PERSISTENCE
    ============================================ */
 
-// Auto backup when database exceeds this size (in MB)
 const AUTO_BACKUP_SIZE_MB = 4.0;
+let saveTimeout = null;
+let pendingBackup = false;
 
-export async function saveDatabase() {
+async function performAutoBackup(sizeInMB) {
+  if (pendingBackup) return;
+  pendingBackup = true;
+
+  try {
+    const { exportDatabaseToJSON } = await import('./reset.js');
+    const exportResult = exportDatabaseToJSON();
+
+    if (exportResult.success) {
+      const backupData = {
+        timestamp: new Date().toISOString(),
+        size: sizeInMB.toFixed(2) + ' MB',
+        data: exportResult.data
+      };
+
+      localStorage.setItem('metalsheets_auto_backup', JSON.stringify(backupData));
+
+      if (process.env.NODE_ENV === 'development') {
+        console.info(`✅ Auto backup created: ${sizeInMB.toFixed(2)} MB`);
+      }
+    }
+  } catch (err) {
+    console.error('Auto backup error:', err);
+  } finally {
+    pendingBackup = false;
+  }
+}
+
+async function saveDatabaseImmediate() {
   if (!db) return { success: false, error: 'No database' };
 
   try {
     const data = db.export();
     const serialized = JSON.stringify(Array.from(data));
-
     const sizeInMB = new Blob([serialized]).size / (1024 * 1024);
 
-    // Auto backup if size exceeds threshold
-    if (sizeInMB >= AUTO_BACKUP_SIZE_MB) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`📦 Database size: ${sizeInMB.toFixed(2)} MB - Creating auto backup...`);
-      }
-
-      try {
-        // Create automatic backup using exportDatabaseToJSON
-        // We need to dynamically import it to avoid circular dependency
-        import('./reset.js').then(({ exportDatabaseToJSON }) => {
-          const exportResult = exportDatabaseToJSON();
-
-          if (exportResult.success) {
-            const backupData = {
-              timestamp: new Date().toISOString(),
-              size: sizeInMB.toFixed(2) + ' MB',
-              data: exportResult.data
-            };
-
-            // Save to separate localStorage key
-            const backupKey = 'metalsheets_auto_backup';
-            const backupSerialized = JSON.stringify(backupData);
-
-            try {
-              localStorage.setItem(backupKey, backupSerialized);
-
-              // Show notification in console
-              console.info(
-                `✅ نسخة احتياطية تلقائية تم إنشاؤها بنجاح!\n` +
-                `📊 الحجم: ${sizeInMB.toFixed(2)} MB\n` +
-                `📅 التاريخ: ${new Date().toLocaleString('ar')}\n` +
-                `💾 المفتاح: ${backupKey}`
-              );
-
-              // Try to show user notification if in browser environment
-              if (typeof window !== 'undefined' && window.alert) {
-                // Use setTimeout to not block the save operation
-                setTimeout(() => {
-                  const message =
-                    `تنبيه: قاعدة البيانات تجاوزت ${AUTO_BACKUP_SIZE_MB} ميجابايت!\n\n` +
-                    `✅ تم إنشاء نسخة احتياطية تلقائية بنجاح\n` +
-                    `الحجم: ${sizeInMB.toFixed(2)} MB\n` +
-                    `التاريخ: ${new Date().toLocaleString('ar')}\n\n` +
-                    `يُنصح بتصدير البيانات القديمة وأرشفتها للحفاظ على الأداء.`;
-
-                  // Check if user is on the page (not a background save)
-                  if (document.visibilityState === 'visible') {
-                    console.warn(message);
-                  }
-                }, 100);
-              }
-            } catch (backupError) {
-              console.error('Failed to save auto backup:', backupError);
-            }
-          }
-        }).catch(err => {
-          console.error('Failed to create auto backup:', err);
-        });
-      } catch (backupError) {
-        console.error('Auto backup error:', backupError);
-      }
+    if (sizeInMB >= AUTO_BACKUP_SIZE_MB && !pendingBackup) {
+      requestIdleCallback(() => performAutoBackup(sizeInMB), { timeout: 5000 });
     }
 
     if (sizeInMB > 4.5) {
       console.warn(`⚠️ Database size: ${sizeInMB.toFixed(2)} MB - approaching limit!`);
     }
 
-    // Encrypt the database before storing
     const encrypted = await encryptData(serialized);
     localStorage.setItem('metalsheets_database', encrypted);
-
-    // Log encryption status (only in development)
-    if (process.env.NODE_ENV === 'development') {
-      const securityStatus = getSecurityStatus();
-      console.log('🔒 Database saved with encryption:', securityStatus.algorithm);
-    }
 
     return { success: true, size: sizeInMB, encrypted: true };
 
@@ -165,6 +134,19 @@ export async function saveDatabase() {
     }
     return { success: false, error: e.message };
   }
+}
+
+export async function saveDatabase() {
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+  }
+
+  return new Promise((resolve) => {
+    saveTimeout = setTimeout(async () => {
+      const result = await saveDatabaseImmediate();
+      resolve(result);
+    }, 300);
+  });
 }
 
 /**

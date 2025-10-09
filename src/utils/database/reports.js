@@ -12,11 +12,11 @@ export function getProfitBreakdown(dateFrom = null, dateTo = null) {
     expenses: { total: 0 },
     total: { revenue: 0, cost: 0, gross: 0, net: 0 }
   };
-  
+
   try {
     let dateWhere = '';
     const params = [];
-    
+
     if (dateFrom) {
       dateWhere += ' AND s.sale_date >= ?';
       params.push(dateFrom);
@@ -25,109 +25,54 @@ export function getProfitBreakdown(dateFrom = null, dateTo = null) {
       dateWhere += ' AND s.sale_date <= ?';
       params.push(dateTo);
     }
-    
-    // Materials revenue
-    const matRevStmt = db.prepare(`
-      SELECT COALESCE(SUM(si.total_price), 0) as total
-      FROM sale_items si
-      JOIN sales s ON s.id = si.sale_id
-      WHERE COALESCE(si.item_type, 'material') = 'material' ${dateWhere}
-    `);
-    if (params.length > 0) matRevStmt.bind(params);
-    
-    let matRevenue = 0;
-    if (matRevStmt.step()) {
-      const row = matRevStmt.getAsObject();
-      matRevenue = safe(row.total, 0);
-    }
-    matRevStmt.free();
-    
-    // Materials COGS
-    const matCogsStmt = db.prepare(`
-      SELECT COALESCE(SUM(si.cogs_total), 0) as total
-      FROM sale_items si
-      JOIN sales s ON s.id = si.sale_id
-      WHERE COALESCE(si.item_type, 'material') = 'material' ${dateWhere}
-    `);
-    if (params.length > 0) matCogsStmt.bind(params);
-    
-    let matCogs = 0;
-    if (matCogsStmt.step()) {
-      const row = matCogsStmt.getAsObject();
-      matCogs = safe(row.total, 0);
-    }
-    matCogsStmt.free();
-    
-    // Services revenue
-    const srvRevStmt = db.prepare(`
-      SELECT COALESCE(SUM(si.total_price), 0) as total
-      FROM sale_items si
-      JOIN sales s ON s.id = si.sale_id
-      WHERE si.item_type = 'service' ${dateWhere}
-    `);
-    if (params.length > 0) srvRevStmt.bind(params);
-    
-    let srvRevenue = 0;
-    if (srvRevStmt.step()) {
-      const row = srvRevStmt.getAsObject();
-      srvRevenue = safe(row.total, 0);
-    }
-    srvRevStmt.free();
-    
-    // Services cost
-    const srvCostStmt = db.prepare(`
-      SELECT COALESCE(SUM(si.service_cost_total), 0) as total
-      FROM sale_items si
-      JOIN sales s ON s.id = si.sale_id
-      WHERE si.item_type = 'service' ${dateWhere}
-    `);
-    if (params.length > 0) srvCostStmt.bind(params);
-    
-    let srvCost = 0;
-    if (srvCostStmt.step()) {
-      const row = srvCostStmt.getAsObject();
-      srvCost = safe(row.total, 0);
-    }
-    srvCostStmt.free();
-    
-    // Expenses
+
     let expenseWhere = '';
-    const expParams = [];
     if (dateFrom) {
-      expenseWhere += ' WHERE expense_date >= ?';
-      expParams.push(dateFrom);
+      expenseWhere += ' AND e.expense_date >= ?';
     }
     if (dateTo) {
-      expenseWhere += dateFrom ? ' AND' : ' WHERE';
-      expenseWhere += ' expense_date <= ?';
-      expParams.push(dateTo);
+      expenseWhere += ' AND e.expense_date <= ?';
     }
-    
-    const expStmt = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total
-      FROM expenses ${expenseWhere}
+
+    const stmt = db.prepare(`
+      SELECT
+        COALESCE(SUM(CASE WHEN COALESCE(si.item_type, 'material') = 'material' THEN si.total_price ELSE 0 END), 0) as mat_revenue,
+        COALESCE(SUM(CASE WHEN COALESCE(si.item_type, 'material') = 'material' THEN si.cogs_total ELSE 0 END), 0) as mat_cogs,
+        COALESCE(SUM(CASE WHEN si.item_type = 'service' THEN si.total_price ELSE 0 END), 0) as srv_revenue,
+        COALESCE(SUM(CASE WHEN si.item_type = 'service' THEN si.service_cost_total ELSE 0 END), 0) as srv_cost,
+        (SELECT COALESCE(SUM(e.amount), 0) FROM expenses e WHERE 1=1 ${expenseWhere}) as total_expenses
+      FROM sale_items si
+      JOIN sales s ON s.id = si.sale_id
+      WHERE 1=1 ${dateWhere}
     `);
-    if (expParams.length > 0) expStmt.bind(expParams);
-    
-    let totalExpenses = 0;
-    if (expStmt.step()) {
-      const row = expStmt.getAsObject();
-      totalExpenses = safe(row.total, 0);
+
+    const allParams = [...params, ...(dateFrom ? [dateFrom] : []), ...(dateTo ? [dateTo] : [])];
+    if (allParams.length > 0) stmt.bind(allParams);
+
+    let matRevenue = 0, matCogs = 0, srvRevenue = 0, srvCost = 0, totalExpenses = 0;
+
+    if (stmt.step()) {
+      const row = stmt.getAsObject();
+      matRevenue = safe(row.mat_revenue, 0);
+      matCogs = safe(row.mat_cogs, 0);
+      srvRevenue = safe(row.srv_revenue, 0);
+      srvCost = safe(row.srv_cost, 0);
+      totalExpenses = safe(row.total_expenses, 0);
     }
-    expStmt.free();
-    
+    stmt.free();
+
     const materials = {
       revenue: round2(matRevenue),
       cogs: round2(matCogs),
       gross: round2(matRevenue - matCogs)
     };
-    
+
     const services = {
       revenue: round2(srvRevenue),
       cost: round2(srvCost),
       gross: round2(srvRevenue - srvCost)
     };
-    
+
     const totalRevenue = materials.revenue + services.revenue;
     const totalDirectCost = materials.cogs + services.cost;
     const grossProfit = totalRevenue - totalDirectCost;

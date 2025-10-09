@@ -1,4 +1,3 @@
-// src/components/Login.jsx
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import {
@@ -22,6 +21,7 @@ import {
 } from '@mui/icons-material';
 import BusinessIcon from '@mui/icons-material/Business';
 import { getCompanyProfile } from '../utils/database';
+import { checkLoginAttempt } from '../utils/security/rateLimiter';
 
 function Login({ onLogin }) {
   const [username, setUsername] = useState('');
@@ -49,7 +49,6 @@ function Login({ onLogin }) {
       return;
     }
 
-    // Allow empty password for admin initial setup
     if (!password && username.trim().toLowerCase() !== 'admin') {
       setError('يرجى إدخال كلمة المرور');
       return;
@@ -58,7 +57,15 @@ function Login({ onLogin }) {
     setLoading(true);
 
     try {
+      const limitCheck = await checkLoginAttempt(username.trim(), false);
+      if (!limitCheck.allowed) {
+        setError(limitCheck.message);
+        setLoading(false);
+        return;
+      }
+
       await onLogin(username.trim(), password);
+      await checkLoginAttempt(username.trim(), true);
     } catch (err) {
       setError(err.message || 'فشل تسجيل الدخول');
     } finally {

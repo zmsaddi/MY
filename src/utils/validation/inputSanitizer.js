@@ -120,16 +120,7 @@ export function validateString(value, options = {}) {
     }
   }
 
-  // Escape special characters for SQL safety
-  const sanitized = str
-    .replace(/'/g, "''")  // Escape single quotes
-    .replace(/\\/g, "\\\\")  // Escape backslashes
-    .replace(/\0/g, "\\0")  // Escape null bytes
-    .replace(/\n/g, "\\n")  // Escape newlines
-    .replace(/\r/g, "\\r")  // Escape carriage returns
-    .replace(/\x1a/g, "\\Z"); // Escape EOF
-
-  return { valid: true, value: sanitized, error: null };
+  return { valid: true, value: str, error: null };
 }
 
 /**

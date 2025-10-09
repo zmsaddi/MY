@@ -322,7 +322,7 @@ function processSaleItemService(saleId, item, saleCurrency, baseCurrency, exchan
 
 export function processSale(saleData) {
   try {
-    tx.begin();
+    tx.begin('IMMEDIATE');
     
     const validationError = validators.validateSale(saleData);
     if (validationError) {
@@ -469,21 +469,28 @@ export function processSale(saleData) {
 
 export function deleteSale(saleId) {
   try {
-    tx.begin();
-    
+    tx.begin('IMMEDIATE');
+
     const itemsStmt = db.prepare(`
-      SELECT sheet_id, batch_id, quantity_sold 
-      FROM sale_items 
+      SELECT sheet_id, batch_id, quantity_sold
+      FROM sale_items
       WHERE sale_id = ? AND COALESCE(item_type, 'material') = 'material'
     `);
     itemsStmt.bind([saleId]);
-    
+
     while (itemsStmt.step()) {
       const row = itemsStmt.getAsObject();
-      
-      const updateStmt = db.prepare('UPDATE batches SET quantity_remaining = quantity_remaining + ? WHERE id = ?');
-      updateStmt.run([row.quantity_sold, row.batch_id]);
-      updateStmt.free();
+
+      const checkStmt = db.prepare('SELECT id FROM batches WHERE id = ?');
+      checkStmt.bind([row.batch_id]);
+      const batchExists = checkStmt.step();
+      checkStmt.free();
+
+      if (batchExists) {
+        const updateStmt = db.prepare('UPDATE batches SET quantity_remaining = quantity_remaining + ? WHERE id = ?');
+        updateStmt.run([row.quantity_sold, row.batch_id]);
+        updateStmt.free();
+      }
     }
     itemsStmt.free();
     

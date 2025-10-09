@@ -10,7 +10,18 @@
       "Bash(findstr:*)",
       "Bash(taskkill:*)",
       "Bash(dir:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(del:*)",
+      "Bash(if exist \"accounting\" rmdir /S /Q \"accounting\")",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run build:*)",
+      "Bash(timeout 10 npm run dev)",
+      "Bash(echo:*)",
+      "Bash(node -e \"import(''./src/components/tabs/SalesTab.jsx'').catch(e => console.error(''Syntax error:'', e.message))\")",
+      "Bash(node -e \"const p=require(''''./package.json''''); console.log(''''Name:'''', p.name); console.log(''''Version:'''', p.version);\")",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

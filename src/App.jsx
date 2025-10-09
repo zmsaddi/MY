@@ -18,15 +18,13 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import MenuIcon from '@mui/icons-material/Menu';
 import LogoutIcon from '@mui/icons-material/Logout';
 
-// Eager load critical components
 import ErrorBoundary from './components/ErrorBoundary';
 import TabErrorBoundary from './components/common/ErrorBoundary';
 import ErrorNotification from './components/ErrorNotification';
-import Login from './components/Login';
-import DashboardTab from './components/Dashboard';
 import { useErrorHandler } from './hooks/useErrorHandler';
 
-// Lazy load tab components for better performance
+const Login = lazy(() => import('./components/Login'));
+const DashboardTab = lazy(() => import('./components/Dashboard'));
 const SalesTab = lazy(() => import('./components/tabs/SalesTab'));
 const CustomersTab = lazy(() => import('./components/tabs/CustomersTab'));
 const SuppliersTab = lazy(() => import('./components/tabs/SuppliersTab'));

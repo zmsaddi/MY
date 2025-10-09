@@ -3,8 +3,7 @@ import { useState, useEffect } from 'react';
 import {
   Box, Card, CardContent, Grid, TextField, Button, Typography,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Dialog, DialogTitle, DialogContent, DialogActions,
-  Alert, Chip, Paper, IconButton, Tooltip, Tabs, Tab
+  Alert, Chip, Paper, IconButton, Tooltip, Tabs, Tab, MenuItem, InputAdornment
 } from '@mui/material';
 
 import AddIcon from '@mui/icons-material/Add';
@@ -13,6 +12,11 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import MoneyOffIcon from '@mui/icons-material/MoneyOff';
 import CategoryIcon from '@mui/icons-material/Category';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+
+import UnifiedFormField from '../common/forms/UnifiedFormField';
+import UnifiedFormDialog from '../common/forms/UnifiedFormDialog';
+import UnifiedConfirmDialog from '../common/dialogs/UnifiedConfirmDialog';
+import { confirmationMessages } from '../../theme/designSystem';
 
 import {
   getAllExpenses,
@@ -24,6 +28,7 @@ import {
   updateExpenseCategory,
   getBaseCurrencyInfo
 } from '../../utils/database';
+import { safeNotes, safeDescription } from '../../utils/displayHelpers';
 
 const fmt = (n) => Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
@@ -33,21 +38,21 @@ function TabPanel({ children, value, index }) {
 
 export default function ExpensesTab() {
   const [currentTab, setCurrentTab] = useState(0);
-  
+
   // Expenses
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-  
+
   // Dialogs
   const [openExpenseDialog, setOpenExpenseDialog] = useState(false);
   const [openCategoryDialog, setOpenCategoryDialog] = useState(false);
-  
+
   // Selected items
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
-  
+
   // Form data
   const [expenseForm, setExpenseForm] = useState({
     category_id: '',
@@ -56,17 +61,28 @@ export default function ExpensesTab() {
     expense_date: new Date().toISOString().split('T')[0],
     notes: ''
   });
-  
+
   const [categoryForm, setCategoryForm] = useState({
     name_ar: '',
     name_en: '',
     is_active: true
   });
-  
+
   // UI state
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [errors, setErrors] = useState({});
+  const [categoryErrors, setCategoryErrors] = useState({});
+  const [loading, setLoading] = useState(false);
   const [baseCurrencyInfo, setBaseCurrencyInfo] = useState({ code: 'USD', symbol: '$' });
+
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    type: 'save',
+    data: null,
+    action: null
+  });
 
   useEffect(() => {
     loadData();
@@ -75,14 +91,14 @@ export default function ExpensesTab() {
   const loadData = () => {
     const cats = getExpenseCategories(false);
     setCategories(cats);
-    
+
     const today = new Date().toISOString().split('T')[0];
     const firstDay = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
     setFromDate(firstDay);
     setToDate(today);
-    
+
     loadExpenses(firstDay, today);
-    
+
     const currInfo = getBaseCurrencyInfo();
     setBaseCurrencyInfo(currInfo);
   };
@@ -96,9 +112,44 @@ export default function ExpensesTab() {
     loadExpenses(fromDate, toDate);
   };
 
+  // Helper functions for confirmation dialogs
+  const openConfirm = (type, data = null, action = null) => {
+    setConfirmDialog({ open: true, type, data, action });
+  };
+
+  const closeConfirm = () => {
+    setConfirmDialog({ ...confirmDialog, open: false });
+  };
+
+  // ===== Expense Validation =====
+  const validateExpenseForm = () => {
+    const newErrors = {};
+
+    if (!expenseForm.category_id) {
+      newErrors.category_id = 'الفئة مطلوبة';
+    }
+
+    const amount = parseFloat(expenseForm.amount);
+    if (!expenseForm.amount || amount <= 0) {
+      newErrors.amount = 'المبلغ يجب أن يكون أكبر من صفر';
+    }
+
+    if (!expenseForm.description.trim()) {
+      newErrors.description = 'الوصف مطلوب';
+    }
+
+    if (!expenseForm.expense_date) {
+      newErrors.expense_date = 'تاريخ المصروف مطلوب';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   // ===== Expense Dialog =====
   const handleOpenExpenseDialog = (expense = null) => {
     setError('');
+    setErrors({});
     if (expense) {
       setExpenseForm({
         category_id: expense.category_id,
@@ -121,69 +172,105 @@ export default function ExpensesTab() {
     setOpenExpenseDialog(true);
   };
 
-  const handleSaveExpense = () => {
+  const handleCloseExpenseDialog = () => {
+    setOpenExpenseDialog(false);
+    setSelectedExpense(null);
     setError('');
-    
-    if (!expenseForm.category_id) {
-      setError('يرجى اختيار فئة المصروف');
-      return;
-    }
-    
-    if (!expenseForm.amount || parseFloat(expenseForm.amount) <= 0) {
-      setError('المبلغ يجب أن يكون أكبر من صفر');
-      return;
-    }
-    
-    if (!expenseForm.description.trim()) {
-      setError('الوصف مطلوب');
+    setErrors({});
+  };
+
+  const handleActualSaveExpense = async () => {
+    if (!validateExpenseForm()) {
+      closeConfirm();
       return;
     }
 
-    let result;
-    if (selectedExpense) {
-      result = updateExpense(selectedExpense.id, {
-        category_id: expenseForm.category_id,
-        amount: parseFloat(expenseForm.amount),
-        description: expenseForm.description.trim(),
-        expense_date: expenseForm.expense_date,
-        notes: expenseForm.notes.trim() || null
-      });
-    } else {
-      result = addExpense({
-        category_id: expenseForm.category_id,
-        amount: parseFloat(expenseForm.amount),
-        description: expenseForm.description.trim(),
-        expense_date: expenseForm.expense_date,
-        notes: expenseForm.notes.trim() || null
-      });
-    }
+    setLoading(true);
+    try {
+      let result;
+      if (selectedExpense) {
+        result = updateExpense(selectedExpense.id, {
+          category_id: expenseForm.category_id,
+          amount: parseFloat(expenseForm.amount),
+          description: expenseForm.description.trim(),
+          expense_date: expenseForm.expense_date,
+          notes: expenseForm.notes.trim() || null
+        });
+      } else {
+        result = addExpense({
+          category_id: expenseForm.category_id,
+          amount: parseFloat(expenseForm.amount),
+          description: expenseForm.description.trim(),
+          expense_date: expenseForm.expense_date,
+          notes: expenseForm.notes.trim() || null
+        });
+      }
 
-    if (result.success) {
-      setSuccess(selectedExpense ? '✓ تم تحديث المصروف' : '✓ تم إضافة المصروف بنجاح');
-      setTimeout(() => setSuccess(''), 3000);
-      setOpenExpenseDialog(false);
-      loadExpenses(fromDate, toDate);
-    } else {
-      setError('فشل الحفظ: ' + result.error);
+      if (result.success) {
+        setSuccess(selectedExpense ? 'تم تحديث المصروف بنجاح' : 'تم إضافة المصروف بنجاح');
+        setTimeout(() => setSuccess(''), 3000);
+        handleCloseExpenseDialog();
+        loadExpenses(fromDate, toDate);
+      } else {
+        setError('فشل الحفظ: ' + result.error);
+      }
+    } catch (err) {
+      setError('حدث خطأ: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExpenseFormSubmit = () => {
+    openConfirm(selectedExpense ? 'update' : 'save', expenseForm, handleActualSaveExpense);
+  };
+
+  const handleExpenseInputChange = (e) => {
+    const { name, value } = e.target;
+    setExpenseForm({ ...expenseForm, [name]: value });
+    if (errors[name]) {
+      setErrors({ ...errors, [name]: null });
+    }
+  };
+
+  const handleActualDeleteExpense = async (expenseId) => {
+    setLoading(true);
+    try {
+      const result = deleteExpense(expenseId);
+      if (result.success) {
+        setSuccess('تم حذف المصروف بنجاح');
+        setTimeout(() => setSuccess(''), 2500);
+        loadExpenses(fromDate, toDate);
+      } else {
+        setError('فشل الحذف: ' + result.error);
+      }
+    } catch (err) {
+      setError('حدث خطأ: ' + err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDeleteExpense = (expenseId) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا المصروف؟')) return;
-    
-    const result = deleteExpense(expenseId);
-    if (result.success) {
-      setSuccess('✓ تم حذف المصروف');
-      setTimeout(() => setSuccess(''), 2500);
-      loadExpenses(fromDate, toDate);
-    } else {
-      setError('فشل الحذف: ' + result.error);
+    openConfirm('delete', { id: expenseId }, () => handleActualDeleteExpense(expenseId));
+  };
+
+  // ===== Category Validation =====
+  const validateCategoryForm = () => {
+    const newErrors = {};
+
+    if (!categoryForm.name_ar.trim()) {
+      newErrors.name_ar = 'اسم الفئة بالعربي مطلوب';
     }
+
+    setCategoryErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   // ===== Category Dialog =====
   const handleOpenCategoryDialog = (category = null) => {
     setError('');
+    setCategoryErrors({});
     if (category) {
       setCategoryForm({
         name_ar: category.name_ar,
@@ -202,36 +289,60 @@ export default function ExpensesTab() {
     setOpenCategoryDialog(true);
   };
 
-  const handleSaveCategory = () => {
+  const handleCloseCategoryDialog = () => {
+    setOpenCategoryDialog(false);
+    setSelectedCategory(null);
     setError('');
-    
-    if (!categoryForm.name_ar.trim()) {
-      setError('اسم الفئة بالعربي مطلوب');
+    setCategoryErrors({});
+  };
+
+  const handleActualSaveCategory = async () => {
+    if (!validateCategoryForm()) {
+      closeConfirm();
       return;
     }
 
-    let result;
-    if (selectedCategory) {
-      result = updateExpenseCategory(selectedCategory.id, {
-        name_ar: categoryForm.name_ar.trim(),
-        name_en: categoryForm.name_en.trim() || null,
-        is_active: categoryForm.is_active ? 1 : 0
-      });
-    } else {
-      result = addExpenseCategory({
-        name_ar: categoryForm.name_ar.trim(),
-        name_en: categoryForm.name_en.trim() || null,
-        is_active: categoryForm.is_active ? 1 : 0
-      });
-    }
+    setLoading(true);
+    try {
+      let result;
+      if (selectedCategory) {
+        result = updateExpenseCategory(selectedCategory.id, {
+          name_ar: categoryForm.name_ar.trim(),
+          name_en: categoryForm.name_en.trim() || null,
+          is_active: categoryForm.is_active ? 1 : 0
+        });
+      } else {
+        result = addExpenseCategory({
+          name_ar: categoryForm.name_ar.trim(),
+          name_en: categoryForm.name_en.trim() || null,
+          is_active: categoryForm.is_active ? 1 : 0
+        });
+      }
 
-    if (result.success) {
-      setSuccess(selectedCategory ? '✓ تم تحديث الفئة' : '✓ تم إضافة الفئة بنجاح');
-      setTimeout(() => setSuccess(''), 3000);
-      setOpenCategoryDialog(false);
-      loadData();
-    } else {
-      setError('فشل الحفظ: ' + result.error);
+      if (result.success) {
+        setSuccess(selectedCategory ? 'تم تحديث الفئة بنجاح' : 'تم إضافة الفئة بنجاح');
+        setTimeout(() => setSuccess(''), 3000);
+        handleCloseCategoryDialog();
+        loadData();
+      } else {
+        setError('فشل الحفظ: ' + result.error);
+      }
+    } catch (err) {
+      setError('حدث خطأ: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCategoryFormSubmit = () => {
+    openConfirm(selectedCategory ? 'update' : 'save', categoryForm, handleActualSaveCategory);
+  };
+
+  const handleCategoryInputChange = (e) => {
+    const { name, value } = e.target;
+    setCategoryForm({ ...categoryForm, [name]: value });
+    if (categoryErrors[name]) {
+      setCategoryErrors({ ...categoryErrors, [name]: null });
     }
   };
 
@@ -253,14 +364,14 @@ export default function ExpensesTab() {
       {error && <Alert severity="error" sx={{ mb: 3, fontSize: '1rem' }} onClose={() => setError('')}>{error}</Alert>}
 
       <Tabs value={currentTab} onChange={(e, v) => setCurrentTab(v)} sx={{ mb: 3 }}>
-        <Tab 
-          icon={<ReceiptLongIcon />} 
-          iconPosition="start" 
+        <Tab
+          icon={<ReceiptLongIcon />}
+          iconPosition="start"
           label={<Typography fontSize="1rem" fontWeight={600}>المصروفات</Typography>}
         />
-        <Tab 
-          icon={<CategoryIcon />} 
-          iconPosition="start" 
+        <Tab
+          icon={<CategoryIcon />}
+          iconPosition="start"
           label={<Typography fontSize="1rem" fontWeight={600}>الفئات</Typography>}
         />
       </Tabs>
@@ -364,14 +475,14 @@ export default function ExpensesTab() {
                   <TableRow key={expense.id} hover>
                     <TableCell><Typography fontSize="0.9375rem">{expense.expense_date}</Typography></TableCell>
                     <TableCell>
-                      <Chip 
-                        label={expense.category_name} 
-                        color="primary" 
-                        size="small" 
+                      <Chip
+                        label={expense.category_name}
+                        color="primary"
+                        size="small"
                         variant="outlined"
                       />
                     </TableCell>
-                    <TableCell><Typography fontSize="0.9375rem">{expense.description}</Typography></TableCell>
+                    <TableCell><Typography fontSize="0.9375rem">{safeDescription(expense.description)}</Typography></TableCell>
                     <TableCell align="right">
                       <Typography fontWeight={700} color="error.main" fontSize="1rem">
                         {fmt(expense.amount)} {baseCurrencyInfo.symbol}
@@ -379,7 +490,7 @@ export default function ExpensesTab() {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" color="text.secondary" fontSize="0.875rem">
-                        {expense.notes || '---'}
+                        {safeNotes(expense.notes) || '---'}
                       </Typography>
                     </TableCell>
                     <TableCell align="center">
@@ -432,13 +543,13 @@ export default function ExpensesTab() {
                         </Typography>
                       )}
                     </Box>
-                    <Chip 
-                      label={category.is_active ? 'مفعّل' : 'موقوف'} 
+                    <Chip
+                      label={category.is_active ? 'مفعّل' : 'موقوف'}
                       color={category.is_active ? 'success' : 'default'}
                       size="small"
                     />
                   </Box>
-                  
+
                   <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
                     <Button
                       fullWidth
@@ -457,136 +568,140 @@ export default function ExpensesTab() {
         </Grid>
       </TabPanel>
 
-      {/* Expense Dialog */}
-      <Dialog 
-        open={openExpenseDialog} 
-        onClose={() => setOpenExpenseDialog(false)} 
-        maxWidth="md" 
-        fullWidth
-        PaperProps={{ sx: { borderRadius: 3 } }}
+      {/* Dialog: Add/Edit Expense */}
+      <UnifiedFormDialog
+        open={openExpenseDialog}
+        onClose={handleCloseExpenseDialog}
+        onSubmit={handleExpenseFormSubmit}
+        title={selectedExpense ? 'تعديل مصروف' : 'إضافة مصروف جديد'}
+        subtitle="أدخل البيانات المطلوبة أدناه"
+        submitText={selectedExpense ? 'تحديث' : 'حفظ'}
+        loading={loading}
       >
-        <DialogTitle>
-          <Typography variant="h5" fontWeight={700}>
-            {selectedExpense ? 'تعديل مصروف' : 'إضافة مصروف جديد'}
-          </Typography>
-        </DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2.5} sx={{ mt: 0.5 }}>
-            <Grid item xs={12} md={6}>
-              <TextField
-                select
-                fullWidth
-                label="الفئة *"
-                value={expenseForm.category_id}
-                onChange={(e) => setExpenseForm({ ...expenseForm, category_id: e.target.value })}
-                SelectProps={{ native: true }}
-              >
-                <option value="">-- اختر الفئة --</option>
-                {categories.filter(c => c.is_active).map((cat) => (
-                  <option key={cat.id} value={cat.id}>{cat.name_ar}</option>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                type="number"
-                label="المبلغ *"
-                value={expenseForm.amount}
-                onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
-                inputProps={{ step: 0.01, min: 0.01 }}
-                InputProps={{
-                  endAdornment: <Typography sx={{ ml: 1, color: 'text.secondary' }}>{baseCurrencyInfo.symbol}</Typography>
-                }}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="الوصف *"
-                value={expenseForm.description}
-                onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
-                placeholder="مثال: رواتب شهر يناير، فاتورة كهرباء، إلخ"
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                type="date"
-                label="تاريخ المصروف"
-                value={expenseForm.expense_date}
-                onChange={(e) => setExpenseForm({ ...expenseForm, expense_date: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                multiline
-                rows={3}
-                label="ملاحظات"
-                value={expenseForm.notes}
-                onChange={(e) => setExpenseForm({ ...expenseForm, notes: e.target.value })}
-              />
-            </Grid>
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={6}>
+            <UnifiedFormField
+              label="الفئة"
+              value={expenseForm.category_id}
+              onChange={handleExpenseInputChange}
+              name="category_id"
+              select
+              required
+              error={errors.category_id}
+            >
+              <MenuItem value="">-- اختر الفئة --</MenuItem>
+              {categories.filter(c => c.is_active).map((cat) => (
+                <MenuItem key={cat.id} value={cat.id}>{cat.name_ar}</MenuItem>
+              ))}
+            </UnifiedFormField>
           </Grid>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button onClick={() => setOpenExpenseDialog(false)} size="large">إلغاء</Button>
-          <Button onClick={handleSaveExpense} variant="contained" size="large">حفظ</Button>
-        </DialogActions>
-      </Dialog>
+          <Grid item xs={12} md={6}>
+            <UnifiedFormField
+              label="المبلغ"
+              value={expenseForm.amount}
+              onChange={handleExpenseInputChange}
+              name="amount"
+              type="number"
+              required
+              error={errors.amount}
+              inputProps={{ step: 0.01, min: 0.01 }}
+              InputProps={{
+                endAdornment: <InputAdornment position="end">{baseCurrencyInfo.symbol}</InputAdornment>
+              }}
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <UnifiedFormField
+              label="الوصف"
+              value={expenseForm.description}
+              onChange={handleExpenseInputChange}
+              name="description"
+              required
+              error={errors.description}
+              autoFocus
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <UnifiedFormField
+              label="تاريخ المصروف"
+              value={expenseForm.expense_date}
+              onChange={handleExpenseInputChange}
+              name="expense_date"
+              type="date"
+              required
+              error={errors.expense_date}
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <UnifiedFormField
+              label="ملاحظات"
+              value={expenseForm.notes}
+              onChange={handleExpenseInputChange}
+              name="notes"
+              multiline
+              rows={3}
+            />
+          </Grid>
+        </Grid>
+      </UnifiedFormDialog>
 
-      {/* Category Dialog */}
-      <Dialog 
-        open={openCategoryDialog} 
-        onClose={() => setOpenCategoryDialog(false)} 
-        maxWidth="sm" 
-        fullWidth
-        PaperProps={{ sx: { borderRadius: 3 } }}
+      {/* Dialog: Add/Edit Category */}
+      <UnifiedFormDialog
+        open={openCategoryDialog}
+        onClose={handleCloseCategoryDialog}
+        onSubmit={handleCategoryFormSubmit}
+        title={selectedCategory ? 'تعديل فئة' : 'إضافة فئة جديدة'}
+        subtitle="أدخل البيانات المطلوبة أدناه"
+        submitText={selectedCategory ? 'تحديث' : 'حفظ'}
+        loading={loading}
+        maxWidth="sm"
       >
-        <DialogTitle>
-          <Typography variant="h5" fontWeight={700}>
-            {selectedCategory ? 'تعديل فئة' : 'إضافة فئة جديدة'}
-          </Typography>
-        </DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2.5} sx={{ mt: 0.5 }}>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="اسم الفئة (عربي) *"
-                value={categoryForm.name_ar}
-                onChange={(e) => setCategoryForm({ ...categoryForm, name_ar: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="اسم الفئة (إنجليزي)"
-                value={categoryForm.name_en}
-                onChange={(e) => setCategoryForm({ ...categoryForm, name_en: e.target.value })}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Typography fontSize="1rem">الحالة:</Typography>
-                <Chip 
-                  label={categoryForm.is_active ? 'مفعّل' : 'موقوف'}
-                  color={categoryForm.is_active ? 'success' : 'default'}
-                  onClick={() => setCategoryForm({ ...categoryForm, is_active: !categoryForm.is_active })}
-                  sx={{ cursor: 'pointer' }}
-                />
-              </Box>
-            </Grid>
+        <Grid container spacing={2}>
+          <Grid item xs={12}>
+            <UnifiedFormField
+              label="اسم الفئة (عربي)"
+              value={categoryForm.name_ar}
+              onChange={handleCategoryInputChange}
+              name="name_ar"
+              required
+              error={categoryErrors.name_ar}
+              autoFocus
+            />
           </Grid>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button onClick={() => setOpenCategoryDialog(false)} size="large">إلغاء</Button>
-          <Button onClick={handleSaveCategory} variant="contained" size="large">حفظ</Button>
-        </DialogActions>
-      </Dialog>
+          <Grid item xs={12}>
+            <UnifiedFormField
+              label="اسم الفئة (إنجليزي)"
+              value={categoryForm.name_en}
+              onChange={handleCategoryInputChange}
+              name="name_en"
+              helperText="اختياري"
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography fontSize="1rem">الحالة:</Typography>
+              <Chip
+                label={categoryForm.is_active ? 'مفعّل' : 'موقوف'}
+                color={categoryForm.is_active ? 'success' : 'default'}
+                onClick={() => setCategoryForm({ ...categoryForm, is_active: !categoryForm.is_active })}
+                sx={{ cursor: 'pointer' }}
+              />
+            </Box>
+          </Grid>
+        </Grid>
+      </UnifiedFormDialog>
+
+      {/* Confirmation Dialog */}
+      <UnifiedConfirmDialog
+        open={confirmDialog.open}
+        onClose={closeConfirm}
+        onConfirm={async () => {
+          await confirmDialog.action();
+          closeConfirm();
+        }}
+        {...confirmationMessages[confirmDialog.type]}
+        loading={loading}
+      />
     </Box>
   );
 }

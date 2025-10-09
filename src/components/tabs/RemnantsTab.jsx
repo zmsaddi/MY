@@ -3,10 +3,9 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   Box, Card, CardContent, Grid, TextField, Button, Typography,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Dialog, DialogTitle, DialogContent, DialogActions, IconButton,
-  Alert, Chip, Paper, InputAdornment, Tooltip,
+  IconButton, Alert, Chip, Paper, InputAdornment, Tooltip,
   Accordion, AccordionSummary, AccordionDetails, Collapse, Autocomplete,
-  FormControlLabel, Switch, RadioGroup, Radio, FormLabel
+  FormControlLabel, Switch, RadioGroup, Radio, FormLabel, MenuItem
 } from '@mui/material';
 
 import AddIcon from '@mui/icons-material/Add';
@@ -24,6 +23,10 @@ import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 // Import unified components
 import ResponsiveTable from '../common/ResponsiveTable';
 import WeightPriceEntry from '../common/WeightPriceEntry';
+import UnifiedFormField from '../common/forms/UnifiedFormField';
+import UnifiedFormDialog from '../common/forms/UnifiedFormDialog';
+import UnifiedConfirmDialog from '../common/dialogs/UnifiedConfirmDialog';
+import { confirmationMessages } from '../../theme/designSystem';
 
 import {
   getAllSheets,
@@ -38,6 +41,7 @@ import {
   getFinishes,
   generateSheetCode
 } from '../../utils/database';
+import { safeText, safeNotes } from '../../utils/displayHelpers';
 
 const fmt = (n) => Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
@@ -114,6 +118,18 @@ export default function RemnantsTab() {
   // Alerts
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [errors, setErrors] = useState({});
+  const [batchErrors, setBatchErrors] = useState({});
+  const [existingBatchErrors, setExistingBatchErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+
+  // Confirmation dialog
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    type: 'save',
+    data: null,
+    action: null
+  });
 
   // ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -162,6 +178,14 @@ export default function RemnantsTab() {
       setRemnantForm(prev => ({ ...prev, code: generated }));
     }
   }, [autoGenerateCode, remnantForm.metal_type_id, remnantForm.length_mm, remnantForm.width_mm, remnantForm.thickness_mm, remnantForm.grade_id, remnantForm.finish_id]);
+
+  const openConfirm = (type, data = null, action = null) => {
+    setConfirmDialog({ open: true, type, data, action });
+  };
+
+  const closeConfirm = () => {
+    setConfirmDialog({ ...confirmDialog, open: false });
+  };
 
   const resetFilters = () => {
     setSearchTerm('');
@@ -237,13 +261,13 @@ export default function RemnantsTab() {
       parent_sheet_id: null,
       piece_source: 'company_stock',
     });
-    
+
     // Load grades/finishes for default metal type
     if (defaultMetalType) {
       setGrades(getGrades(defaultMetalType, true));
       setFinishes(getFinishes(defaultMetalType, true));
     }
-    
+
     setBatchForm({
       supplier_id: '',
       quantity: '',
@@ -257,67 +281,113 @@ export default function RemnantsTab() {
     });
     setAutoGenerateCode(true);
     setError('');
+    setErrors({});
+    setBatchErrors({});
     setOpenAddDialog(true);
   };
 
   const handleCloseAddDialog = () => {
     setOpenAddDialog(false);
     setError('');
+    setErrors({});
+    setBatchErrors({});
+  };
+
+  const validateRemnantForm = () => {
+    const newErrors = {};
+    const newBatchErrors = {};
+
+    if (!remnantForm.code.trim()) {
+      newErrors.code = 'الكود مطلوب';
+    }
+
+    if (!remnantForm.metal_type_id) {
+      newErrors.metal_type_id = 'نوع المعدن مطلوب';
+    }
+
+    if (!remnantForm.length_mm || Number(remnantForm.length_mm) <= 0) {
+      newErrors.length_mm = 'الطول يجب أن يكون أكبر من صفر';
+    }
+
+    if (!remnantForm.width_mm || Number(remnantForm.width_mm) <= 0) {
+      newErrors.width_mm = 'العرض يجب أن يكون أكبر من صفر';
+    }
+
+    if (!remnantForm.thickness_mm || Number(remnantForm.thickness_mm) <= 0) {
+      newErrors.thickness_mm = 'السماكة يجب أن تكون أكبر من صفر';
+    }
+
+    if (remnantForm.piece_source === 'from_sheet_cutting' && !remnantForm.parent_sheet_id) {
+      newErrors.parent_sheet_id = 'يجب اختيار الصفيحة الأم عند اختيار "من قص صفيحة"';
+    }
+
+    if (!batchForm.quantity || Number(batchForm.quantity) <= 0) {
+      newBatchErrors.quantity = 'الكمية يجب أن تكون أكبر من صفر';
+    }
+
+    setErrors(newErrors);
+    setBatchErrors(newBatchErrors);
+    return Object.keys(newErrors).length === 0 && Object.keys(newBatchErrors).length === 0;
+  };
+
+  const handleActualSaveRemnant = async () => {
+    if (!validateRemnantForm()) {
+      closeConfirm();
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const preview = computeTotalsPreview(
+        batchForm.pricing_mode,
+        batchForm.price_per_kg,
+        batchForm.total_cost,
+        batchForm.quantity,
+        remnantForm.weight_per_sheet_kg,
+        batchForm.batch_weight_kg
+      );
+
+      const sheetData = {
+        code: remnantForm.code.trim(),
+        metal_type_id: Number(remnantForm.metal_type_id),
+        grade_id: remnantForm.grade_id ? Number(remnantForm.grade_id) : null,
+        finish_id: remnantForm.finish_id ? Number(remnantForm.finish_id) : null,
+        length_mm: Number(remnantForm.length_mm),
+        width_mm: Number(remnantForm.width_mm),
+        thickness_mm: Number(remnantForm.thickness_mm),
+        weight_per_sheet_kg: remnantForm.weight_per_sheet_kg ? Number(remnantForm.weight_per_sheet_kg) : null,
+        is_remnant: true,
+        parent_sheet_id: remnantForm.parent_sheet_id || null
+      };
+
+      const batchData = {
+        supplier_id: batchForm.supplier_id || null,
+        quantity: Number(batchForm.quantity),
+        price_per_kg: preview.price_per_kg != null ? Number(preview.price_per_kg) : null,
+        total_cost: preview.total_cost != null ? Number(preview.total_cost.toFixed(2)) : null,
+        storage_location: batchForm.storage_location || null,
+        received_date: batchForm.received_date,
+        notes: batchForm.notes || null
+      };
+
+      const result = addSheetWithBatch(sheetData, batchData);
+      if (result.success) {
+        setSuccess(`✓ تم إضافة ${result.linked ? 'الدفعة للبقية الموجودة' : 'البقية والدفعة'} بنجاح`);
+        setTimeout(() => setSuccess(''), 3000);
+        handleCloseAddDialog();
+        refreshAll();
+      } else {
+        setError('فشل الحفظ: ' + result.error);
+      }
+    } catch (err) {
+      setError('حدث خطأ: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSaveNewRemnant = () => {
-    if (!remnantForm.code.trim()) return setError('الكود مطلوب');
-    if (!remnantForm.length_mm || !remnantForm.width_mm || !remnantForm.thickness_mm)
-      return setError('الأبعاد مطلوبة');
-    if (!batchForm.quantity || Number(batchForm.quantity) <= 0)
-      return setError('الكمية يجب أن تكون أكبر من صفر');
-
-    // Validation for from_sheet_cutting
-    if (remnantForm.piece_source === 'from_sheet_cutting' && !remnantForm.parent_sheet_id) {
-      return setError('يجب اختيار الصفيحة الأم عند اختيار "من قص صفيحة"');
-    }
-
-    const preview = computeTotalsPreview(
-      batchForm.pricing_mode,
-      batchForm.price_per_kg,
-      batchForm.total_cost,
-      batchForm.quantity,
-      remnantForm.weight_per_sheet_kg,
-      batchForm.batch_weight_kg
-    );
-
-    const sheetData = {
-      code: remnantForm.code.trim(),
-      metal_type_id: Number(remnantForm.metal_type_id),
-      grade_id: remnantForm.grade_id ? Number(remnantForm.grade_id) : null,
-      finish_id: remnantForm.finish_id ? Number(remnantForm.finish_id) : null,
-      length_mm: Number(remnantForm.length_mm),
-      width_mm: Number(remnantForm.width_mm),
-      thickness_mm: Number(remnantForm.thickness_mm),
-      weight_per_sheet_kg: remnantForm.weight_per_sheet_kg ? Number(remnantForm.weight_per_sheet_kg) : null,
-      is_remnant: true,
-      parent_sheet_id: remnantForm.parent_sheet_id || null
-    };
-
-    const batchData = {
-      supplier_id: batchForm.supplier_id || null,
-      quantity: Number(batchForm.quantity),
-      price_per_kg: preview.price_per_kg != null ? Number(preview.price_per_kg) : null,
-      total_cost: preview.total_cost != null ? Number(preview.total_cost.toFixed(2)) : null,
-      storage_location: batchForm.storage_location || null,
-      received_date: batchForm.received_date,
-      notes: batchForm.notes || null
-    };
-
-    const result = addSheetWithBatch(sheetData, batchData);
-    if (result.success) {
-      setSuccess(`✓ تم إضافة ${result.linked ? 'الدفعة للبقية الموجودة' : 'البقية والدفعة'} بنجاح`);
-      setTimeout(() => setSuccess(''), 3000);
-      handleCloseAddDialog();
-      refreshAll();
-    } else {
-      setError('فشل الحفظ: ' + result.error);
-    }
+    openConfirm('save', remnantForm, handleActualSaveRemnant);
   };
 
   // ──────────────────────────────────────────────────────────────
@@ -335,56 +405,82 @@ export default function RemnantsTab() {
       received_date: new Date().toISOString().split('T')[0],
       notes: ''
     });
+    setError('');
+    setExistingBatchErrors({});
     const list = getBatchesBySheetId(remnant.id);
     setBatches(list);
     setOpenBatchesDialog(true);
   };
 
-  const handleAddBatchToExisting = () => {
-    if (!selectedRemnant) return;
-    if (!existingBatchForm.quantity || Number(existingBatchForm.quantity) <= 0)
-      return setError('الكمية يجب أن تكون أكبر من صفر');
+  const validateExistingBatch = () => {
+    const newErrors = {};
 
-    const preview = computeTotalsPreview(
-      existingBatchForm.pricing_mode,
-      existingBatchForm.price_per_kg,
-      existingBatchForm.total_cost,
-      existingBatchForm.quantity,
-      selectedRemnant.weight_per_sheet_kg,
-      existingBatchForm.batch_weight_kg
-    );
-
-    const payload = {
-      sheet_id: selectedRemnant.id,
-      supplier_id: existingBatchForm.supplier_id || null,
-      quantity: Number(existingBatchForm.quantity),
-      price_per_kg: preview.price_per_kg != null ? Number(preview.price_per_kg) : null,
-      total_cost: preview.total_cost != null ? Number(preview.total_cost.toFixed(2)) : null,
-      storage_location: existingBatchForm.storage_location || null,
-      received_date: existingBatchForm.received_date,
-      notes: existingBatchForm.notes || null
-    };
-
-    const res = addBatchToSheet(payload);
-    if (res?.success) {
-      setSuccess('✓ تمت إضافة الدفعة بنجاح');
-      setTimeout(() => setSuccess(''), 3000);
-      const list = getBatchesBySheetId(selectedRemnant.id);
-      setBatches(list);
-      refreshAll();
-      setExistingBatchForm((f) => ({
-        ...f,
-        supplier_id: '',
-        quantity: '',
-        price_per_kg: f.pricing_mode === 'per_kg' ? '' : f.price_per_kg,
-        total_cost: f.pricing_mode === 'per_batch' ? '' : f.total_cost,
-        batch_weight_kg: '',
-        storage_location: '',
-        notes: ''
-      }));
-    } else {
-      setError('فشل إضافة الدفعة: ' + (res?.error || ''));
+    if (!existingBatchForm.quantity || Number(existingBatchForm.quantity) <= 0) {
+      newErrors.quantity = 'الكمية يجب أن تكون أكبر من صفر';
     }
+
+    setExistingBatchErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleActualAddBatch = async () => {
+    if (!selectedRemnant || !validateExistingBatch()) {
+      closeConfirm();
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const preview = computeTotalsPreview(
+        existingBatchForm.pricing_mode,
+        existingBatchForm.price_per_kg,
+        existingBatchForm.total_cost,
+        existingBatchForm.quantity,
+        selectedRemnant.weight_per_sheet_kg,
+        existingBatchForm.batch_weight_kg
+      );
+
+      const payload = {
+        sheet_id: selectedRemnant.id,
+        supplier_id: existingBatchForm.supplier_id || null,
+        quantity: Number(existingBatchForm.quantity),
+        price_per_kg: preview.price_per_kg != null ? Number(preview.price_per_kg) : null,
+        total_cost: preview.total_cost != null ? Number(preview.total_cost.toFixed(2)) : null,
+        storage_location: existingBatchForm.storage_location || null,
+        received_date: existingBatchForm.received_date,
+        notes: existingBatchForm.notes || null
+      };
+
+      const res = addBatchToSheet(payload);
+      if (res?.success) {
+        setSuccess('✓ تمت إضافة الدفعة بنجاح');
+        setTimeout(() => setSuccess(''), 3000);
+        const list = getBatchesBySheetId(selectedRemnant.id);
+        setBatches(list);
+        refreshAll();
+        setExistingBatchForm((f) => ({
+          ...f,
+          supplier_id: '',
+          quantity: '',
+          price_per_kg: f.pricing_mode === 'per_kg' ? '' : f.price_per_kg,
+          total_cost: f.pricing_mode === 'per_batch' ? '' : f.total_cost,
+          batch_weight_kg: '',
+          storage_location: '',
+          notes: ''
+        }));
+        setExistingBatchErrors({});
+      } else {
+        setError('فشل إضافة الدفعة: ' + (res?.error || ''));
+      }
+    } catch (err) {
+      setError('حدث خطأ: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddBatchToExisting = () => {
+    openConfirm('save', existingBatchForm, handleActualAddBatch);
   };
 
   const getStockColor = (quantity) => {
@@ -624,13 +720,18 @@ export default function RemnantsTab() {
       />
 
       {/* Dialog: Add Remnant + Initial Batch */}
-      <Dialog open={openAddDialog} onClose={handleCloseAddDialog} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-        <DialogTitle>
-          <Typography variant="h5" fontWeight={700}>إضافة بقية جديدة</Typography>
-        </DialogTitle>
-        <DialogContent>
-          {error && <Alert severity="error" sx={{ mt: 2, mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
-          <Box sx={{ mt: 2 }}>
+      <UnifiedFormDialog
+        open={openAddDialog}
+        onClose={handleCloseAddDialog}
+        onSubmit={handleSaveNewRemnant}
+        title="إضافة بقية جديدة"
+        subtitle="أدخل البيانات المطلوبة أدناه"
+        submitText="حفظ"
+        loading={loading}
+        maxWidth="md"
+      >
+        {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+        <Box>
             <Accordion defaultExpanded>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Typography variant="h6" fontWeight={700}>
@@ -704,111 +805,138 @@ export default function RemnantsTab() {
                   </Grid>
 
                   <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      label="الكود *"
+                    <UnifiedFormField
+                      label="الكود"
                       value={remnantForm.code}
-                      onChange={(e) => setRemnantForm({ ...remnantForm, code: e.target.value })}
+                      onChange={(e) => {
+                        setRemnantForm({ ...remnantForm, code: e.target.value });
+                        if (errors.code) {
+                          setErrors({ ...errors, code: null });
+                        }
+                      }}
+                      name="code"
+                      required
+                      error={errors.code}
                       disabled={autoGenerateCode}
                       helperText={autoGenerateCode ? "سيتم توليد الكود تلقائياً بناءً على المواصفات (R...)" : ""}
                     />
                   </Grid>
-                  
+
                   <Grid item xs={12} md={6}>
-                    <TextField
-                      select
-                      fullWidth
-                      label="نوع المعدن *"
+                    <UnifiedFormField
+                      label="نوع المعدن"
                       value={remnantForm.metal_type_id}
                       onChange={(e) => {
                         const newMetalId = e.target.value;
-                        setRemnantForm({ 
-                          ...remnantForm, 
-                          metal_type_id: newMetalId, 
-                          grade_id: '', 
-                          finish_id: '' 
+                        setRemnantForm({
+                          ...remnantForm,
+                          metal_type_id: newMetalId,
+                          grade_id: '',
+                          finish_id: ''
                         });
+                        if (errors.metal_type_id) {
+                          setErrors({ ...errors, metal_type_id: null });
+                        }
                       }}
-                      SelectProps={{ native: true }}
+                      name="metal_type_id"
+                      select
+                      required
+                      error={errors.metal_type_id}
                     >
-                      <option value="">-- اختر النوع --</option>
+                      <MenuItem value="">-- اختر النوع --</MenuItem>
                       {metalTypes.filter(m => m.is_active).map(metal => (
-                        <option key={metal.id} value={metal.id}>{metal.name_ar}</option>
+                        <MenuItem key={metal.id} value={metal.id}>{metal.name_ar}</MenuItem>
                       ))}
-                    </TextField>
+                    </UnifiedFormField>
                   </Grid>
 
                   {/* NEW: Grade Selection */}
                   <Grid item xs={12} md={6}>
-                    <TextField
-                      select
-                      fullWidth
+                    <UnifiedFormField
                       label="الدرجة"
                       value={remnantForm.grade_id}
                       onChange={(e) => setRemnantForm({ ...remnantForm, grade_id: e.target.value })}
-                      SelectProps={{ native: true }}
+                      name="grade_id"
+                      select
                       disabled={!remnantForm.metal_type_id || grades.length === 0}
                       helperText={!remnantForm.metal_type_id ? "اختر نوع المعدن أولاً" : (grades.length === 0 ? "لا توجد درجات متاحة" : "")}
                     >
-                      <option value="">-- بدون درجة (xx) --</option>
+                      <MenuItem value="">-- بدون درجة (xx) --</MenuItem>
                       {grades.map(grade => (
-                        <option key={grade.id} value={grade.id}>{grade.name}</option>
+                        <MenuItem key={grade.id} value={grade.id}>{grade.name}</MenuItem>
                       ))}
-                    </TextField>
+                    </UnifiedFormField>
                   </Grid>
 
                   {/* NEW: Finish Selection */}
                   <Grid item xs={12} md={6}>
-                    <TextField
-                      select
-                      fullWidth
+                    <UnifiedFormField
                       label="التشطيب"
                       value={remnantForm.finish_id}
                       onChange={(e) => setRemnantForm({ ...remnantForm, finish_id: e.target.value })}
-                      SelectProps={{ native: true }}
+                      name="finish_id"
+                      select
                       disabled={!remnantForm.metal_type_id || finishes.length === 0}
                       helperText={!remnantForm.metal_type_id ? "اختر نوع المعدن أولاً" : (finishes.length === 0 ? "لا توجد تشطيبات متاحة" : "")}
                     >
-                      <option value="">-- بدون تشطيب (xx) --</option>
+                      <MenuItem value="">-- بدون تشطيب (xx) --</MenuItem>
                       {finishes.map(finish => (
-                        <option key={finish.id} value={finish.id}>
+                        <MenuItem key={finish.id} value={finish.id}>
                           {finish.name_ar} ({finish.name_en})
-                        </option>
+                        </MenuItem>
                       ))}
-                    </TextField>
+                    </UnifiedFormField>
                   </Grid>
 
                   <Grid item xs={12} md={4}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="الطول (مم) *"
+                    <UnifiedFormField
+                      label="الطول (مم)"
                       value={remnantForm.length_mm}
-                      onChange={(e) => setRemnantForm({ ...remnantForm, length_mm: e.target.value })}
+                      onChange={(e) => {
+                        setRemnantForm({ ...remnantForm, length_mm: e.target.value });
+                        if (errors.length_mm) {
+                          setErrors({ ...errors, length_mm: null });
+                        }
+                      }}
+                      name="length_mm"
+                      type="number"
+                      required
+                      error={errors.length_mm}
                       inputProps={{ min: 1 }}
-                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                   <Grid item xs={12} md={4}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="العرض (مم) *"
+                    <UnifiedFormField
+                      label="العرض (مم)"
                       value={remnantForm.width_mm}
-                      onChange={(e) => setRemnantForm({ ...remnantForm, width_mm: e.target.value })}
+                      onChange={(e) => {
+                        setRemnantForm({ ...remnantForm, width_mm: e.target.value });
+                        if (errors.width_mm) {
+                          setErrors({ ...errors, width_mm: null });
+                        }
+                      }}
+                      name="width_mm"
+                      type="number"
+                      required
+                      error={errors.width_mm}
                       inputProps={{ min: 1 }}
-                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                   <Grid item xs={12} md={4}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="السماكة (مم) *"
+                    <UnifiedFormField
+                      label="السماكة (مم)"
                       value={remnantForm.thickness_mm}
-                      onChange={(e) => setRemnantForm({ ...remnantForm, thickness_mm: e.target.value })}
+                      onChange={(e) => {
+                        setRemnantForm({ ...remnantForm, thickness_mm: e.target.value });
+                        if (errors.thickness_mm) {
+                          setErrors({ ...errors, thickness_mm: null });
+                        }
+                      }}
+                      name="thickness_mm"
+                      type="number"
+                      required
+                      error={errors.thickness_mm}
                       inputProps={{ step: 0.1, min: 0.1 }}
-                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                   <Grid item xs={12}>
@@ -870,13 +998,12 @@ export default function RemnantsTab() {
               <AccordionDetails>
                 <Grid container spacing={2.5}>
                   <Grid item xs={12} md={6}>
-                    <TextField
-                      select
-                      fullWidth
+                    <UnifiedFormField
                       label="المورد"
                       value={batchForm.supplier_id}
                       onChange={(e) => setBatchForm({ ...batchForm, supplier_id: e.target.value })}
-                      SelectProps={{ native: true }}
+                      name="supplier_id"
+                      select
                       disabled={remnantForm.piece_source === 'company_stock'}
                       helperText={
                         remnantForm.piece_source === 'company_stock'
@@ -884,21 +1011,27 @@ export default function RemnantsTab() {
                           : ''
                       }
                     >
-                      <option value="">بدون مورد</option>
+                      <MenuItem value="">بدون مورد</MenuItem>
                       {suppliers.map(supplier => (
-                        <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+                        <MenuItem key={supplier.id} value={supplier.id}>{supplier.name}</MenuItem>
                       ))}
-                    </TextField>
+                    </UnifiedFormField>
                   </Grid>
                   <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="الكمية *"
+                    <UnifiedFormField
+                      label="الكمية"
                       value={batchForm.quantity}
-                      onChange={(e) => setBatchForm({ ...batchForm, quantity: e.target.value })}
+                      onChange={(e) => {
+                        setBatchForm({ ...batchForm, quantity: e.target.value });
+                        if (batchErrors.quantity) {
+                          setBatchErrors({ ...batchErrors, quantity: null });
+                        }
+                      }}
+                      name="quantity"
+                      type="number"
+                      required
+                      error={batchErrors.quantity}
                       inputProps={{ min: 1 }}
-                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
 
@@ -931,44 +1064,42 @@ export default function RemnantsTab() {
                   </Grid>
 
                   <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="الوزن الإجمالي للدفعة (كغ) — اختياري"
+                    <UnifiedFormField
+                      label="الوزن الإجمالي للدفعة (كغ)"
                       value={batchForm.batch_weight_kg}
                       onChange={(e) => setBatchForm({ ...batchForm, batch_weight_kg: e.target.value })}
+                      name="batch_weight_kg"
+                      type="number"
                       inputProps={{ step: 0.001, min: 0 }}
-                      InputLabelProps={{ shrink: true }}
-                      helperText="اتركه فارغاً لحساب الوزن تلقائياً من الكمية"
+                      helperText="اختياري - اتركه فارغاً لحساب الوزن تلقائياً من الكمية"
                     />
                   </Grid>
 
                   <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      type="date"
+                    <UnifiedFormField
                       label="تاريخ الاستلام"
                       value={batchForm.received_date}
                       onChange={(e) => setBatchForm({ ...batchForm, received_date: e.target.value })}
-                      InputLabelProps={{ shrink: true }}
+                      name="received_date"
+                      type="date"
                     />
                   </Grid>
                   <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
+                    <UnifiedFormField
                       label="موقع التخزين"
                       value={batchForm.storage_location}
                       onChange={(e) => setBatchForm({ ...batchForm, storage_location: e.target.value })}
+                      name="storage_location"
                     />
                   </Grid>
                   <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      multiline
-                      rows={2}
+                    <UnifiedFormField
                       label="ملاحظات"
                       value={batchForm.notes}
                       onChange={(e) => setBatchForm({ ...batchForm, notes: e.target.value })}
+                      name="notes"
+                      multiline
+                      rows={2}
                     />
                   </Grid>
 
@@ -998,54 +1129,54 @@ export default function RemnantsTab() {
               </AccordionDetails>
             </Accordion>
           </Box>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button onClick={handleCloseAddDialog} size="large">إلغاء</Button>
-          <Button onClick={handleSaveNewRemnant} variant="contained" size="large">حفظ</Button>
-        </DialogActions>
-      </Dialog>
+      </UnifiedFormDialog>
 
       {/* Dialog: Batches */}
-      <Dialog open={openBatchesDialog} onClose={() => setOpenBatchesDialog(false)} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-        <DialogTitle>
-          <Typography variant="h5" fontWeight={700}>
-            الدفعات - {selectedRemnant?.code}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">
-            {selectedRemnant?.metal_name} | {selectedRemnant?.length_mm}×{selectedRemnant?.width_mm} | {selectedRemnant?.thickness_mm} مم
-            {selectedRemnant?.parent_sheet_id && ` | الأم: ${getParentName(selectedRemnant.parent_sheet_id)}`}
-          </Typography>
-        </DialogTitle>
-        <DialogContent>
+      <UnifiedFormDialog
+        open={openBatchesDialog}
+        onClose={() => setOpenBatchesDialog(false)}
+        onSubmit={() => setOpenBatchesDialog(false)}
+        title={`الدفعات - ${selectedRemnant?.code || ''}`}
+        subtitle={selectedRemnant ? `${selectedRemnant.metal_name} | ${selectedRemnant.length_mm}×${selectedRemnant.width_mm} | ${selectedRemnant.thickness_mm} مم${selectedRemnant.parent_sheet_id ? ` | الأم: ${getParentName(selectedRemnant.parent_sheet_id)}` : ''}` : ''}
+        submitText="إغلاق"
+        cancelText=""
+        maxWidth="md"
+      >
+        {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
           <Box sx={{ mb: 3 }}>
             <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
               <AddBoxIcon fontSize="small" /> إضافة دفعة للبقية
             </Typography>
             <Grid container spacing={2.5}>
               <Grid item xs={12} md={6}>
-                <TextField
-                  select
-                  fullWidth
+                <UnifiedFormField
                   label="المورد"
                   value={existingBatchForm.supplier_id}
                   onChange={(e) => setExistingBatchForm({ ...existingBatchForm, supplier_id: e.target.value })}
-                  SelectProps={{ native: true }}
+                  name="supplier_id"
+                  select
                 >
-                  <option value="">بدون مورد</option>
+                  <MenuItem value="">بدون مورد</MenuItem>
                   {suppliers.map(supplier => (
-                    <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+                    <MenuItem key={supplier.id} value={supplier.id}>{supplier.name}</MenuItem>
                   ))}
-                </TextField>
+                </UnifiedFormField>
               </Grid>
               <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="الكمية *"
+                <UnifiedFormField
+                  label="الكمية"
                   value={existingBatchForm.quantity}
-                  onChange={(e) => setExistingBatchForm({ ...existingBatchForm, quantity: e.target.value })}
+                  onChange={(e) => {
+                    setExistingBatchForm({ ...existingBatchForm, quantity: e.target.value });
+                    if (existingBatchErrors.quantity) {
+                      setExistingBatchErrors({ ...existingBatchErrors, quantity: null });
+                    }
+                  }}
+                  name="quantity"
+                  type="number"
+                  required
+                  error={existingBatchErrors.quantity}
                   inputProps={{ min: 1 }}
-                  InputLabelProps={{ shrink: true }}
                 />
               </Grid>
 
@@ -1078,44 +1209,42 @@ export default function RemnantsTab() {
               </Grid>
 
               <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="الوزن الإجمالي للدفعة (كغ) — اختياري"
+                <UnifiedFormField
+                  label="الوزن الإجمالي للدفعة (كغ)"
                   value={existingBatchForm.batch_weight_kg}
                   onChange={(e) => setExistingBatchForm({ ...existingBatchForm, batch_weight_kg: e.target.value })}
+                  name="batch_weight_kg"
+                  type="number"
                   inputProps={{ step: 0.001, min: 0 }}
-                  InputLabelProps={{ shrink: true }}
-                  helperText="اتركه فارغاً لحساب الوزن تلقائياً من الكمية"
+                  helperText="اختياري - اتركه فارغاً لحساب الوزن تلقائياً من الكمية"
                 />
               </Grid>
 
               <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  type="date"
+                <UnifiedFormField
                   label="تاريخ الاستلام"
                   value={existingBatchForm.received_date}
                   onChange={(e) => setExistingBatchForm({ ...existingBatchForm, received_date: e.target.value })}
-                  InputLabelProps={{ shrink: true }}
+                  name="received_date"
+                  type="date"
                 />
               </Grid>
               <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
+                <UnifiedFormField
                   label="موقع التخزين"
                   value={existingBatchForm.storage_location}
                   onChange={(e) => setExistingBatchForm({ ...existingBatchForm, storage_location: e.target.value })}
+                  name="storage_location"
                 />
               </Grid>
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={2}
+                <UnifiedFormField
                   label="ملاحظات"
                   value={existingBatchForm.notes}
                   onChange={(e) => setExistingBatchForm({ ...existingBatchForm, notes: e.target.value })}
+                  name="notes"
+                  multiline
+                  rows={2}
                 />
               </Grid>
 
@@ -1172,7 +1301,7 @@ export default function RemnantsTab() {
                   <TableBody>
                     {batches.map((batch) => (
                       <TableRow key={batch.id}>
-                        <TableCell><Typography fontSize="0.9375rem">{batch.supplier_name || 'بدون مورد'}</Typography></TableCell>
+                        <TableCell><Typography fontSize="0.9375rem">{safeText(batch.supplier_name) || 'بدون مورد'}</Typography></TableCell>
                         <TableCell><Typography fontSize="0.9375rem">{batch.quantity_original}</Typography></TableCell>
                         <TableCell>
                           <Chip
@@ -1194,11 +1323,19 @@ export default function RemnantsTab() {
               </TableContainer>
             )}
           </Box>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button onClick={() => setOpenBatchesDialog(false)} size="large">إغلاق</Button>
-        </DialogActions>
-      </Dialog>
+      </UnifiedFormDialog>
+
+      {/* Confirmation Dialog */}
+      <UnifiedConfirmDialog
+        open={confirmDialog.open}
+        onClose={closeConfirm}
+        onConfirm={async () => {
+          await confirmDialog.action();
+          closeConfirm();
+        }}
+        {...confirmationMessages[confirmDialog.type]}
+        loading={loading}
+      />
     </Box>
   );
 }

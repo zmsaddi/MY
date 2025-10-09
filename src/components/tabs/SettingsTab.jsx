@@ -1,13 +1,11 @@
 // src/components/tabs/SettingsTab.jsx
 import { useState, useEffect } from 'react';
 import {
-  Box, Card, CardContent, Grid, TextField, Button, Typography,
+  Box, Card, CardContent, Grid, Button, Typography,
   Alert, Divider, InputAdornment, Switch, FormControlLabel,
   Avatar, IconButton, Tooltip,
-  Accordion, AccordionSummary, AccordionDetails,
   Table, TableHead, TableBody, TableRow, TableCell, TableContainer, Paper,
-  Tabs, Tab, Chip,
-  Dialog, DialogTitle, DialogContent, DialogActions  // Add these
+  Tabs, Tab, Chip, MenuItem
 } from '@mui/material';
 
 import SaveIcon from '@mui/icons-material/Save';
@@ -15,15 +13,16 @@ import BusinessIcon from '@mui/icons-material/Business';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import BuildIcon from '@mui/icons-material/Build';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import ClearIcon from '@mui/icons-material/Clear';
-import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
-import PaymentIcon from '@mui/icons-material/Payment';
-import PeopleIcon from '@mui/icons-material/People';
-import LockIcon from '@mui/icons-material/Lock';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import LockIcon from '@mui/icons-material/Lock';
+
+import UnifiedFormField from '../common/forms/UnifiedFormField';
+import UnifiedFormDialog from '../common/forms/UnifiedFormDialog';
+import UnifiedConfirmDialog from '../common/dialogs/UnifiedConfirmDialog';
+import { confirmationMessages } from '../../theme/designSystem';
 
 import {
   getCompanyProfile,
@@ -37,7 +36,6 @@ import {
   getPaymentMethodsForUI,
   addPaymentMethod,
   updatePaymentMethod,
-  getBaseCurrencyInfo,
   getMetalTypes,
   addMetalType,
   updateMetalType,
@@ -55,6 +53,7 @@ import {
 } from '../../utils/database';
 
 import { getCurrentUser } from '../../utils/auth';
+import { safeText, safeNotes, safeCompanyName } from '../../utils/displayHelpers';
 import DatabaseResetSection from '../features/settings/DatabaseResetSection';
 
 /* ---------------- Service Row ---------------- */
@@ -66,6 +65,11 @@ function ServiceRow({ service, onUpdated }) {
     is_active: !!service.is_active,
   });
   const [saving, setSaving] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    type: 'update',
+    action: null
+  });
 
   useEffect(() => {
     setRow({
@@ -91,7 +95,7 @@ function ServiceRow({ service, onUpdated }) {
     }
   };
 
-  const handleSaveEdit = async () => {
+  const handleActualSave = async () => {
     if (!row.name_ar.trim()) return;
     setSaving(true);
     try {
@@ -104,7 +108,16 @@ function ServiceRow({ service, onUpdated }) {
       onUpdated?.();
     } finally {
       setSaving(false);
+      setConfirmDialog({ ...confirmDialog, open: false });
     }
+  };
+
+  const handleSaveEdit = () => {
+    setConfirmDialog({
+      open: true,
+      type: 'update',
+      action: handleActualSave
+    });
   };
 
   const handleCancel = () => {
@@ -117,77 +130,89 @@ function ServiceRow({ service, onUpdated }) {
   };
 
   return (
-    <TableRow hover>
-      <TableCell>
-        {editing ? (
-          <TextField
-            fullWidth
-            size="small"
-            value={row.name_ar}
-            onChange={(e) => setRow((r) => ({ ...r, name_ar: e.target.value }))}
-          />
-        ) : (
-          <Typography fontSize="1rem">{service.name_ar}</Typography>
-        )}
-      </TableCell>
-
-      <TableCell>
-        {editing ? (
-          <TextField
-            fullWidth
-            size="small"
-            value={row.name_en}
-            onChange={(e) => setRow((r) => ({ ...r, name_en: e.target.value }))}
-          />
-        ) : (
-          <Typography color="text.secondary" fontSize="0.95rem">{service.name_en || '—'}</Typography>
-        )}
-      </TableCell>
-
-      <TableCell>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={row.is_active}
-              onChange={(e) => handleToggleActive(e.target.checked)}
-              color="primary"
-              disabled={saving || editing}
+    <>
+      <TableRow hover>
+        <TableCell>
+          {editing ? (
+            <UnifiedFormField
+              value={row.name_ar}
+              onChange={(e) => setRow((r) => ({ ...r, name_ar: e.target.value }))}
+              name="name_ar"
+              fullWidth
             />
-          }
-          label={<Typography fontSize="0.95rem">{row.is_active ? 'مفعّل' : 'موقوف'}</Typography>}
-        />
-      </TableCell>
+          ) : (
+            <Typography fontSize="1rem">{safeText(service.name_ar)}</Typography>
+          )}
+        </TableCell>
 
-      <TableCell align="left">
-        {editing ? (
-          <>
-            <Tooltip title="حفظ">
-              <span>
-                <IconButton 
-                  onClick={handleSaveEdit} 
-                  disabled={saving || !row.name_ar.trim()} 
-                  color="primary"
-                  size="small"
-                >
-                  <SaveIcon />
+        <TableCell>
+          {editing ? (
+            <UnifiedFormField
+              value={row.name_en}
+              onChange={(e) => setRow((r) => ({ ...r, name_en: e.target.value }))}
+              name="name_en"
+              fullWidth
+            />
+          ) : (
+            <Typography color="text.secondary" fontSize="0.95rem">{safeText(service.name_en) || '—'}</Typography>
+          )}
+        </TableCell>
+
+        <TableCell>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={row.is_active}
+                onChange={(e) => handleToggleActive(e.target.checked)}
+                color="primary"
+                disabled={saving || editing}
+              />
+            }
+            label={<Typography fontSize="0.95rem">{row.is_active ? 'مفعّل' : 'موقوف'}</Typography>}
+          />
+        </TableCell>
+
+        <TableCell align="left">
+          {editing ? (
+            <>
+              <Tooltip title="حفظ">
+                <span>
+                  <IconButton
+                    onClick={handleSaveEdit}
+                    disabled={saving || !row.name_ar.trim()}
+                    color="primary"
+                    size="small"
+                  >
+                    <SaveIcon />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Tooltip title="إلغاء">
+                <IconButton onClick={handleCancel} color="inherit" size="small">
+                  <ClearIcon />
                 </IconButton>
-              </span>
-            </Tooltip>
-            <Tooltip title="إلغاء">
-              <IconButton onClick={handleCancel} color="inherit" size="small">
-                <ClearIcon />
+              </Tooltip>
+            </>
+          ) : (
+            <Tooltip title="تعديل">
+              <IconButton onClick={() => setEditing(true)} color="primary" size="small">
+                <EditIcon />
               </IconButton>
             </Tooltip>
-          </>
-        ) : (
-          <Tooltip title="تعديل">
-            <IconButton onClick={() => setEditing(true)} color="primary" size="small">
-              <EditIcon />
-            </IconButton>
-          </Tooltip>
-        )}
-      </TableCell>
-    </TableRow>
+          )}
+        </TableCell>
+      </TableRow>
+
+      <UnifiedConfirmDialog
+        open={confirmDialog.open}
+        onClose={() => setConfirmDialog({ ...confirmDialog, open: false })}
+        onConfirm={async () => {
+          await confirmDialog.action();
+        }}
+        {...confirmationMessages[confirmDialog.type]}
+        loading={saving}
+      />
+    </>
   );
 }
 
@@ -214,6 +239,11 @@ function MaterialRow({ material, onUpdated }) {
   const [editGradeValue, setEditGradeValue] = useState('');
   const [editFinishValue, setEditFinishValue] = useState({ name_ar: '', name_en: '' });
   const [deleteConfirm, setDeleteConfirm] = useState({ open: false, type: null, id: null, name: '' });
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    type: 'update',
+    action: null
+  });
 
   useEffect(() => {
     setRow({
@@ -237,7 +267,7 @@ function MaterialRow({ material, onUpdated }) {
     }
   };
 
-  const handleSaveEdit = async () => {
+  const handleActualSave = async () => {
     if (!row.name_ar.trim() || !row.abbreviation.trim()) return;
     setSaving(true);
     try {
@@ -252,7 +282,16 @@ function MaterialRow({ material, onUpdated }) {
       onUpdated?.();
     } finally {
       setSaving(false);
+      setConfirmDialog({ ...confirmDialog, open: false });
     }
+  };
+
+  const handleSaveEdit = () => {
+    setConfirmDialog({
+      open: true,
+      type: 'update',
+      action: handleActualSave
+    });
   };
 
   const handleCancel = () => {
@@ -312,11 +351,11 @@ function MaterialRow({ material, onUpdated }) {
   };
 
   const handleDeleteGrade = (grade) => {
-    setDeleteConfirm({ 
-      open: true, 
-      type: 'grade', 
-      id: grade.id, 
-      name: grade.name 
+    setDeleteConfirm({
+      open: true,
+      type: 'grade',
+      id: grade.id,
+      name: grade.name
     });
   };
 
@@ -371,11 +410,11 @@ function MaterialRow({ material, onUpdated }) {
   };
 
   const handleDeleteFinish = (finish) => {
-    setDeleteConfirm({ 
-      open: true, 
-      type: 'finish', 
-      id: finish.id, 
-      name: `${finish.name_ar} (${finish.name_en || '-'})` 
+    setDeleteConfirm({
+      open: true,
+      type: 'finish',
+      id: finish.id,
+      name: `${finish.name_ar} (${finish.name_en || '-'})`
     });
   };
 
@@ -383,18 +422,18 @@ function MaterialRow({ material, onUpdated }) {
     const { type, id } = deleteConfirm;
     try {
       if (type === 'grade') {
-        const res = await updateGrade(id, { 
-          name: editGradeValue || 'DELETED', 
-          is_active: false 
+        const res = await updateGrade(id, {
+          name: editGradeValue || 'DELETED',
+          is_active: false
         });
         if (res?.success) {
           onUpdated?.();
         }
       } else if (type === 'finish') {
-        const res = await updateFinish(id, { 
-          name_ar: 'DELETED', 
-          name_en: 'DELETED', 
-          is_active: false 
+        const res = await updateFinish(id, {
+          name_ar: 'DELETED',
+          name_en: 'DELETED',
+          is_active: false
         });
         if (res?.success) {
           onUpdated?.();
@@ -421,21 +460,21 @@ function MaterialRow({ material, onUpdated }) {
         </TableCell>
         <TableCell>
           {editing ? (
-            <TextField
-              size="small"
+            <UnifiedFormField
               value={row.name_ar}
               onChange={(e) => setRow((r) => ({ ...r, name_ar: e.target.value }))}
+              name="name_ar"
             />
           ) : (
-            <Typography fontSize="1rem">{material.name_ar}</Typography>
+            <Typography fontSize="1rem">{safeText(material.name_ar)}</Typography>
           )}
         </TableCell>
         <TableCell>
           {editing ? (
-            <TextField
-              size="small"
+            <UnifiedFormField
               value={row.abbreviation}
               onChange={(e) => setRow((r) => ({ ...r, abbreviation: e.target.value.toUpperCase() }))}
+              name="abbreviation"
               inputProps={{ maxLength: 3 }}
             />
           ) : (
@@ -496,12 +535,12 @@ function MaterialRow({ material, onUpdated }) {
 
                 {addingGrade && (
                   <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                    <TextField
-                      size="small"
-                      fullWidth
+                    <UnifiedFormField
                       label="اسم الدرجة (مثل: 304)"
                       value={newGrade}
                       onChange={(e) => setNewGrade(e.target.value)}
+                      name="new_grade"
+                      fullWidth
                     />
                     <IconButton color="primary" onClick={handleAddGrade} disabled={!newGrade.trim()}>
                       <SaveIcon />
@@ -517,11 +556,11 @@ function MaterialRow({ material, onUpdated }) {
                     <Box key={grade.id}>
                       {editingGrade === grade.id ? (
                         <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-                          <TextField
-                            size="small"
+                          <UnifiedFormField
                             value={editGradeValue}
                             onChange={(e) => setEditGradeValue(e.target.value)}
-                            sx={{ width: 100 }}
+                            name="edit_grade"
+                            fullWidth={false}
                           />
                           <IconButton size="small" color="primary" onClick={() => handleSaveGrade(grade.id)}>
                             <SaveIcon fontSize="small" />
@@ -533,7 +572,7 @@ function MaterialRow({ material, onUpdated }) {
                       ) : (
                         <Box sx={{ display: 'inline-flex', gap: 0.5, alignItems: 'center' }}>
                           <Chip
-                            label={grade.name}
+                            label={safeText(grade.name)}
                             color={grade.is_active ? 'primary' : 'default'}
                             variant="outlined"
                             size="small"
@@ -567,20 +606,20 @@ function MaterialRow({ material, onUpdated }) {
 
                 {addingFinish && (
                   <Box sx={{ display: 'flex', gap: 1, mb: 2, flexDirection: 'column' }}>
-                    <TextField
-                      size="small"
-                      fullWidth
+                    <UnifiedFormField
                       label="الاسم بالعربي"
                       value={newFinish.name_ar}
                       onChange={(e) => setNewFinish((f) => ({ ...f, name_ar: e.target.value }))}
+                      name="new_finish_ar"
+                      fullWidth
                     />
                     <Box sx={{ display: 'flex', gap: 1 }}>
-                      <TextField
-                        size="small"
-                        fullWidth
+                      <UnifiedFormField
                         label="الاسم بالإنجليزي"
                         value={newFinish.name_en}
                         onChange={(e) => setNewFinish((f) => ({ ...f, name_en: e.target.value }))}
+                        name="new_finish_en"
+                        fullWidth
                       />
                       <IconButton color="primary" onClick={handleAddFinish} disabled={!newFinish.name_ar.trim()}>
                         <SaveIcon />
@@ -597,19 +636,17 @@ function MaterialRow({ material, onUpdated }) {
                     <Box key={finish.id}>
                       {editingFinish === finish.id ? (
                         <Box sx={{ display: 'flex', gap: 0.5, flexDirection: 'column', p: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                          <TextField
-                            size="small"
+                          <UnifiedFormField
                             label="عربي"
                             value={editFinishValue.name_ar}
                             onChange={(e) => setEditFinishValue((f) => ({ ...f, name_ar: e.target.value }))}
-                            sx={{ width: 140 }}
+                            name="edit_finish_ar"
                           />
-                          <TextField
-                            size="small"
+                          <UnifiedFormField
                             label="English"
                             value={editFinishValue.name_en}
                             onChange={(e) => setEditFinishValue((f) => ({ ...f, name_en: e.target.value }))}
-                            sx={{ width: 140 }}
+                            name="edit_finish_en"
                           />
                           <Box sx={{ display: 'flex', gap: 0.5 }}>
                             <IconButton size="small" color="primary" onClick={() => handleSaveFinish(finish.id)}>
@@ -623,7 +660,7 @@ function MaterialRow({ material, onUpdated }) {
                       ) : (
                         <Box sx={{ display: 'inline-flex', gap: 0.5, alignItems: 'center' }}>
                           <Chip
-                            label={`${finish.name_ar} (${finish.name_en || '-'})`}
+                            label={`${safeText(finish.name_ar)} (${safeText(finish.name_en) || '-'})`}
                             color={finish.is_active ? 'secondary' : 'default'}
                             variant="outlined"
                             size="small"
@@ -649,23 +686,27 @@ function MaterialRow({ material, onUpdated }) {
       )}
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteConfirm.open} onClose={handleCancelDelete}>
-        <DialogTitle>تأكيد الحذف</DialogTitle>
-        <DialogContent>
-          <Typography>
-            هل أنت متأكد من حذف {deleteConfirm.type === 'grade' ? 'الدرجة' : 'التشطيب'} "{deleteConfirm.name}"؟
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            ملاحظة: سيتم تعطيل العنصر فقط للحفاظ على سلامة البيانات التاريخية
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCancelDelete}>إلغاء</Button>
-          <Button onClick={handleConfirmDelete} color="error" variant="contained">
-            حذف
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <UnifiedConfirmDialog
+        open={deleteConfirm.open}
+        onClose={handleCancelDelete}
+        onConfirm={handleConfirmDelete}
+        title="تأكيد الحذف"
+        message={`هل أنت متأكد من حذف ${deleteConfirm.type === 'grade' ? 'الدرجة' : 'التشطيب'} "${deleteConfirm.name}"؟ سيتم تعطيل العنصر فقط للحفاظ على سلامة البيانات التاريخية.`}
+        type="warning"
+        confirmText="حذف"
+        confirmColor="error"
+      />
+
+      {/* Update Confirmation Dialog */}
+      <UnifiedConfirmDialog
+        open={confirmDialog.open}
+        onClose={() => setConfirmDialog({ ...confirmDialog, open: false })}
+        onConfirm={async () => {
+          await confirmDialog.action();
+        }}
+        {...confirmationMessages[confirmDialog.type]}
+        loading={saving}
+      />
     </>
   );
 }
@@ -681,6 +722,11 @@ function CurrencyRow({ currency, onUpdated }) {
     is_active: !!currency.is_active,
   });
   const [saving, setSaving] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    type: 'update',
+    action: null
+  });
 
   useEffect(() => {
     setRow({
@@ -704,7 +750,7 @@ function CurrencyRow({ currency, onUpdated }) {
     }
   };
 
-  const handleSaveEdit = async () => {
+  const handleActualSave = async () => {
     if (!row.exchange_rate || row.exchange_rate <= 0) return;
     setSaving(true);
     try {
@@ -719,7 +765,16 @@ function CurrencyRow({ currency, onUpdated }) {
       onUpdated?.();
     } finally {
       setSaving(false);
+      setConfirmDialog({ ...confirmDialog, open: false });
     }
+  };
+
+  const handleSaveEdit = () => {
+    setConfirmDialog({
+      open: true,
+      type: 'update',
+      action: handleActualSave
+    });
   };
 
   const handleCancel = () => {
@@ -734,67 +789,86 @@ function CurrencyRow({ currency, onUpdated }) {
   };
 
   return (
-    <TableRow hover>
-      <TableCell>
-        <Typography fontSize="1rem" fontWeight={600}>{currency.code}</Typography>
-      </TableCell>
-      <TableCell>
-        {editing ? (
-          <TextField size="small" value={row.name_ar} onChange={(e) => setRow((r) => ({ ...r, name_ar: e.target.value }))} />
-        ) : (
-          <Typography fontSize="1rem">{currency.name_ar}</Typography>
-        )}
-      </TableCell>
-      <TableCell>
-        {editing ? (
-          <TextField size="small" value={row.symbol} onChange={(e) => setRow((r) => ({ ...r, symbol: e.target.value }))} />
-        ) : (
-          <Typography fontSize="1rem">{currency.symbol}</Typography>
-        )}
-      </TableCell>
-      <TableCell>
-        {editing ? (
-          <TextField
-            size="small"
-            type="number"
-            value={row.exchange_rate}
-            onChange={(e) => setRow((r) => ({ ...r, exchange_rate: e.target.value }))}
-            inputProps={{ step: 0.01, min: 0.01 }}
-            InputLabelProps={{ shrink: true }}
-          />
-        ) : (
-          <Typography fontSize="0.95rem">{currency.exchange_rate}</Typography>
-        )}
-      </TableCell>
-      <TableCell>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={row.is_active}
-              onChange={(e) => handleToggleActive(e.target.checked)}
-              disabled={saving || editing}
+    <>
+      <TableRow hover>
+        <TableCell>
+          <Typography fontSize="1rem" fontWeight={600}>{currency.code}</Typography>
+        </TableCell>
+        <TableCell>
+          {editing ? (
+            <UnifiedFormField
+              value={row.name_ar}
+              onChange={(e) => setRow((r) => ({ ...r, name_ar: e.target.value }))}
+              name="name_ar"
             />
-          }
-          label={<Typography fontSize="0.95rem">{row.is_active ? 'مفعّل' : 'موقوف'}</Typography>}
-        />
-      </TableCell>
-      <TableCell align="left">
-        {editing ? (
-          <>
-            <IconButton onClick={handleSaveEdit} disabled={saving} color="primary" size="small">
-              <SaveIcon />
+          ) : (
+            <Typography fontSize="1rem">{safeText(currency.name_ar)}</Typography>
+          )}
+        </TableCell>
+        <TableCell>
+          {editing ? (
+            <UnifiedFormField
+              value={row.symbol}
+              onChange={(e) => setRow((r) => ({ ...r, symbol: e.target.value }))}
+              name="symbol"
+            />
+          ) : (
+            <Typography fontSize="1rem">{currency.symbol}</Typography>
+          )}
+        </TableCell>
+        <TableCell>
+          {editing ? (
+            <UnifiedFormField
+              value={row.exchange_rate}
+              onChange={(e) => setRow((r) => ({ ...r, exchange_rate: e.target.value }))}
+              name="exchange_rate"
+              type="number"
+              inputProps={{ step: 0.01, min: 0.01 }}
+            />
+          ) : (
+            <Typography fontSize="0.95rem">{currency.exchange_rate}</Typography>
+          )}
+        </TableCell>
+        <TableCell>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={row.is_active}
+                onChange={(e) => handleToggleActive(e.target.checked)}
+                disabled={saving || editing}
+              />
+            }
+            label={<Typography fontSize="0.95rem">{row.is_active ? 'مفعّل' : 'موقوف'}</Typography>}
+          />
+        </TableCell>
+        <TableCell align="left">
+          {editing ? (
+            <>
+              <IconButton onClick={handleSaveEdit} disabled={saving} color="primary" size="small">
+                <SaveIcon />
+              </IconButton>
+              <IconButton onClick={handleCancel} size="small">
+                <ClearIcon />
+              </IconButton>
+            </>
+          ) : (
+            <IconButton onClick={() => setEditing(true)} color="primary" size="small">
+              <EditIcon />
             </IconButton>
-            <IconButton onClick={handleCancel} size="small">
-              <ClearIcon />
-            </IconButton>
-          </>
-        ) : (
-          <IconButton onClick={() => setEditing(true)} color="primary" size="small">
-            <EditIcon />
-          </IconButton>
-        )}
-      </TableCell>
-    </TableRow>
+          )}
+        </TableCell>
+      </TableRow>
+
+      <UnifiedConfirmDialog
+        open={confirmDialog.open}
+        onClose={() => setConfirmDialog({ ...confirmDialog, open: false })}
+        onConfirm={async () => {
+          await confirmDialog.action();
+        }}
+        {...confirmationMessages[confirmDialog.type]}
+        loading={saving}
+      />
+    </>
   );
 }
 
@@ -807,6 +881,11 @@ function PaymentMethodRow({ method, onUpdated }) {
     is_active: !!method.is_active,
   });
   const [saving, setSaving] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    type: 'update',
+    action: null
+  });
 
   useEffect(() => {
     setRow({
@@ -828,7 +907,7 @@ function PaymentMethodRow({ method, onUpdated }) {
     }
   };
 
-  const handleSaveEdit = async () => {
+  const handleActualSave = async () => {
     if (!row.name_ar.trim()) return;
     setSaving(true);
     try {
@@ -841,7 +920,16 @@ function PaymentMethodRow({ method, onUpdated }) {
       onUpdated?.();
     } finally {
       setSaving(false);
+      setConfirmDialog({ ...confirmDialog, open: false });
     }
+  };
+
+  const handleSaveEdit = () => {
+    setConfirmDialog({
+      open: true,
+      type: 'update',
+      action: handleActualSave
+    });
   };
 
   const handleCancel = () => {
@@ -854,67 +942,79 @@ function PaymentMethodRow({ method, onUpdated }) {
   };
 
   return (
-    <TableRow hover>
-      <TableCell>
-        {editing ? (
-          <TextField
-            fullWidth
-            size="small"
-            value={row.name_ar}
-            onChange={(e) => setRow((r) => ({ ...r, name_ar: e.target.value }))}
-          />
-        ) : (
-          <Typography fontSize="1rem">{method.name_ar}</Typography>
-        )}
-      </TableCell>
-      <TableCell>
-        {editing ? (
-          <TextField
-            fullWidth
-            size="small"
-            value={row.name_en}
-            onChange={(e) => setRow((r) => ({ ...r, name_en: e.target.value }))}
-          />
-        ) : (
-          <Typography color="text.secondary" fontSize="0.95rem">{method.name_en || '—'}</Typography>
-        )}
-      </TableCell>
-      <TableCell>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={row.is_active}
-              onChange={(e) => handleToggleActive(e.target.checked)}
-              disabled={saving || editing}
+    <>
+      <TableRow hover>
+        <TableCell>
+          {editing ? (
+            <UnifiedFormField
+              value={row.name_ar}
+              onChange={(e) => setRow((r) => ({ ...r, name_ar: e.target.value }))}
+              name="name_ar"
+              fullWidth
             />
-          }
-          label={<Typography fontSize="0.95rem">{row.is_active ? 'مفعّل' : 'موقوف'}</Typography>}
-        />
-      </TableCell>
-      <TableCell align="left">
-        {editing ? (
-          <>
-            <IconButton onClick={handleSaveEdit} disabled={saving} color="primary" size="small">
-              <SaveIcon />
+          ) : (
+            <Typography fontSize="1rem">{safeText(method.name_ar)}</Typography>
+          )}
+        </TableCell>
+        <TableCell>
+          {editing ? (
+            <UnifiedFormField
+              value={row.name_en}
+              onChange={(e) => setRow((r) => ({ ...r, name_en: e.target.value }))}
+              name="name_en"
+              fullWidth
+            />
+          ) : (
+            <Typography color="text.secondary" fontSize="0.95rem">{safeText(method.name_en) || '—'}</Typography>
+          )}
+        </TableCell>
+        <TableCell>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={row.is_active}
+                onChange={(e) => handleToggleActive(e.target.checked)}
+                disabled={saving || editing}
+              />
+            }
+            label={<Typography fontSize="0.95rem">{row.is_active ? 'مفعّل' : 'موقوف'}</Typography>}
+          />
+        </TableCell>
+        <TableCell align="left">
+          {editing ? (
+            <>
+              <IconButton onClick={handleSaveEdit} disabled={saving} color="primary" size="small">
+                <SaveIcon />
+              </IconButton>
+              <IconButton onClick={handleCancel} size="small">
+                <ClearIcon />
+              </IconButton>
+            </>
+          ) : (
+            <IconButton onClick={() => setEditing(true)} color="primary" size="small">
+              <EditIcon />
             </IconButton>
-            <IconButton onClick={handleCancel} size="small">
-              <ClearIcon />
-            </IconButton>
-          </>
-        ) : (
-          <IconButton onClick={() => setEditing(true)} color="primary" size="small">
-            <EditIcon />
-          </IconButton>
-        )}
-      </TableCell>
-    </TableRow>
+          )}
+        </TableCell>
+      </TableRow>
+
+      <UnifiedConfirmDialog
+        open={confirmDialog.open}
+        onClose={() => setConfirmDialog({ ...confirmDialog, open: false })}
+        onConfirm={async () => {
+          await confirmDialog.action();
+        }}
+        {...confirmationMessages[confirmDialog.type]}
+        loading={saving}
+      />
+    </>
   );
 }
 
 /* ---------------- Main SettingsTab ---------------- */
 export default function SettingsTab() {
   const [tabValue, setTabValue] = useState(0);
-  
+
   const [profile, setProfile] = useState({
     company_name: '',
     company_name_en: '',
@@ -932,48 +1032,95 @@ export default function SettingsTab() {
 
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
   // Services
   const [services, setServices] = useState([]);
   const [svcError, setSvcError] = useState('');
+  const [svcErrors, setSvcErrors] = useState({});
   const [svcSuccess, setSvcSuccess] = useState('');
   const [adding, setAdding] = useState(false);
   const [newService, setNewService] = useState({ name_ar: '', name_en: '', is_active: true });
+  const [svcDialogOpen, setSvcDialogOpen] = useState(false);
+  const [svcConfirmDialog, setSvcConfirmDialog] = useState({
+    open: false,
+    type: 'save',
+    action: null
+  });
 
   // Materials
   const [materials, setMaterials] = useState([]);
-  const [newMaterial, setNewMaterial] = useState({ 
-    name_ar: '', 
-    name_en: '', 
-    abbreviation: '', 
-    density: '', 
-    is_active: true 
+  const [newMaterial, setNewMaterial] = useState({
+    name_ar: '',
+    name_en: '',
+    abbreviation: '',
+    density: '',
+    is_active: true
   });
   const [matError, setMatError] = useState('');
+  const [matErrors, setMatErrors] = useState({});
   const [matSuccess, setMatSuccess] = useState('');
+  const [matDialogOpen, setMatDialogOpen] = useState(false);
+  const [matConfirmDialog, setMatConfirmDialog] = useState({
+    open: false,
+    type: 'save',
+    action: null
+  });
 
   // Currencies
   const [currencies, setCurrencies] = useState([]);
   const [newCurrency, setNewCurrency] = useState({ code: '', name_ar: '', name_en: '', symbol: '', exchange_rate: 1, is_active: true });
   const [currError, setCurrError] = useState('');
+  const [currErrors, setCurrErrors] = useState({});
   const [currSuccess, setCurrSuccess] = useState('');
+  const [currDialogOpen, setCurrDialogOpen] = useState(false);
+  const [currConfirmDialog, setCurrConfirmDialog] = useState({
+    open: false,
+    type: 'save',
+    action: null
+  });
 
   // Payment Methods
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [newPayment, setNewPayment] = useState({ name_ar: '', name_en: '', is_active: true });
   const [pmError, setPmError] = useState('');
+  const [pmErrors, setPmErrors] = useState({});
   const [pmSuccess, setPmSuccess] = useState('');
+  const [pmDialogOpen, setPmDialogOpen] = useState(false);
+  const [pmConfirmDialog, setPmConfirmDialog] = useState({
+    open: false,
+    type: 'save',
+    action: null
+  });
 
   // Users
   const [users, setUsers] = useState([]);
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [userForm, setUserForm] = useState({ username: '', password: '', display_name: '' });
+  const [userForm, setUserForm] = useState({ username: '', password: '', display_name: '', role: 'user' });
   const [newPassword, setNewPassword] = useState('');
   const [userError, setUserError] = useState('');
+  const [userErrors, setUserErrors] = useState({});
   const [userSuccess, setUserSuccess] = useState('');
+  const [userConfirmDialog, setUserConfirmDialog] = useState({
+    open: false,
+    type: 'save',
+    action: null
+  });
+  const [deleteUserConfirm, setDeleteUserConfirm] = useState({
+    open: false,
+    userId: null,
+    userName: ''
+  });
+
+  // Company profile confirmation
+  const [profileConfirmDialog, setProfileConfirmDialog] = useState({
+    open: false,
+    type: 'update',
+    action: null
+  });
 
   useEffect(() => {
     loadData();
@@ -1056,6 +1203,9 @@ export default function SettingsTab() {
 
   const handleChange = (field, value) => {
     setProfile(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors({ ...errors, [field]: null });
+    }
     setError('');
     setSuccess('');
   };
@@ -1089,13 +1239,24 @@ export default function SettingsTab() {
     setSuccess('سيتم حذف الشعار عند الحفظ');
   };
 
-  const handleSave = async () => {
+  const validateProfile = () => {
+    const newErrors = {};
+
     if (!profile.company_name?.trim()) {
-      setError('اسم الشركة مطلوب');
-      return;
+      newErrors.company_name = 'اسم الشركة مطلوب';
     }
+
     if (profile.vat_enabled && (isNaN(profile.vat_rate) || profile.vat_rate < 0 || profile.vat_rate > 100)) {
-      setError('نسبة الضريبة يجب أن تكون بين 0 و 100');
+      newErrors.vat_rate = 'نسبة الضريبة يجب أن تكون بين 0 و 100';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleActualSave = async () => {
+    if (!validateProfile()) {
+      setProfileConfirmDialog({ ...profileConfirmDialog, open: false });
       return;
     }
 
@@ -1119,17 +1280,36 @@ export default function SettingsTab() {
       setError('حدث خطأ: ' + (err?.message || String(err)));
     } finally {
       setLoading(false);
+      setProfileConfirmDialog({ ...profileConfirmDialog, open: false });
     }
   };
 
-  const handleAddService = async () => {
-    setSvcError('');
-    setSvcSuccess('');
+  const handleSave = () => {
+    setProfileConfirmDialog({
+      open: true,
+      type: 'update',
+      action: handleActualSave
+    });
+  };
+
+  // Service handlers
+  const validateService = () => {
+    const newErrors = {};
     if (!newService.name_ar.trim()) {
-      setSvcError('الاسم بالعربي مطلوب');
+      newErrors.name_ar = 'الاسم بالعربي مطلوب';
+    }
+    setSvcErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleActualAddService = async () => {
+    if (!validateService()) {
+      setSvcConfirmDialog({ ...svcConfirmDialog, open: false });
       return;
     }
+
     setAdding(true);
+    setSvcError('');
     try {
       const res = await addServiceType({
         name_ar: newService.name_ar.trim(),
@@ -1139,6 +1319,7 @@ export default function SettingsTab() {
       if (res?.success) {
         setSvcSuccess('✓ تمت إضافة الخدمة');
         setNewService({ name_ar: '', name_en: '', is_active: true });
+        setSvcDialogOpen(false);
         loadServices();
         setTimeout(() => setSvcSuccess(''), 2500);
       } else {
@@ -1148,21 +1329,62 @@ export default function SettingsTab() {
       setSvcError('فشل الإضافة');
     } finally {
       setAdding(false);
+      setSvcConfirmDialog({ ...svcConfirmDialog, open: false });
     }
   };
 
-  const handleAddMaterial = async () => {
-    setMatError('');
-    setMatSuccess('');
-    if (!newMaterial.name_ar.trim() || !newMaterial.abbreviation.trim()) {
-      setMatError('الاسم والاختصار مطلوبان');
+  const handleAddService = () => {
+    setSvcConfirmDialog({
+      open: true,
+      type: 'save',
+      action: handleActualAddService
+    });
+  };
+
+  const handleServiceChange = (e) => {
+    const { name, value } = e.target;
+    setNewService({ ...newService, [name]: value });
+    if (svcErrors[name]) {
+      setSvcErrors({ ...svcErrors, [name]: null });
+    }
+  };
+
+  // Material handlers
+  const validateMaterial = () => {
+    const newErrors = {};
+    if (!newMaterial.name_ar.trim()) {
+      newErrors.name_ar = 'الاسم بالعربي مطلوب';
+    }
+    if (!newMaterial.abbreviation.trim()) {
+      newErrors.abbreviation = 'الاختصار مطلوب';
+    }
+    if (newMaterial.density && isNaN(parseFloat(newMaterial.density))) {
+      newErrors.density = 'الكثافة يجب أن تكون رقماً';
+    }
+    setMatErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleActualAddMaterial = async () => {
+    if (!validateMaterial()) {
+      setMatConfirmDialog({ ...matConfirmDialog, open: false });
       return;
     }
+
+    setMatError('');
+    setMatSuccess('');
     try {
-      const res = await addMetalType(newMaterial);
+      const res = await addMetalType({
+        name_ar: newMaterial.name_ar.trim(),
+        name_en: newMaterial.name_en?.trim() || null,
+        abbreviation: newMaterial.abbreviation.toUpperCase().trim(),
+        density: newMaterial.density ? parseFloat(newMaterial.density) : null,
+        is_active: newMaterial.is_active ? 1 : 0,
+      });
       if (res?.success) {
         setMatSuccess('✓ تمت إضافة المادة');
         setNewMaterial({ name_ar: '', name_en: '', abbreviation: '', density: '', is_active: true });
+        setMatDialogOpen(false);
         loadMaterials();
         setTimeout(() => setMatSuccess(''), 2500);
       } else {
@@ -1170,21 +1392,67 @@ export default function SettingsTab() {
       }
     } catch (e) {
       setMatError('فشل الإضافة');
+    } finally {
+      setMatConfirmDialog({ ...matConfirmDialog, open: false });
     }
   };
 
-  const handleAddCurrency = async () => {
-    setCurrError('');
-    setCurrSuccess('');
-    if (!newCurrency.code.trim() || !newCurrency.name_ar.trim()) {
-      setCurrError('الكود والاسم مطلوبان');
+  const handleAddMaterial = () => {
+    setMatConfirmDialog({
+      open: true,
+      type: 'save',
+      action: handleActualAddMaterial
+    });
+  };
+
+  const handleMaterialChange = (e) => {
+    const { name, value } = e.target;
+    setNewMaterial({ ...newMaterial, [name]: value });
+    if (matErrors[name]) {
+      setMatErrors({ ...matErrors, [name]: null });
+    }
+  };
+
+  // Currency handlers
+  const validateCurrency = () => {
+    const newErrors = {};
+    if (!newCurrency.code.trim()) {
+      newErrors.code = 'الكود مطلوب';
+    }
+    if (!newCurrency.name_ar.trim()) {
+      newErrors.name_ar = 'الاسم بالعربي مطلوب';
+    }
+    if (!newCurrency.symbol.trim()) {
+      newErrors.symbol = 'الرمز مطلوب';
+    }
+    if (!newCurrency.exchange_rate || newCurrency.exchange_rate <= 0) {
+      newErrors.exchange_rate = 'سعر الصرف يجب أن يكون أكبر من صفر';
+    }
+    setCurrErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleActualAddCurrency = async () => {
+    if (!validateCurrency()) {
+      setCurrConfirmDialog({ ...currConfirmDialog, open: false });
       return;
     }
+
+    setCurrError('');
+    setCurrSuccess('');
     try {
-      const res = await addCurrency(newCurrency);
+      const res = await addCurrency({
+        code: newCurrency.code.toUpperCase().trim(),
+        name_ar: newCurrency.name_ar.trim(),
+        name_en: newCurrency.name_en?.trim() || null,
+        symbol: newCurrency.symbol.trim(),
+        exchange_rate: parseFloat(newCurrency.exchange_rate),
+        is_active: newCurrency.is_active ? 1 : 0,
+      });
       if (res?.success) {
         setCurrSuccess('✓ تمت إضافة العملة');
         setNewCurrency({ code: '', name_ar: '', name_en: '', symbol: '', exchange_rate: 1, is_active: true });
+        setCurrDialogOpen(false);
         loadCurrencies();
         setTimeout(() => setCurrSuccess(''), 2500);
       } else {
@@ -1192,21 +1460,55 @@ export default function SettingsTab() {
       }
     } catch (e) {
       setCurrError('فشل الإضافة');
+    } finally {
+      setCurrConfirmDialog({ ...currConfirmDialog, open: false });
     }
   };
 
-  const handleAddPayment = async () => {
-    setPmError('');
-    setPmSuccess('');
+  const handleAddCurrency = () => {
+    setCurrConfirmDialog({
+      open: true,
+      type: 'save',
+      action: handleActualAddCurrency
+    });
+  };
+
+  const handleCurrencyChange = (e) => {
+    const { name, value } = e.target;
+    setNewCurrency({ ...newCurrency, [name]: value });
+    if (currErrors[name]) {
+      setCurrErrors({ ...currErrors, [name]: null });
+    }
+  };
+
+  // Payment Method handlers
+  const validatePaymentMethod = () => {
+    const newErrors = {};
     if (!newPayment.name_ar.trim()) {
-      setPmError('الاسم بالعربي مطلوب');
+      newErrors.name_ar = 'الاسم بالعربي مطلوب';
+    }
+    setPmErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleActualAddPayment = async () => {
+    if (!validatePaymentMethod()) {
+      setPmConfirmDialog({ ...pmConfirmDialog, open: false });
       return;
     }
+
+    setPmError('');
+    setPmSuccess('');
     try {
-      const res = await addPaymentMethod(newPayment);
+      const res = await addPaymentMethod({
+        name_ar: newPayment.name_ar.trim(),
+        name_en: newPayment.name_en?.trim() || null,
+        is_active: newPayment.is_active ? 1 : 0,
+      });
       if (res?.success) {
         setPmSuccess('✓ تمت إضافة طريقة الدفع');
         setNewPayment({ name_ar: '', name_en: '', is_active: true });
+        setPmDialogOpen(false);
         loadPaymentMethods();
         setTimeout(() => setPmSuccess(''), 2500);
       } else {
@@ -1214,21 +1516,50 @@ export default function SettingsTab() {
       }
     } catch (e) {
       setPmError('فشل الإضافة');
+    } finally {
+      setPmConfirmDialog({ ...pmConfirmDialog, open: false });
+    }
+  };
+
+  const handleAddPayment = () => {
+    setPmConfirmDialog({
+      open: true,
+      type: 'save',
+      action: handleActualAddPayment
+    });
+  };
+
+  const handlePaymentChange = (e) => {
+    const { name, value } = e.target;
+    setNewPayment({ ...newPayment, [name]: value });
+    if (pmErrors[name]) {
+      setPmErrors({ ...pmErrors, [name]: null });
     }
   };
 
   // User Management Handlers
-  const handleAddUser = async () => {
-    setUserError('');
+  const validateUser = () => {
+    const newErrors = {};
     if (!userForm.username.trim()) {
-      setUserError('اسم المستخدم مطلوب');
-      return;
+      newErrors.username = 'اسم المستخدم مطلوب';
     }
-    if (!userForm.password) {
-      setUserError('كلمة المرور مطلوبة');
+    if (!editingUser && !userForm.password) {
+      newErrors.password = 'كلمة المرور مطلوبة';
+    }
+    if (!userForm.role) {
+      newErrors.role = 'الدور مطلوب';
+    }
+    setUserErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleActualAddUser = async () => {
+    if (!validateUser()) {
+      setUserConfirmDialog({ ...userConfirmDialog, open: false });
       return;
     }
 
+    setUserError('');
     try {
       const res = await addUser(userForm, getCurrentUser());
       if (res?.success) {
@@ -1241,16 +1572,35 @@ export default function SettingsTab() {
       }
     } catch (e) {
       setUserError(e.message || 'فشل إضافة المستخدم');
+    } finally {
+      setUserConfirmDialog({ ...userConfirmDialog, open: false });
     }
   };
 
-  const handleChangePassword = async () => {
-    setUserError('');
+  const handleAddUser = () => {
+    setUserConfirmDialog({
+      open: true,
+      type: 'save',
+      action: handleActualAddUser
+    });
+  };
+
+  const validatePassword = () => {
+    const newErrors = {};
     if (!newPassword) {
-      setUserError('كلمة المرور الجديدة مطلوبة');
+      newErrors.password = 'كلمة المرور الجديدة مطلوبة';
+    }
+    setUserErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleActualChangePassword = async () => {
+    if (!validatePassword()) {
+      setUserConfirmDialog({ ...userConfirmDialog, open: false });
       return;
     }
 
+    setUserError('');
     try {
       const res = await changeUserPassword(editingUser.id, newPassword, getCurrentUser());
       if (res?.success) {
@@ -1262,14 +1612,22 @@ export default function SettingsTab() {
       }
     } catch (e) {
       setUserError(e.message || 'فشل تغيير كلمة المرور');
+    } finally {
+      setUserConfirmDialog({ ...userConfirmDialog, open: false });
     }
   };
 
-  const handleDeleteUser = async (userId) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا المستخدم؟')) return;
+  const handleChangePassword = () => {
+    setUserConfirmDialog({
+      open: true,
+      type: 'update',
+      action: handleActualChangePassword
+    });
+  };
 
+  const handleActualDeleteUser = async () => {
     try {
-      const res = await deleteUser(userId);
+      const res = await deleteUser(deleteUserConfirm.userId);
       if (res?.success) {
         setUserSuccess('✓ تم حذف المستخدم بنجاح');
         loadUsers();
@@ -1279,6 +1637,24 @@ export default function SettingsTab() {
       }
     } catch (e) {
       setUserError(e.message || 'فشل حذف المستخدم');
+    } finally {
+      setDeleteUserConfirm({ open: false, userId: null, userName: '' });
+    }
+  };
+
+  const handleDeleteUser = (user) => {
+    setDeleteUserConfirm({
+      open: true,
+      userId: user.id,
+      userName: user.username
+    });
+  };
+
+  const handleUserChange = (e) => {
+    const { name, value } = e.target;
+    setUserForm({ ...userForm, [name]: value });
+    if (userErrors[name]) {
+      setUserErrors({ ...userErrors, [name]: null });
     }
   };
 
@@ -1307,68 +1683,70 @@ export default function SettingsTab() {
 
               <Grid container spacing={2.5}>
                 <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="اسم الشركة (بالعربية) *"
+                  <UnifiedFormField
+                    label="اسم الشركة (بالعربية)"
                     value={profile.company_name}
                     onChange={(e) => handleChange('company_name', e.target.value)}
+                    name="company_name"
+                    required
+                    error={errors.company_name}
                   />
                 </Grid>
 
                 <Grid item xs={12}>
-                  <TextField
-                    fullWidth
+                  <UnifiedFormField
                     label="Company Name (English)"
                     value={profile.company_name_en}
                     onChange={(e) => handleChange('company_name_en', e.target.value)}
+                    name="company_name_en"
                   />
                 </Grid>
 
                 <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    multiline
-                    rows={2}
+                  <UnifiedFormField
                     label="العنوان"
                     value={profile.address}
                     onChange={(e) => handleChange('address', e.target.value)}
+                    name="address"
+                    multiline
+                    rows={2}
                   />
                 </Grid>
 
                 <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
+                  <UnifiedFormField
                     label="الهاتف 1"
                     value={profile.phone1}
                     onChange={(e) => handleChange('phone1', e.target.value)}
+                    name="phone1"
                   />
                 </Grid>
 
                 <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
+                  <UnifiedFormField
                     label="الهاتف 2"
                     value={profile.phone2}
                     onChange={(e) => handleChange('phone2', e.target.value)}
+                    name="phone2"
                   />
                 </Grid>
 
                 <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
+                  <UnifiedFormField
                     label="البريد الإلكتروني"
-                    type="email"
                     value={profile.email}
                     onChange={(e) => handleChange('email', e.target.value)}
+                    name="email"
+                    type="email"
                   />
                 </Grid>
 
                 <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
+                  <UnifiedFormField
                     label="الرقم الضريبي"
                     value={profile.tax_number}
                     onChange={(e) => handleChange('tax_number', e.target.value)}
+                    name="tax_number"
                   />
                 </Grid>
               </Grid>
@@ -1381,38 +1759,36 @@ export default function SettingsTab() {
 
               <Grid container spacing={2.5}>
                 <Grid item xs={12} md={6}>
-                  <TextField
-                    select
-                    fullWidth
+                  <UnifiedFormField
                     label="العملة الأساسية"
                     value={profile.base_currency}
                     onChange={(e) => handleChange('base_currency', e.target.value)}
-                    SelectProps={{ native: true }}
+                    name="base_currency"
+                    select
                     helperText="جميع المبالغ ستُحفظ بهذه العملة"
                   >
                     {currencies.filter(c => c.is_active).map((curr) => (
-                      <option key={curr.id} value={curr.code}>
-                        {curr.name_ar} ({curr.code}) - {curr.symbol}
-                      </option>
+                      <MenuItem key={curr.id} value={curr.code}>
+                        {safeText(curr.name_ar)} ({curr.code}) - {curr.symbol}
+                      </MenuItem>
                     ))}
-                  </TextField>
+                  </UnifiedFormField>
                 </Grid>
 
                 <Grid item xs={12} md={6}>
-                  <TextField
-                    select
-                    fullWidth
+                  <UnifiedFormField
                     label="طريقة الدفع الافتراضية"
                     value={profile.default_payment_method}
                     onChange={(e) => handleChange('default_payment_method', e.target.value)}
-                    SelectProps={{ native: true }}
+                    name="default_payment_method"
+                    select
                   >
                     {paymentMethods.filter(pm => pm.is_active).map((pm) => (
-                      <option key={pm.id} value={pm.name}>
-                        {pm.name}
-                      </option>
+                      <MenuItem key={pm.id} value={pm.name}>
+                        {safeText(pm.name)}
+                      </MenuItem>
                     ))}
-                  </TextField>
+                  </UnifiedFormField>
                 </Grid>
               </Grid>
 
@@ -1435,16 +1811,16 @@ export default function SettingsTab() {
                 </Grid>
 
                 <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    type="number"
+                  <UnifiedFormField
                     label="نسبة الضريبة"
                     value={profile.vat_rate}
                     onChange={(e) => handleChange('vat_rate', parseFloat(e.target.value) || 0)}
+                    name="vat_rate"
+                    type="number"
                     disabled={!profile.vat_enabled}
+                    error={errors.vat_rate}
                     inputProps={{ step: 0.1, min: 0, max: 100 }}
                     InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
-                    InputLabelProps={{ shrink: true }}
                   />
                 </Grid>
               </Grid>
@@ -1468,39 +1844,20 @@ export default function SettingsTab() {
                 {svcSuccess && <Alert severity="success" sx={{ mb: 2, fontSize: '1rem' }}>{svcSuccess}</Alert>}
                 {svcError && <Alert severity="error" sx={{ mb: 2, fontSize: '1rem' }} onClose={() => setSvcError('')}>{svcError}</Alert>}
 
-                <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-                  <Grid container spacing={2} alignItems="center">
-                    <Grid item xs={12} md={5}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="الاسم بالعربي *"
-                        value={newService.name_ar}
-                        onChange={(e) => setNewService((s) => ({ ...s, name_ar: e.target.value }))}
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={5}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="الاسم بالإنجليزي"
-                        value={newService.name_en}
-                        onChange={(e) => setNewService((s) => ({ ...s, name_en: e.target.value }))}
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={2}>
-                      <Button
-                        variant="contained"
-                        fullWidth
-                        startIcon={<AddIcon />}
-                        onClick={handleAddService}
-                        disabled={adding || !newService.name_ar.trim()}
-                      >
-                        إضافة
-                      </Button>
-                    </Grid>
-                  </Grid>
-                </Paper>
+                <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={() => {
+                      setNewService({ name_ar: '', name_en: '', is_active: true });
+                      setSvcErrors({});
+                      setSvcError('');
+                      setSvcDialogOpen(true);
+                    }}
+                  >
+                    إضافة خدمة
+                  </Button>
+                </Box>
 
                 <TableContainer component={Paper} variant="outlined">
                   <Table size="small">
@@ -1535,60 +1892,20 @@ export default function SettingsTab() {
                 {matSuccess && <Alert severity="success" sx={{ mb: 2, fontSize: '1rem' }}>{matSuccess}</Alert>}
                 {matError && <Alert severity="error" sx={{ mb: 2, fontSize: '1rem' }} onClose={() => setMatError('')}>{matError}</Alert>}
 
-                <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-                  <Grid container spacing={2} alignItems="center">
-                    <Grid item xs={12} md={3}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="الاسم بالعربي *"
-                        value={newMaterial.name_ar}
-                        onChange={(e) => setNewMaterial((m) => ({ ...m, name_ar: e.target.value }))}
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={3}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="الاسم بالإنجليزي"
-                        value={newMaterial.name_en}
-                        onChange={(e) => setNewMaterial((m) => ({ ...m, name_en: e.target.value }))}
-                      />
-                    </Grid>
-                    <Grid item xs={6} md={2}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="الاختصار *"
-                        value={newMaterial.abbreviation}
-                        onChange={(e) => setNewMaterial((m) => ({ ...m, abbreviation: e.target.value.toUpperCase() }))}
-                        inputProps={{ maxLength: 3 }}
-                      />
-                    </Grid>
-                    <Grid item xs={6} md={2}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        type="number"
-                        label="الكثافة"
-                        value={newMaterial.density}
-                        onChange={(e) => setNewMaterial((m) => ({ ...m, density: e.target.value }))}
-                        InputLabelProps={{ shrink: true }}
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={2}>
-                      <Button
-                        variant="contained"
-                        fullWidth
-                        startIcon={<AddIcon />}
-                        onClick={handleAddMaterial}
-                        disabled={!newMaterial.name_ar.trim() || !newMaterial.abbreviation.trim()}
-                      >
-                        إضافة
-                      </Button>
-                    </Grid>
-                  </Grid>
-                </Paper>
+                <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={() => {
+                      setNewMaterial({ name_ar: '', name_en: '', abbreviation: '', density: '', is_active: true });
+                      setMatErrors({});
+                      setMatError('');
+                      setMatDialogOpen(true);
+                    }}
+                  >
+                    إضافة مادة
+                  </Button>
+                </Box>
 
                 <TableContainer component={Paper} variant="outlined">
                   <Table size="small">
@@ -1626,61 +1943,20 @@ export default function SettingsTab() {
                 {currSuccess && <Alert severity="success" sx={{ mb: 2, fontSize: '1rem' }}>{currSuccess}</Alert>}
                 {currError && <Alert severity="error" sx={{ mb: 2, fontSize: '1rem' }} onClose={() => setCurrError('')}>{currError}</Alert>}
 
-                <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-                  <Grid container spacing={2} alignItems="center">
-                    <Grid item xs={6} md={2}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="الكود *"
-                        value={newCurrency.code}
-                        onChange={(e) => setNewCurrency((c) => ({ ...c, code: e.target.value.toUpperCase() }))}
-                        inputProps={{ maxLength: 3 }}
-                      />
-                    </Grid>
-                    <Grid item xs={6} md={2}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="الرمز"
-                        value={newCurrency.symbol}
-                        onChange={(e) => setNewCurrency((c) => ({ ...c, symbol: e.target.value }))}
-                      />
-                    </Grid>
-                    <Grid item xs={6} md={3}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="الاسم بالعربي *"
-                        value={newCurrency.name_ar}
-                        onChange={(e) => setNewCurrency((c) => ({ ...c, name_ar: e.target.value }))}
-                      />
-                    </Grid>
-                    <Grid item xs={6} md={3}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        type="number"
-                        label="سعر الصرف"
-                        value={newCurrency.exchange_rate}
-                        onChange={(e) => setNewCurrency((c) => ({ ...c, exchange_rate: parseFloat(e.target.value) || 1 }))}
-                        inputProps={{ step: 0.01, min: 0.01 }}
-                        InputLabelProps={{ shrink: true }}
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={2}>
-                      <Button
-                        variant="contained"
-                        fullWidth
-                        startIcon={<AddIcon />}
-                        onClick={handleAddCurrency}
-                        disabled={!newCurrency.code.trim() || !newCurrency.name_ar.trim()}
-                      >
-                        إضافة
-                      </Button>
-                    </Grid>
-                  </Grid>
-                </Paper>
+                <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={() => {
+                      setNewCurrency({ code: '', name_ar: '', name_en: '', symbol: '', exchange_rate: 1, is_active: true });
+                      setCurrErrors({});
+                      setCurrError('');
+                      setCurrDialogOpen(true);
+                    }}
+                  >
+                    إضافة عملة
+                  </Button>
+                </Box>
 
                 <TableContainer component={Paper} variant="outlined">
                   <Table size="small">
@@ -1710,39 +1986,20 @@ export default function SettingsTab() {
                 {pmSuccess && <Alert severity="success" sx={{ mb: 2, fontSize: '1rem' }}>{pmSuccess}</Alert>}
                 {pmError && <Alert severity="error" sx={{ mb: 2, fontSize: '1rem' }} onClose={() => setPmError('')}>{pmError}</Alert>}
 
-                <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-                  <Grid container spacing={2} alignItems="center">
-                    <Grid item xs={12} md={5}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="الاسم بالعربي *"
-                        value={newPayment.name_ar}
-                        onChange={(e) => setNewPayment((p) => ({ ...p, name_ar: e.target.value }))}
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={5}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="الاسم بالإنجليزي"
-                        value={newPayment.name_en}
-                        onChange={(e) => setNewPayment((p) => ({ ...p, name_en: e.target.value }))}
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={2}>
-                      <Button
-                        variant="contained"
-                        fullWidth
-                        startIcon={<AddIcon />}
-                        onClick={handleAddPayment}
-                        disabled={!newPayment.name_ar.trim()}
-                      >
-                        إضافة
-                      </Button>
-                    </Grid>
-                  </Grid>
-                </Paper>
+                <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={() => {
+                      setNewPayment({ name_ar: '', name_en: '', is_active: true });
+                      setPmErrors({});
+                      setPmError('');
+                      setPmDialogOpen(true);
+                    }}
+                  >
+                    إضافة طريقة دفع
+                  </Button>
+                </Box>
 
                 <TableContainer component={Paper} variant="outlined">
                   <Table size="small">
@@ -1779,7 +2036,8 @@ export default function SettingsTab() {
                     startIcon={<PersonAddIcon />}
                     onClick={() => {
                       setEditingUser(null);
-                      setUserForm({ username: '', password: '', display_name: '' });
+                      setUserForm({ username: '', password: '', display_name: '', role: 'user' });
+                      setUserErrors({});
                       setUserError('');
                       setUserDialogOpen(true);
                     }}
@@ -1803,9 +2061,9 @@ export default function SettingsTab() {
                       {users.map((user) => (
                         <TableRow key={user.id}>
                           <TableCell>
-                            <Typography fontWeight={600}>{user.username}</Typography>
+                            <Typography fontWeight={600}>{safeText(user.username)}</Typography>
                           </TableCell>
-                          <TableCell>{user.display_name || '-'}</TableCell>
+                          <TableCell>{safeText(user.display_name) || '-'}</TableCell>
                           <TableCell>
                             <Chip
                               label={user.is_active ? 'نشط' : 'معطل'}
@@ -1821,6 +2079,7 @@ export default function SettingsTab() {
                                 onClick={() => {
                                   setEditingUser(user);
                                   setNewPassword('');
+                                  setUserErrors({});
                                   setUserError('');
                                   setPasswordDialogOpen(true);
                                 }}
@@ -1833,7 +2092,7 @@ export default function SettingsTab() {
                                 <IconButton
                                   size="small"
                                   disabled={user.id === 1}
-                                  onClick={() => handleDeleteUser(user.id)}
+                                  onClick={() => handleDeleteUser(user)}
                                   color="error"
                                 >
                                   <DeleteIcon fontSize="small" />
@@ -1930,76 +2189,323 @@ export default function SettingsTab() {
         </Button>
       </Box>
 
+      {/* Add Service Dialog */}
+      <UnifiedFormDialog
+        open={svcDialogOpen}
+        onClose={() => setSvcDialogOpen(false)}
+        onSubmit={handleAddService}
+        title="إضافة خدمة جديدة"
+        subtitle="أدخل بيانات الخدمة"
+        submitText="حفظ"
+        loading={adding}
+      >
+        <UnifiedFormField
+          label="الاسم بالعربي"
+          value={newService.name_ar}
+          onChange={handleServiceChange}
+          name="name_ar"
+          required
+          error={svcErrors.name_ar}
+          autoFocus
+        />
+        <UnifiedFormField
+          label="الاسم بالإنجليزي"
+          value={newService.name_en}
+          onChange={handleServiceChange}
+          name="name_en"
+          helperText="اختياري"
+        />
+      </UnifiedFormDialog>
+
+      {/* Add Material Dialog */}
+      <UnifiedFormDialog
+        open={matDialogOpen}
+        onClose={() => setMatDialogOpen(false)}
+        onSubmit={handleAddMaterial}
+        title="إضافة مادة جديدة"
+        subtitle="أدخل بيانات المادة"
+        submitText="حفظ"
+      >
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={6}>
+            <UnifiedFormField
+              label="الاسم بالعربي"
+              value={newMaterial.name_ar}
+              onChange={handleMaterialChange}
+              name="name_ar"
+              required
+              error={matErrors.name_ar}
+              autoFocus
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <UnifiedFormField
+              label="الاسم بالإنجليزي"
+              value={newMaterial.name_en}
+              onChange={handleMaterialChange}
+              name="name_en"
+              helperText="اختياري"
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <UnifiedFormField
+              label="الاختصار (3 أحرف)"
+              value={newMaterial.abbreviation}
+              onChange={(e) => handleMaterialChange({ target: { name: 'abbreviation', value: e.target.value.toUpperCase() } })}
+              name="abbreviation"
+              required
+              error={matErrors.abbreviation}
+              inputProps={{ maxLength: 3 }}
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <UnifiedFormField
+              label="الكثافة"
+              value={newMaterial.density}
+              onChange={handleMaterialChange}
+              name="density"
+              type="number"
+              error={matErrors.density}
+              helperText="اختياري - بوحدة g/cm³"
+              inputProps={{ step: 0.01, min: 0 }}
+            />
+          </Grid>
+        </Grid>
+      </UnifiedFormDialog>
+
+      {/* Add Currency Dialog */}
+      <UnifiedFormDialog
+        open={currDialogOpen}
+        onClose={() => setCurrDialogOpen(false)}
+        onSubmit={handleAddCurrency}
+        title="إضافة عملة جديدة"
+        subtitle="أدخل بيانات العملة"
+        submitText="حفظ"
+      >
+        <Grid container spacing={2}>
+          <Grid item xs={6}>
+            <UnifiedFormField
+              label="الكود (3 أحرف)"
+              value={newCurrency.code}
+              onChange={(e) => handleCurrencyChange({ target: { name: 'code', value: e.target.value.toUpperCase() } })}
+              name="code"
+              required
+              error={currErrors.code}
+              autoFocus
+              inputProps={{ maxLength: 3 }}
+              helperText="مثل: USD, EUR"
+            />
+          </Grid>
+          <Grid item xs={6}>
+            <UnifiedFormField
+              label="الرمز"
+              value={newCurrency.symbol}
+              onChange={handleCurrencyChange}
+              name="symbol"
+              required
+              error={currErrors.symbol}
+              helperText="مثل: $, €"
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <UnifiedFormField
+              label="الاسم بالعربي"
+              value={newCurrency.name_ar}
+              onChange={handleCurrencyChange}
+              name="name_ar"
+              required
+              error={currErrors.name_ar}
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <UnifiedFormField
+              label="الاسم بالإنجليزي"
+              value={newCurrency.name_en}
+              onChange={handleCurrencyChange}
+              name="name_en"
+              helperText="اختياري"
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <UnifiedFormField
+              label="سعر الصرف"
+              value={newCurrency.exchange_rate}
+              onChange={handleCurrencyChange}
+              name="exchange_rate"
+              type="number"
+              required
+              error={currErrors.exchange_rate}
+              helperText="نسبة إلى العملة الأساسية"
+              inputProps={{ step: 0.01, min: 0.01 }}
+            />
+          </Grid>
+        </Grid>
+      </UnifiedFormDialog>
+
+      {/* Add Payment Method Dialog */}
+      <UnifiedFormDialog
+        open={pmDialogOpen}
+        onClose={() => setPmDialogOpen(false)}
+        onSubmit={handleAddPayment}
+        title="إضافة طريقة دفع جديدة"
+        subtitle="أدخل بيانات طريقة الدفع"
+        submitText="حفظ"
+      >
+        <UnifiedFormField
+          label="الاسم بالعربي"
+          value={newPayment.name_ar}
+          onChange={handlePaymentChange}
+          name="name_ar"
+          required
+          error={pmErrors.name_ar}
+          autoFocus
+        />
+        <UnifiedFormField
+          label="الاسم بالإنجليزي"
+          value={newPayment.name_en}
+          onChange={handlePaymentChange}
+          name="name_en"
+          helperText="اختياري"
+        />
+      </UnifiedFormDialog>
+
       {/* Add User Dialog */}
-      <Dialog open={userDialogOpen} onClose={() => setUserDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>إضافة مستخدم جديد</DialogTitle>
-        <DialogContent>
-          {userError && <Alert severity="error" sx={{ mb: 2 }}>{userError}</Alert>}
+      <UnifiedFormDialog
+        open={userDialogOpen}
+        onClose={() => setUserDialogOpen(false)}
+        onSubmit={handleAddUser}
+        title="إضافة مستخدم جديد"
+        submitText="حفظ"
+      >
+        <UnifiedFormField
+          label="اسم المستخدم"
+          value={userForm.username}
+          onChange={handleUserChange}
+          name="username"
+          required
+          error={userErrors.username}
+          autoFocus
+        />
 
-          <TextField
-            fullWidth
-            label="اسم المستخدم *"
-            value={userForm.username}
-            onChange={(e) => setUserForm({ ...userForm, username: e.target.value })}
-            sx={{ mt: 2, mb: 2 }}
-            autoFocus
-          />
+        <UnifiedFormField
+          label="الاسم الكامل"
+          value={userForm.display_name}
+          onChange={handleUserChange}
+          name="display_name"
+          helperText="اختياري"
+        />
 
-          <TextField
-            fullWidth
-            label="الاسم (اختياري)"
-            value={userForm.display_name}
-            onChange={(e) => setUserForm({ ...userForm, display_name: e.target.value })}
-            sx={{ mb: 2 }}
-          />
+        <UnifiedFormField
+          label="كلمة المرور"
+          value={userForm.password}
+          onChange={handleUserChange}
+          name="password"
+          type="password"
+          required
+          error={userErrors.password}
+        />
 
-          <TextField
-            fullWidth
-            type="password"
-            label="كلمة المرور *"
-            value={userForm.password}
-            onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setUserDialogOpen(false)}>إلغاء</Button>
-          <Button
-            variant="contained"
-            onClick={handleAddUser}
-            disabled={!userForm.username.trim() || !userForm.password}
-          >
-            إضافة
-          </Button>
-        </DialogActions>
-      </Dialog>
+        <UnifiedFormField
+          label="الدور"
+          value={userForm.role}
+          onChange={handleUserChange}
+          name="role"
+          select
+          required
+          error={userErrors.role}
+        >
+          <MenuItem value="admin">مدير</MenuItem>
+          <MenuItem value="user">مستخدم</MenuItem>
+        </UnifiedFormField>
+      </UnifiedFormDialog>
 
       {/* Change Password Dialog */}
-      <Dialog open={passwordDialogOpen} onClose={() => setPasswordDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>تغيير كلمة المرور - {editingUser?.username}</DialogTitle>
-        <DialogContent>
-          {userError && <Alert severity="error" sx={{ mb: 2 }}>{userError}</Alert>}
+      <UnifiedFormDialog
+        open={passwordDialogOpen}
+        onClose={() => setPasswordDialogOpen(false)}
+        onSubmit={handleChangePassword}
+        title={`تغيير كلمة المرور - ${editingUser?.username}`}
+        submitText="حفظ"
+      >
+        <UnifiedFormField
+          label="كلمة المرور الجديدة"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          name="new_password"
+          type="password"
+          required
+          error={userErrors.password}
+          autoFocus
+        />
+      </UnifiedFormDialog>
 
-          <TextField
-            fullWidth
-            type="password"
-            label="كلمة المرور الجديدة *"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            sx={{ mt: 2 }}
-            autoFocus
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPasswordDialogOpen(false)}>إلغاء</Button>
-          <Button
-            variant="contained"
-            onClick={handleChangePassword}
-            disabled={!newPassword}
-          >
-            حفظ
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* Confirmation Dialogs */}
+      <UnifiedConfirmDialog
+        open={profileConfirmDialog.open}
+        onClose={() => setProfileConfirmDialog({ ...profileConfirmDialog, open: false })}
+        onConfirm={async () => {
+          await profileConfirmDialog.action();
+        }}
+        {...confirmationMessages[profileConfirmDialog.type]}
+        loading={loading}
+      />
+
+      <UnifiedConfirmDialog
+        open={svcConfirmDialog.open}
+        onClose={() => setSvcConfirmDialog({ ...svcConfirmDialog, open: false })}
+        onConfirm={async () => {
+          await svcConfirmDialog.action();
+        }}
+        {...confirmationMessages[svcConfirmDialog.type]}
+        loading={adding}
+      />
+
+      <UnifiedConfirmDialog
+        open={matConfirmDialog.open}
+        onClose={() => setMatConfirmDialog({ ...matConfirmDialog, open: false })}
+        onConfirm={async () => {
+          await matConfirmDialog.action();
+        }}
+        {...confirmationMessages[matConfirmDialog.type]}
+      />
+
+      <UnifiedConfirmDialog
+        open={currConfirmDialog.open}
+        onClose={() => setCurrConfirmDialog({ ...currConfirmDialog, open: false })}
+        onConfirm={async () => {
+          await currConfirmDialog.action();
+        }}
+        {...confirmationMessages[currConfirmDialog.type]}
+      />
+
+      <UnifiedConfirmDialog
+        open={pmConfirmDialog.open}
+        onClose={() => setPmConfirmDialog({ ...pmConfirmDialog, open: false })}
+        onConfirm={async () => {
+          await pmConfirmDialog.action();
+        }}
+        {...confirmationMessages[pmConfirmDialog.type]}
+      />
+
+      <UnifiedConfirmDialog
+        open={userConfirmDialog.open}
+        onClose={() => setUserConfirmDialog({ ...userConfirmDialog, open: false })}
+        onConfirm={async () => {
+          await userConfirmDialog.action();
+        }}
+        {...confirmationMessages[userConfirmDialog.type]}
+      />
+
+      <UnifiedConfirmDialog
+        open={deleteUserConfirm.open}
+        onClose={() => setDeleteUserConfirm({ open: false, userId: null, userName: '' })}
+        onConfirm={handleActualDeleteUser}
+        title="تأكيد حذف المستخدم"
+        message={`هل أنت متأكد من حذف المستخدم "${deleteUserConfirm.userName}"؟ لا يمكن التراجع عن هذا الإجراء.`}
+        type="warning"
+        confirmText="حذف"
+        confirmColor="error"
+      />
     </Box>
   );
 }

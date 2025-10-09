@@ -6,8 +6,7 @@ import {
   validateString,
   validateEmail,
   validatePhone,
-  validateDate,
-  sanitizeForSQL
+  validateDate
 } from './inputSanitizer.js';
 
 /**

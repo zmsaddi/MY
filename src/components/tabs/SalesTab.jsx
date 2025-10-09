@@ -4,17 +4,27 @@ import {
   Box, Card, CardContent, Grid, TextField, Button, Typography,
   Dialog, DialogTitle, DialogContent, DialogActions,
   Alert, InputAdornment, Divider,
-  Stepper, Step, StepLabel, Autocomplete
+  Stepper, Step, StepLabel, Autocomplete,
+  FormLabel, RadioGroup, Radio, FormControlLabel,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Paper, Chip, IconButton
 } from '@mui/material';
 
 import AddIcon from '@mui/icons-material/Add';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import DeleteIcon from '@mui/icons-material/Delete';
+
+import UnifiedFormField from '../common/forms/UnifiedFormField';
+import UnifiedFormDialog from '../common/forms/UnifiedFormDialog';
+import UnifiedConfirmDialog from '../common/dialogs/UnifiedConfirmDialog';
+import { confirmationMessages } from '../../theme/designSystem';
 
 import {
   getAllSales, getSaleById, processSale, generateInvoiceNumber, deleteSale,
   getCustomers, getAllSheets, getServiceTypes, getPaymentMethodsForUI,
-  getCompanyProfile, getBaseCurrencyInfo, getCurrencies
+  getCompanyProfile, getBaseCurrencyInfo, getCurrencies, addSheetWithBatch
 } from '../../utils/database';
+import { safeText, safeNotes, safeDescription } from '../../utils/displayHelpers';
 
 // Import new components
 import { SalesTable, SaleItemsForm, RemnantCreationDialog } from '../sales';
@@ -80,6 +90,16 @@ export default function SalesTab() {
   // Alerts
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+
+  // Confirmation Dialog
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    type: 'save',
+    data: null,
+    action: null
+  });
 
   // Expand detail
   const [expandedSale, setExpandedSale] = useState(null);
@@ -87,6 +107,14 @@ export default function SalesTab() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const openConfirm = (type, data = null, action = null) => {
+    setConfirmDialog({ open: true, type, data, action });
+  };
+
+  const closeConfirm = () => {
+    setConfirmDialog({ ...confirmDialog, open: false });
+  };
 
   const loadData = () => {
     setSales(getAllSales());
@@ -109,6 +137,29 @@ export default function SalesTab() {
   };
 
   // ─────────────────────────────────────────────────────────────
+  // Validation
+  const validateSaleForm = () => {
+    const newErrors = {};
+
+    // Step 0: Basic info validation
+    if (!customerId) {
+      newErrors.customer_id = 'يجب اختيار زبون';
+    }
+
+    if (!saleDate) {
+      newErrors.sale_date = 'تاريخ البيع مطلوب';
+    }
+
+    // Step 1: Items validation
+    if (items.length === 0) {
+      newErrors.items = 'يجب إضافة صنف واحد على الأقل';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // ─────────────────────────────────────────────────────────────
   // Create Invoice Dialog
   const handleOpenCreateDialog = () => {
     setInvoiceNumber(generateInvoiceNumber());
@@ -122,6 +173,7 @@ export default function SalesTab() {
     setPaymentMethod(profile?.default_payment_method || '');
     setActiveStep(0);
     setError('');
+    setErrors({});
     setOpenCreateDialog(true);
   };
 
@@ -131,15 +183,21 @@ export default function SalesTab() {
   };
 
   const handleNext = () => {
+    const newErrors = {};
+
     if (activeStep === 0 && !customerId) {
-      setError('يجب اختيار زبون');
+      newErrors.customer_id = 'يجب اختيار زبون';
+      setErrors(newErrors);
       return;
     }
     if (activeStep === 1 && items.length === 0) {
+      newErrors.items = 'يجب إضافة صنف واحد على الأقل';
+      setErrors(newErrors);
       setError('يجب إضافة صنف واحد على الأقل');
       return;
     }
     setError('');
+    setErrors({});
     setActiveStep((prev) => prev + 1);
   };
 
@@ -317,63 +375,80 @@ export default function SalesTab() {
 
   // ─────────────────────────────────────────────────────────────
   // Submit
-  const handleSubmitSale = () => {
-    setError('');
-    if (items.length === 0) return setError('يجب إضافة صنف واحد على الأقل');
-
-    const saleData = {
-      invoice_number: invoiceNumber,
-      customer_id: customerId,
-      sale_date: saleDate,
-      currency_code: saleCurrency,
-      discount: discount || 0,
-      amount_paid: amountPaid || 0,
-      payment_method: paymentMethod || profile?.default_payment_method || 'Cash',
-      notes: notes || null,
-      items: items.map((it) =>
-        it.item_type === 'service'
-          ? {
-              item_type: 'service',
-              service_type_id: it.service_type_id,
-              quantity: it.quantity,
-              service_price: it.service_price,
-              material_description: it.material_description || null,
-              notes: it.notes || null
-            }
-          : {
-              item_type: 'material',
-              sheet_id: it.sheet_id,
-              quantity: it.quantity,
-              unit_price: it.unit_price,
-              is_custom_size: it.is_custom_size || false,
-              sold_dimensions: it.sold_dimensions || null,
-              sold_weight: it.sold_weight || null
-            }
-      )
-    };
-
-    const result = processSale(saleData);
-    if (result.success) {
-      setSuccess(`✓ تم إنشاء الفاتورة ${result.invoice_number} بنجاح`);
-      setTimeout(() => setSuccess(''), 3000);
-      handleCloseCreateDialog();
-      loadData();
-
-      // Check if there were any cut_from_sheet items
-      const hasCutFromSheet = items.some(it => it.sale_type === 'cut_from_sheet');
-      if (hasCutFromSheet && currentSaleData) {
-        // Show remnant dialog
-        setRemnantPieces([{
-          length: '',
-          width: '',
-          thickness: currentSaleData.thickness,
-          quantity: '1'
-        }]);
-        setShowRemnantDialog(true);
-      }
-    } else {
-      setError('فشل الحفظ: ' + result.error);
+  const handleActualSaveSale = async () => {
+    if (!validateSaleForm()) {
+      closeConfirm();
+      return;
     }
+
+    setLoading(true);
+    try {
+      const saleData = {
+        invoice_number: invoiceNumber,
+        customer_id: customerId,
+        sale_date: saleDate,
+        currency_code: saleCurrency,
+        discount: discount || 0,
+        amount_paid: amountPaid || 0,
+        payment_method: paymentMethod || profile?.default_payment_method || 'Cash',
+        notes: notes || null,
+        items: items.map((it) =>
+          it.item_type === 'service'
+            ? {
+                item_type: 'service',
+                service_type_id: it.service_type_id,
+                quantity: it.quantity,
+                service_price: it.service_price,
+                material_description: it.material_description || null,
+                notes: it.notes || null
+              }
+            : {
+                item_type: 'material',
+                sheet_id: it.sheet_id,
+                quantity: it.quantity,
+                unit_price: it.unit_price,
+                is_custom_size: it.is_custom_size || false,
+                sold_dimensions: it.sold_dimensions || null,
+                sold_weight: it.sold_weight || null
+              }
+        )
+      };
+
+      const result = processSale(saleData);
+      if (result.success) {
+        setSuccess(`تم إنشاء الفاتورة ${result.invoice_number} بنجاح`);
+        setTimeout(() => setSuccess(''), 3000);
+        handleCloseCreateDialog();
+        loadData();
+
+        // Check if there were any cut_from_sheet items
+        const hasCutFromSheet = items.some(it => it.sale_type === 'cut_from_sheet');
+        if (hasCutFromSheet && currentSaleData) {
+          // Show remnant dialog
+          setRemnantPieces([{
+            length: '',
+            width: '',
+            thickness: currentSaleData.thickness,
+            quantity: '1'
+          }]);
+          setShowRemnantDialog(true);
+        }
+      } else {
+        setError('فشل الحفظ: ' + result.error);
+      }
+    } catch (err) {
+      setError('حدث خطأ: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmitSale = () => {
+    if (items.length === 0) {
+      setError('يجب إضافة صنف واحد على الأقل');
+      return;
+    }
+    openConfirm('save', null, handleActualSaveSale);
   };
 
   // ─────────────────────────────────────────────────────────────
@@ -383,23 +458,39 @@ export default function SalesTab() {
     setSelectedSale(sale);
     setOpenViewDialog(true);
   };
-  
-  const handleDeleteSale = (saleId) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذه الفاتورة؟')) return;
-    const result = deleteSale(saleId);
-    if (result.success) {
-      setSuccess('✓ تم حذف الفاتورة');
-      setTimeout(() => setSuccess(''), 2500);
-      loadData();
-    } else {
-      setError('فشل الحذف: ' + result.error);
+
+  const handleActualDeleteSale = async (saleId) => {
+    setLoading(true);
+    try {
+      const result = deleteSale(saleId);
+      if (result.success) {
+        setSuccess('تم حذف الفاتورة بنجاح');
+        setTimeout(() => setSuccess(''), 2500);
+        loadData();
+      } else {
+        setError('فشل الحذف: ' + result.error);
+      }
+    } catch (err) {
+      setError('حدث خطأ: ' + err.message);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleDeleteSale = (saleId) => {
+    openConfirm('deleteSale', saleId, () => handleActualDeleteSale(saleId));
   };
 
   const getPaymentStatusColor = (status) =>
     status === 'paid' ? 'success' : status === 'partial' ? 'warning' : 'error';
   const getPaymentStatusLabel = (status) =>
     status === 'paid' ? 'مدفوعة' : status === 'partial' ? 'جزئية' : 'غير مدفوعة';
+
+  const getPriceColor = (price, minPrice) => {
+    if (!price || !minPrice) return 'inherit';
+    if (price < minPrice) return 'error.main';
+    return 'success.main';
+  };
 
   // ─────────────────────────────────────────────────────────────
   return (
@@ -468,16 +559,27 @@ export default function SalesTab() {
           {activeStep === 0 && (
             <Grid container spacing={2.5}>
               <Grid item xs={12} md={6}>
-                <TextField fullWidth label="رقم الفاتورة" value={invoiceNumber} InputProps={{ readOnly: true }} />
+                <UnifiedFormField
+                  label="رقم الفاتورة"
+                  value={invoiceNumber}
+                  InputProps={{ readOnly: true }}
+                  helperText="يتم توليده تلقائياً"
+                />
               </Grid>
               <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  type="date"
+                <UnifiedFormField
                   label="تاريخ البيع"
+                  type="date"
                   value={saleDate}
-                  onChange={(e) => setSaleDate(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
+                  onChange={(e) => {
+                    setSaleDate(e.target.value);
+                    if (errors.sale_date) {
+                      setErrors({ ...errors, sale_date: null });
+                    }
+                  }}
+                  name="sale_date"
+                  required
+                  error={errors.sale_date}
                 />
               </Grid>
 
@@ -486,36 +588,51 @@ export default function SalesTab() {
                   options={customers}
                   getOptionLabel={(c) => c.name}
                   value={customers.find((c) => c.id === customerId) || null}
-                  onChange={(_e, val) => setCustomerId(val?.id || null)}
-                  renderInput={(params) => <TextField {...params} label="الزبون *" />}
+                  onChange={(_e, val) => {
+                    setCustomerId(val?.id || null);
+                    if (errors.customer_id) {
+                      setErrors({ ...errors, customer_id: null });
+                    }
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="الزبون"
+                      required
+                      error={!!errors.customer_id}
+                      helperText={errors.customer_id || ''}
+                    />
+                  )}
                 />
               </Grid>
 
               <Grid item xs={12} md={6}>
-                <TextField
-                  select
-                  fullWidth
+                <UnifiedFormField
                   label="عملة الفاتورة"
                   value={saleCurrency}
                   onChange={(e) => setSaleCurrency(e.target.value)}
+                  name="currency"
+                  select
                   SelectProps={{ native: true }}
+                  required
                 >
                   {currencies.map((curr) => (
                     <option key={curr.id} value={curr.code}>
                       {curr.name_ar} ({curr.code}) - {curr.symbol}
                     </option>
                   ))}
-                </TextField>
+                </UnifiedFormField>
               </Grid>
 
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={2}
+                <UnifiedFormField
                   label="ملاحظات"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
+                  name="notes"
+                  multiline
+                  rows={2}
+                  helperText="اختياري"
                 />
               </Grid>
             </Grid>
@@ -527,20 +644,20 @@ export default function SalesTab() {
               <Card variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2 }}>
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
-                    <TextField
-                      select
-                      fullWidth
+                    <UnifiedFormField
                       label="نوع الصنف"
                       value={itemType}
                       onChange={(e) => {
                         setItemType(e.target.value);
                         resetItemForm();
                       }}
+                      name="item_type"
+                      select
                       SelectProps={{ native: true }}
                     >
                       <option value="material">معدن من المخزون</option>
                       <option value="service">خدمة</option>
-                    </TextField>
+                    </UnifiedFormField>
                   </Grid>
 
                   {/* Sale Type Radio Buttons - Only for material */}
@@ -587,34 +704,34 @@ export default function SalesTab() {
                               getOptionLabel={(s) => `${s.code} - ${s.metal_name} (${s.total_quantity})`}
                               value={selectedSheet}
                               onChange={(_e, val) => setSelectedSheet(val)}
-                              renderInput={(params) => <TextField {...params} label="اختر الصفيحة *" />}
+                              renderInput={(params) => <TextField {...params} label="اختر الصفيحة" required />}
                             />
                           </Grid>
                           <Grid item xs={12} md={3}>
-                            <TextField
-                              fullWidth
+                            <UnifiedFormField
+                              label="الكمية"
                               type="number"
-                              label="الكمية *"
                               value={itemQuantity}
                               onChange={(e) => setItemQuantity(e.target.value)}
+                              name="quantity"
+                              required
                               inputProps={{ min: 1 }}
                               helperText={selectedSheet ? `المتاح: ${selectedSheet.total_quantity}` : ' '}
-                              InputLabelProps={{ shrink: true }}
                             />
                           </Grid>
                           <Grid item xs={12} md={3}>
-                            <TextField
-                              fullWidth
+                            <UnifiedFormField
+                              label="السعر/قطعة"
                               type="number"
-                              label="السعر/قطعة *"
                               value={itemPrice}
                               onChange={(e) => setItemPrice(e.target.value)}
+                              name="price"
+                              required
                               inputProps={{ step: 0.01, min: 0 }}
                               InputProps={{
                                 endAdornment: <InputAdornment position="end">{getCurrencySymbol(saleCurrency)}</InputAdornment>,
                                 sx: { color: selectedSheet?.min_price ? getPriceColor(parseFloat(itemPrice), selectedSheet.min_price) : 'inherit' }
                               }}
-                              InputLabelProps={{ shrink: true }}
                             />
                           </Grid>
                         </>
@@ -629,34 +746,34 @@ export default function SalesTab() {
                               getOptionLabel={(r) => `${r.code} - ${r.metal_name} - ${r.length_mm}×${r.width_mm}×${r.thickness_mm} (${r.total_quantity})`}
                               value={selectedRemnant}
                               onChange={(_e, val) => setSelectedRemnant(val)}
-                              renderInput={(params) => <TextField {...params} label="اختر البقية *" />}
+                              renderInput={(params) => <TextField {...params} label="اختر البقية" required />}
                             />
                           </Grid>
                           <Grid item xs={12} md={3}>
-                            <TextField
-                              fullWidth
+                            <UnifiedFormField
+                              label="الكمية"
                               type="number"
-                              label="الكمية *"
                               value={itemQuantity}
                               onChange={(e) => setItemQuantity(e.target.value)}
+                              name="quantity"
+                              required
                               inputProps={{ min: 1 }}
                               helperText={selectedRemnant ? `المتاح: ${selectedRemnant.total_quantity}` : ' '}
-                              InputLabelProps={{ shrink: true }}
                             />
                           </Grid>
                           <Grid item xs={12} md={3}>
-                            <TextField
-                              fullWidth
+                            <UnifiedFormField
+                              label="السعر/قطعة"
                               type="number"
-                              label="السعر/قطعة *"
                               value={itemPrice}
                               onChange={(e) => setItemPrice(e.target.value)}
+                              name="price"
+                              required
                               inputProps={{ step: 0.01, min: 0 }}
                               InputProps={{
                                 endAdornment: <InputAdornment position="end">{getCurrencySymbol(saleCurrency)}</InputAdornment>,
                                 sx: { color: selectedRemnant?.min_price ? getPriceColor(parseFloat(itemPrice), selectedRemnant.min_price) : 'inherit' }
                               }}
-                              InputLabelProps={{ shrink: true }}
                             />
                           </Grid>
                         </>
@@ -676,96 +793,93 @@ export default function SalesTab() {
                                   setSoldDimensions(prev => ({ ...prev, thickness: val.thickness_mm }));
                                 }
                               }}
-                              renderInput={(params) => <TextField {...params} label="اختر الصفيحة الأم *" />}
+                              renderInput={(params) => <TextField {...params} label="اختر الصفيحة الأم" required />}
                             />
                           </Grid>
                           <Grid item xs={12} md={2}>
-                            <TextField
-                              fullWidth
+                            <UnifiedFormField
+                              label="الطول (مم)"
                               type="number"
-                              label="الطول (مم) *"
                               value={soldDimensions.length}
                               onChange={(e) => setSoldDimensions(prev => ({ ...prev, length: e.target.value }))}
+                              name="length"
+                              required
                               inputProps={{ min: 1 }}
-                              InputLabelProps={{ shrink: true }}
                             />
                           </Grid>
                           <Grid item xs={12} md={2}>
-                            <TextField
-                              fullWidth
+                            <UnifiedFormField
+                              label="العرض (مم)"
                               type="number"
-                              label="العرض (مم) *"
                               value={soldDimensions.width}
                               onChange={(e) => setSoldDimensions(prev => ({ ...prev, width: e.target.value }))}
+                              name="width"
+                              required
                               inputProps={{ min: 1 }}
-                              InputLabelProps={{ shrink: true }}
                             />
                           </Grid>
                           <Grid item xs={12} md={2}>
-                            <TextField
-                              fullWidth
+                            <UnifiedFormField
+                              label="السماكة (مم)"
                               type="number"
-                              label="السماكة (مم) *"
                               value={soldDimensions.thickness}
                               onChange={(e) => setSoldDimensions(prev => ({ ...prev, thickness: e.target.value }))}
+                              name="thickness"
+                              required
                               inputProps={{ min: 0.1, step: 0.1 }}
-                              InputLabelProps={{ shrink: true }}
                               disabled
                               helperText="من الصفيحة الأم"
                             />
                           </Grid>
                           <Grid item xs={12} md={3}>
-                            <TextField
-                              fullWidth
+                            <UnifiedFormField
+                              label="الكمية"
                               type="number"
-                              label="الكمية *"
                               value={itemQuantity}
                               onChange={(e) => setItemQuantity(e.target.value)}
+                              name="quantity"
+                              required
                               inputProps={{ min: 1 }}
                               helperText={selectedSheet ? `المتاح: ${selectedSheet.total_quantity}` : ' '}
-                              InputLabelProps={{ shrink: true }}
                             />
                           </Grid>
                           <Grid item xs={12} md={3}>
-                            <TextField
-                              fullWidth
-                              type="number"
+                            <UnifiedFormField
                               label="الوزن (كغ)"
+                              type="number"
                               value={soldWeight}
                               onChange={(e) => setSoldWeight(e.target.value)}
+                              name="weight"
                               inputProps={{ min: 0, step: 0.001 }}
                               helperText="اختياري - حساب تلقائي"
-                              InputLabelProps={{ shrink: true }}
                             />
                           </Grid>
                           <Grid item xs={12} md={3}>
-                            <TextField
-                              fullWidth
-                              type="number"
+                            <UnifiedFormField
                               label="السعر/كغ"
+                              type="number"
                               value={itemPricePerKg}
                               onChange={(e) => setItemPricePerKg(e.target.value)}
+                              name="price_per_kg"
                               inputProps={{ step: 0.01, min: 0 }}
                               InputProps={{
                                 endAdornment: <InputAdornment position="end">{getCurrencySymbol(saleCurrency)}</InputAdornment>,
                                 sx: { color: selectedSheet?.min_price ? getPriceColor(parseFloat(itemPricePerKg), selectedSheet.min_price) : 'inherit' }
                               }}
-                              InputLabelProps={{ shrink: true }}
                             />
                           </Grid>
                           <Grid item xs={12} md={3}>
-                            <TextField
-                              fullWidth
-                              type="number"
+                            <UnifiedFormField
                               label="السعر/قطعة"
+                              type="number"
                               value={itemPrice}
                               onChange={(e) => setItemPrice(e.target.value)}
+                              name="price"
                               inputProps={{ step: 0.01, min: 0 }}
                               InputProps={{
                                 endAdornment: <InputAdornment position="end">{getCurrencySymbol(saleCurrency)}</InputAdornment>,
                                 sx: { color: selectedSheet?.min_price && soldWeight ? getPriceColor(parseFloat(itemPrice), selectedSheet.min_price * parseFloat(soldWeight)) : 'inherit' }
                               }}
-                              InputLabelProps={{ shrink: true }}
                             />
                           </Grid>
                         </>
@@ -779,50 +893,52 @@ export default function SalesTab() {
                           getOptionLabel={(s) => s.name_ar}
                           value={selectedService}
                           onChange={(_e, val) => setSelectedService(val)}
-                          renderInput={(params) => <TextField {...params} label="اختر الخدمة *" />}
+                          renderInput={(params) => <TextField {...params} label="اختر الخدمة" required />}
                         />
                       </Grid>
                       <Grid item xs={12} md={4}>
-                        <TextField
-                          fullWidth
+                        <UnifiedFormField
                           label="وصف المادة (نوع، أبعاد، كمية)"
                           value={materialDescription}
                           onChange={(e) => setMaterialDescription(e.target.value)}
-                          placeholder="مثال: ستانلس 1000×2000×1.5 - 10 قطع"
+                          name="material_description"
+                          helperText="اختياري - مثال: ستانلس 1000×2000×1.5"
                         />
                       </Grid>
                       <Grid item xs={12} md={2}>
-                        <TextField
-                          fullWidth
-                          type="number"
+                        <UnifiedFormField
                           label="الكمية"
+                          type="number"
                           value={itemQuantity}
                           onChange={(e) => setItemQuantity(e.target.value)}
+                          name="quantity"
                           inputProps={{ min: 1 }}
-                          placeholder="1"
-                          InputLabelProps={{ shrink: true }}
+                          helperText="افتراضي: 1"
                         />
                       </Grid>
                       <Grid item xs={12} md={2}>
-                        <TextField
-                          fullWidth
+                        <UnifiedFormField
+                          label="سعر الخدمة"
                           type="number"
-                          label="سعر الخدمة *"
                           value={servicePrice}
                           onChange={(e) => setServicePrice(e.target.value)}
+                          name="service_price"
+                          required
                           inputProps={{ step: 0.01, min: 0 }}
                           InputProps={{
                             endAdornment: <InputAdornment position="end">{getCurrencySymbol(saleCurrency)}</InputAdornment>
                           }}
-                          InputLabelProps={{ shrink: true }}
                         />
                       </Grid>
                       <Grid item xs={12}>
-                        <TextField
-                          fullWidth
+                        <UnifiedFormField
                           label="ملاحظات الخدمة"
                           value={itemNotes}
                           onChange={(e) => setItemNotes(e.target.value)}
+                          name="item_notes"
+                          multiline
+                          rows={2}
+                          helperText="اختياري"
                         />
                       </Grid>
                     </>
@@ -910,17 +1026,17 @@ export default function SalesTab() {
                   </Grid>
 
                   <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      type="number"
+                    <UnifiedFormField
                       label="الخصم"
+                      type="number"
                       value={discount}
                       onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                      name="discount"
                       inputProps={{ step: 0.01, min: 0 }}
                       InputProps={{
                         endAdornment: <InputAdornment position="end">{getCurrencySymbol(saleCurrency)}</InputAdornment>
                       }}
-                      InputLabelProps={{ shrink: true }}
+                      helperText="اختياري"
                     />
                   </Grid>
 
@@ -947,34 +1063,35 @@ export default function SalesTab() {
                   <Grid item xs={12}><Divider /></Grid>
 
                   <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
+                    <UnifiedFormField
                       label="المبلغ المدفوع"
+                      type="number"
                       value={amountPaid}
                       onChange={(e) => setAmountPaid(parseFloat(e.target.value) || 0)}
+                      name="amount_paid"
                       inputProps={{ step: 0.01, min: 0 }}
                       InputProps={{
                         endAdornment: <InputAdornment position="end">{getCurrencySymbol(saleCurrency)}</InputAdornment>
                       }}
-                      InputLabelProps={{ shrink: true }}
+                      helperText="اختياري - صفر = آجل"
                     />
                   </Grid>
 
                   <Grid item xs={12} md={6}>
-                    <TextField 
-                      select 
-                      fullWidth 
-                      label="طريقة الدفع" 
-                      value={paymentMethod} 
+                    <UnifiedFormField
+                      label="طريقة الدفع"
+                      value={paymentMethod}
                       onChange={(e) => setPaymentMethod(e.target.value)}
+                      name="payment_method"
+                      select
                       SelectProps={{ native: true }}
+                      helperText="اختياري"
                     >
                       <option value="">غير محدد</option>
                       {paymentMethods.map((pm) => (
                         <option key={pm.id} value={pm.name}>{pm.name}</option>
                       ))}
-                    </TextField>
+                    </UnifiedFormField>
                   </Grid>
 
                   {amountPaid > 0 && (
@@ -1041,48 +1158,45 @@ export default function SalesTab() {
                     </Typography>
                   </Grid>
                   <Grid item xs={4}>
-                    <TextField
-                      fullWidth
-                      type="number"
+                    <UnifiedFormField
                       label="الطول (مم)"
+                      type="number"
                       value={piece.length}
                       onChange={(e) => {
                         const updated = [...remnantPieces];
                         updated[index].length = e.target.value;
                         setRemnantPieces(updated);
                       }}
+                      name={`remnant_length_${index}`}
                       inputProps={{ min: 1 }}
-                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                   <Grid item xs={4}>
-                    <TextField
-                      fullWidth
-                      type="number"
+                    <UnifiedFormField
                       label="العرض (مم)"
+                      type="number"
                       value={piece.width}
                       onChange={(e) => {
                         const updated = [...remnantPieces];
                         updated[index].width = e.target.value;
                         setRemnantPieces(updated);
                       }}
+                      name={`remnant_width_${index}`}
                       inputProps={{ min: 1 }}
-                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                   <Grid item xs={4}>
-                    <TextField
-                      fullWidth
-                      type="number"
+                    <UnifiedFormField
                       label="الكمية"
+                      type="number"
                       value={piece.quantity}
                       onChange={(e) => {
                         const updated = [...remnantPieces];
                         updated[index].quantity = e.target.value;
                         setRemnantPieces(updated);
                       }}
+                      name={`remnant_quantity_${index}`}
                       inputProps={{ min: 1 }}
-                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                   <Grid item xs={12}>
@@ -1358,7 +1472,7 @@ export default function SalesTab() {
                     <Grid item xs={12}><Divider /></Grid>
                     <Grid item xs={12}>
                       <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">ملاحظات:</Typography>
-                      <Typography variant="body1" fontSize="1rem">{selectedSale.notes}</Typography>
+                      <Typography variant="body1" fontSize="1rem">{safeNotes(selectedSale.notes)}</Typography>
                     </Grid>
                   </>
                 )}
@@ -1370,6 +1484,18 @@ export default function SalesTab() {
           </>
         )}
       </Dialog>
+
+      {/* Confirmation Dialog */}
+      <UnifiedConfirmDialog
+        open={confirmDialog.open}
+        onClose={closeConfirm}
+        onConfirm={async () => {
+          await confirmDialog.action();
+          closeConfirm();
+        }}
+        {...confirmationMessages[confirmDialog.type]}
+        loading={loading}
+      />
     </Box>
   );
 }

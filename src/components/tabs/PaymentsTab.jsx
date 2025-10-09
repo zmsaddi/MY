@@ -3,7 +3,6 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   Box, Card, CardContent, Grid, TextField, Button, Typography,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Dialog, DialogTitle, DialogContent, DialogActions,
   Alert, Chip, Paper, InputAdornment, MenuItem, Tabs, Tab,
   FormControl, InputLabel, Select, IconButton, Tooltip
 } from '@mui/material';
@@ -14,12 +13,18 @@ import PaymentIcon from '@mui/icons-material/Payment';
 import PersonIcon from '@mui/icons-material/Person';
 import BusinessIcon from '@mui/icons-material/Business';
 
+import UnifiedFormField from '../common/forms/UnifiedFormField';
+import UnifiedFormDialog from '../common/forms/UnifiedFormDialog';
+import UnifiedConfirmDialog from '../common/dialogs/UnifiedConfirmDialog';
+import { confirmationMessages } from '../../theme/designSystem';
+
 import {
   getCustomers, getSuppliers,
   settleCustomerPayment, settleSupplierPayment,
   getCustomerStatement, getSupplierStatement,
   getPaymentMethodsForUI, getBaseCurrencyInfo, currencyHelpers
 } from '../../utils/database';
+import { safeNotes } from '../../utils/displayHelpers';
 
 const fmt = (n) => Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 const { round2 } = currencyHelpers;
@@ -49,9 +54,19 @@ export default function PaymentsTab() {
   const [paymentCurrency, setPaymentCurrency] = useState('SYP');
   const [paymentNotes, setPaymentNotes] = useState('');
 
+  // Confirmation Dialog
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    type: 'save',
+    data: null,
+    action: null
+  });
+
   // Alerts
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -61,13 +76,13 @@ export default function PaymentsTab() {
     const currInfo = getBaseCurrencyInfo();
     setBaseCurrencyInfo(currInfo);
     setPaymentCurrency(currInfo.code);
-    
+
     setCustomers(getCustomers());
     setSuppliers(getSuppliers());
-    
+
     const methods = getPaymentMethodsForUI(true);
     setPaymentMethods(methods);
-    
+
     loadPayments();
   };
 
@@ -136,6 +151,14 @@ export default function PaymentsTab() {
     return { total, count, todayTotal, todayCount: todayPayments.length };
   }, [filteredPayments]);
 
+  const openConfirm = (type, data = null, action = null) => {
+    setConfirmDialog({ open: true, type, data, action });
+  };
+
+  const closeConfirm = () => {
+    setConfirmDialog({ ...confirmDialog, open: false });
+  };
+
   // Handle Add Payment
   const handleOpenDialog = () => {
     setSelectedPersonId(null);
@@ -145,60 +168,118 @@ export default function PaymentsTab() {
     setPaymentCurrency(baseCurrencyInfo.code);
     setPaymentNotes('');
     setError('');
+    setErrors({});
     setOpenDialog(true);
   };
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
+    setError('');
+    setErrors({});
   };
 
-  const handleSubmitPayment = () => {
-    setError('');
+  const validatePayment = () => {
+    const newErrors = {};
 
     if (!selectedPersonId) {
-      setError(tabValue === 0 ? 'يجب اختيار زبون' : 'يجب اختيار مورد');
-      return;
+      newErrors.person = tabValue === 0 ? 'يجب اختيار زبون' : 'يجب اختيار مورد';
     }
 
     const amount = parseFloat(paymentAmount);
     if (!amount || amount <= 0) {
-      setError('المبلغ يجب أن يكون أكبر من صفر');
-      return;
+      newErrors.amount = 'المبلغ يجب أن يكون أكبر من صفر';
+    }
+
+    if (!paymentDate) {
+      newErrors.payment_date = 'تاريخ الدفع مطلوب';
     }
 
     if (!paymentMethod) {
-      setError('يجب اختيار طريقة الدفع');
+      newErrors.payment_method = 'يجب اختيار طريقة الدفع';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleActualSubmitPayment = async () => {
+    if (!validatePayment()) {
+      closeConfirm();
       return;
     }
 
-    let result;
-    if (tabValue === 0) {
-      result = settleCustomerPayment(
-        selectedPersonId,
-        amount,
-        paymentDate,
-        paymentMethod,
-        paymentNotes || null,
-        paymentCurrency
-      );
-    } else {
-      result = settleSupplierPayment(
-        selectedPersonId,
-        amount,
-        paymentDate,
-        paymentMethod,
-        paymentNotes || null,
-        paymentCurrency
-      );
+    setLoading(true);
+    try {
+      const amount = parseFloat(paymentAmount);
+      let result;
+
+      if (tabValue === 0) {
+        result = settleCustomerPayment(
+          selectedPersonId,
+          amount,
+          paymentDate,
+          paymentMethod,
+          paymentNotes || null,
+          paymentCurrency
+        );
+      } else {
+        result = settleSupplierPayment(
+          selectedPersonId,
+          amount,
+          paymentDate,
+          paymentMethod,
+          paymentNotes || null,
+          paymentCurrency
+        );
+      }
+
+      if (result.success) {
+        setSuccess('✓ تم تسجيل الدفعة بنجاح');
+        setTimeout(() => setSuccess(''), 3000);
+        handleCloseDialog();
+        loadData();
+      } else {
+        setError('فشل التسجيل: ' + result.error);
+      }
+    } catch (err) {
+      setError('حدث خطأ: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmitPayment = () => {
+    openConfirm('payment', null, handleActualSubmitPayment);
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+
+    switch (name) {
+      case 'person':
+        setSelectedPersonId(value);
+        break;
+      case 'amount':
+        setPaymentAmount(value);
+        break;
+      case 'payment_date':
+        setPaymentDate(value);
+        break;
+      case 'payment_method':
+        setPaymentMethod(value);
+        break;
+      case 'currency':
+        setPaymentCurrency(value);
+        break;
+      case 'notes':
+        setPaymentNotes(value);
+        break;
+      default:
+        break;
     }
 
-    if (result.success) {
-      setSuccess('✓ تم تسجيل الدفعة بنجاح');
-      setTimeout(() => setSuccess(''), 3000);
-      handleCloseDialog();
-      loadData();
-    } else {
-      setError('فشل التسجيل: ' + result.error);
+    if (errors[name]) {
+      setErrors({ ...errors, [name]: null });
     }
   };
 
@@ -290,14 +371,14 @@ export default function PaymentsTab() {
           }}
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
-          <Tab 
-            icon={<PersonIcon />} 
-            iconPosition="start" 
+          <Tab
+            icon={<PersonIcon />}
+            iconPosition="start"
             label={<Typography fontSize="1rem" fontWeight={600}>دفعات الزبائن</Typography>}
           />
-          <Tab 
-            icon={<BusinessIcon />} 
-            iconPosition="start" 
+          <Tab
+            icon={<BusinessIcon />}
+            iconPosition="start"
             label={<Typography fontSize="1rem" fontWeight={600}>دفعات الموردين</Typography>}
           />
         </Tabs>
@@ -411,7 +492,7 @@ export default function PaymentsTab() {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">
-                      {payment.notes || '—'}
+                      {safeNotes(payment.notes) || '—'}
                     </Typography>
                   </TableCell>
                   <TableCell align="center">
@@ -432,118 +513,123 @@ export default function PaymentsTab() {
       </TableContainer>
 
       {/* Add Payment Dialog */}
-      <Dialog
+      <UnifiedFormDialog
         open={openDialog}
         onClose={handleCloseDialog}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{ sx: { borderRadius: 3 } }}
+        onSubmit={handleSubmitPayment}
+        title={`تسجيل دفعة ${tabValue === 0 ? 'زبون' : 'مورد'}`}
+        subtitle="أدخل بيانات الدفعة"
+        submitText="تسجيل الدفعة"
+        loading={loading}
       >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <PaymentIcon color="primary" />
-            <Typography variant="h6" fontWeight={700}>
-              تسجيل دفعة {tabValue === 0 ? 'زبون' : 'مورد'}
-            </Typography>
-          </Box>
-        </DialogTitle>
-
-        <DialogContent sx={{ mt: 2 }}>
-          <Grid container spacing={2.5}>
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel>{personLabel} *</InputLabel>
-                <Select
-                  value={selectedPersonId || ''}
-                  onChange={(e) => setSelectedPersonId(e.target.value)}
-                  label={`${personLabel} *`}
-                >
-                  {personList.map(p => (
-                    <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                type="number"
-                label="المبلغ المدفوع *"
-                value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
-                inputProps={{ step: 0.01, min: 0 }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      {baseCurrencyInfo.symbol}
-                    </InputAdornment>
-                  )
-                }}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                select
-                fullWidth
-                label="العملة"
-                value={paymentCurrency}
-                onChange={(e) => setPaymentCurrency(e.target.value)}
-                SelectProps={{ native: true }}
-              >
-                <option value="SYP">ليرة سورية</option>
-                <option value="USD">دولار أمريكي</option>
-              </TextField>
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                type="date"
-                label="تاريخ الدفعة *"
-                value={paymentDate}
-                onChange={(e) => setPaymentDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
-                <InputLabel>طريقة الدفع *</InputLabel>
-                <Select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  label="طريقة الدفع *"
-                >
-                  {paymentMethods.map(pm => (
-                    <MenuItem key={pm.id} value={pm.name}>{pm.name}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                multiline
-                rows={2}
-                label="ملاحظات"
-                value={paymentNotes}
-                onChange={(e) => setPaymentNotes(e.target.value)}
-              />
-            </Grid>
+        <Grid container spacing={2.5}>
+          <Grid item xs={12}>
+            <UnifiedFormField
+              label={personLabel}
+              value={selectedPersonId || ''}
+              onChange={handleInputChange}
+              name="person"
+              select
+              required
+              error={errors.person}
+            >
+              {personList.map(p => (
+                <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
+              ))}
+            </UnifiedFormField>
           </Grid>
-        </DialogContent>
 
-        <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button onClick={handleCloseDialog} size="large">إلغاء</Button>
-          <Button variant="contained" onClick={handleSubmitPayment} size="large">
-            تسجيل الدفعة
-          </Button>
-        </DialogActions>
-      </Dialog>
+          <Grid item xs={12} md={6}>
+            <UnifiedFormField
+              label="المبلغ المدفوع"
+              value={paymentAmount}
+              onChange={handleInputChange}
+              name="amount"
+              type="number"
+              required
+              error={errors.amount}
+              inputProps={{ step: 0.01, min: 0.01 }}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    {baseCurrencyInfo.symbol}
+                  </InputAdornment>
+                )
+              }}
+            />
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <UnifiedFormField
+              label="العملة"
+              value={paymentCurrency}
+              onChange={handleInputChange}
+              name="currency"
+              select
+              required
+            >
+              <MenuItem value="SYP">ليرة سورية</MenuItem>
+              <MenuItem value="USD">دولار أمريكي</MenuItem>
+            </UnifiedFormField>
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <UnifiedFormField
+              label="تاريخ الدفعة"
+              value={paymentDate}
+              onChange={handleInputChange}
+              name="payment_date"
+              type="date"
+              required
+              error={errors.payment_date}
+            />
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <UnifiedFormField
+              label="طريقة الدفع"
+              value={paymentMethod}
+              onChange={handleInputChange}
+              name="payment_method"
+              select
+              required
+              error={errors.payment_method}
+            >
+              {paymentMethods.map(pm => (
+                <MenuItem key={pm.id} value={pm.name}>{pm.name}</MenuItem>
+              ))}
+            </UnifiedFormField>
+          </Grid>
+
+          <Grid item xs={12}>
+            <UnifiedFormField
+              label="ملاحظات"
+              value={paymentNotes}
+              onChange={handleInputChange}
+              name="notes"
+              multiline
+              rows={2}
+            />
+          </Grid>
+        </Grid>
+      </UnifiedFormDialog>
+
+      {/* Confirmation Dialog */}
+      <UnifiedConfirmDialog
+        open={confirmDialog.open}
+        onClose={closeConfirm}
+        onConfirm={async () => {
+          await confirmDialog.action();
+          closeConfirm();
+        }}
+        {...confirmationMessages[confirmDialog.type]}
+        message={
+          confirmDialog.type === 'payment'
+            ? `تسجيل دفعة بمبلغ ${fmt(parseFloat(paymentAmount) || 0)} ${baseCurrencyInfo.symbol}؟`
+            : confirmationMessages[confirmDialog.type]?.message
+        }
+        loading={loading}
+      />
     </Box>
   );
 }
