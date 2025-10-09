@@ -86,6 +86,7 @@ export default function InventoryTab() {
 
   // Dialogs
   const [openAddDialog, setOpenAddDialog] = useState(false);
+  const [openAddRemnantDialog, setOpenAddRemnantDialog] = useState(false);
   const [openBatchesDialog, setOpenBatchesDialog] = useState(false);
   const [openBatchViewDialog, setOpenBatchViewDialog] = useState(false);
 
@@ -147,6 +148,33 @@ export default function InventoryTab() {
     payment_notes: ''
   });
 
+  // Forms — Remnant sheet info
+  const [remnantForm, setRemnantForm] = useState({
+    code: '',
+    metal_type_id: '',
+    grade_id: '',
+    finish_id: '',
+    length_mm: '',
+    width_mm: '',
+    thickness_mm: '',
+    weight_per_sheet_kg: '',
+    parent_sheet_id: null,
+    piece_source: 'company_stock', // 'company_stock' or 'from_sheet_cutting'
+  });
+
+  // Forms — Initial batch for new remnant
+  const [remnantBatchForm, setRemnantBatchForm] = useState({
+    supplier_id: '',
+    quantity: '',
+    pricing_mode: 'per_kg',
+    price_per_kg: '',
+    total_cost: '',
+    batch_weight_kg: '',
+    storage_location: '',
+    received_date: new Date().toISOString().split('T')[0],
+    notes: ''
+  });
+
   // Form — Edit batch
   const [editBatchForm, setEditBatchForm] = useState({
     quantity_original: '',
@@ -162,6 +190,8 @@ export default function InventoryTab() {
   const [errors, setErrors] = useState({});
   const [sheetErrors, setSheetErrors] = useState({});
   const [batchErrors, setBatchErrors] = useState({});
+  const [remnantErrors, setRemnantErrors] = useState({});
+  const [remnantBatchErrors, setRemnantBatchErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
   // Confirmation Dialog
@@ -428,6 +458,156 @@ export default function InventoryTab() {
     setSheetErrors({});
     setBatchErrors({});
   };
+
+  // ──────────────────────────────────────────────────────────────
+  // Add Remnant Handlers
+  const handleOpenAddRemnantDialog = () => {
+    const defaultMetalType = metalTypes.find(m => m.is_active)?.id || '';
+
+    setRemnantForm({
+      code: '',
+      metal_type_id: defaultMetalType,
+      grade_id: '',
+      finish_id: '',
+      length_mm: '',
+      width_mm: '',
+      thickness_mm: '',
+      weight_per_sheet_kg: '',
+      parent_sheet_id: null,
+      piece_source: 'company_stock',
+    });
+
+    if (defaultMetalType) {
+      setGrades(getGrades(defaultMetalType, true));
+      setFinishes(getFinishes(defaultMetalType, true));
+    }
+
+    setRemnantBatchForm({
+      supplier_id: '',
+      quantity: '',
+      pricing_mode: 'per_kg',
+      price_per_kg: '',
+      total_cost: '',
+      batch_weight_kg: '',
+      storage_location: '',
+      received_date: new Date().toISOString().split('T')[0],
+      notes: ''
+    });
+    setAutoGenerateCode(true);
+    setError('');
+    setRemnantErrors({});
+    setRemnantBatchErrors({});
+    setOpenAddRemnantDialog(true);
+  };
+
+  const handleCloseAddRemnantDialog = () => {
+    setOpenAddRemnantDialog(false);
+    setError('');
+    setRemnantErrors({});
+    setRemnantBatchErrors({});
+  };
+
+  const validateRemnantForm = () => {
+    const newErrors = {};
+    const newBatchErrors = {};
+
+    if (!remnantForm.code.trim()) {
+      newErrors.code = 'الكود مطلوب';
+    }
+
+    if (!remnantForm.metal_type_id) {
+      newErrors.metal_type_id = 'نوع المعدن مطلوب';
+    }
+
+    if (!remnantForm.length_mm || Number(remnantForm.length_mm) <= 0) {
+      newErrors.length_mm = 'الطول يجب أن يكون أكبر من صفر';
+    }
+
+    if (!remnantForm.width_mm || Number(remnantForm.width_mm) <= 0) {
+      newErrors.width_mm = 'العرض يجب أن يكون أكبر من صفر';
+    }
+
+    if (!remnantForm.thickness_mm || Number(remnantForm.thickness_mm) <= 0) {
+      newErrors.thickness_mm = 'السماكة يجب أن تكون أكبر من صفر';
+    }
+
+    if (remnantForm.piece_source === 'from_sheet_cutting' && !remnantForm.parent_sheet_id) {
+      newErrors.parent_sheet_id = 'يجب اختيار الصفيحة الأم عند اختيار "من قص صفيحة"';
+    }
+
+    if (!remnantBatchForm.quantity || Number(remnantBatchForm.quantity) <= 0) {
+      newBatchErrors.quantity = 'الكمية يجب أن تكون أكبر من صفر';
+    }
+
+    setRemnantErrors(newErrors);
+    setRemnantBatchErrors(newBatchErrors);
+    return Object.keys(newErrors).length === 0 && Object.keys(newBatchErrors).length === 0;
+  };
+
+  const handleActualSaveRemnant = async () => {
+    if (!validateRemnantForm()) {
+      closeConfirm();
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const preview = computeTotalsPreview(
+        remnantBatchForm.pricing_mode,
+        remnantBatchForm.price_per_kg,
+        remnantBatchForm.total_cost,
+        remnantBatchForm.quantity,
+        remnantForm.weight_per_sheet_kg,
+        remnantBatchForm.batch_weight_kg
+      );
+
+      const sheetData = {
+        code: remnantForm.code.trim(),
+        metal_type_id: Number(remnantForm.metal_type_id),
+        grade_id: remnantForm.grade_id ? Number(remnantForm.grade_id) : null,
+        finish_id: remnantForm.finish_id ? Number(remnantForm.finish_id) : null,
+        length_mm: Number(remnantForm.length_mm),
+        width_mm: Number(remnantForm.width_mm),
+        thickness_mm: Number(remnantForm.thickness_mm),
+        weight_per_sheet_kg: remnantForm.weight_per_sheet_kg ? Number(remnantForm.weight_per_sheet_kg) : null,
+        is_remnant: true,
+        parent_sheet_id: remnantForm.parent_sheet_id || null
+      };
+
+      const batchData = {
+        supplier_id: remnantBatchForm.supplier_id || null,
+        quantity: Number(remnantBatchForm.quantity),
+        price_per_kg: preview.price_per_kg != null ? Number(preview.price_per_kg) : null,
+        total_cost: preview.total_cost != null ? Number(preview.total_cost.toFixed(2)) : null,
+        storage_location: remnantBatchForm.storage_location || null,
+        received_date: remnantBatchForm.received_date,
+        notes: remnantBatchForm.notes || null
+      };
+
+      const result = addSheetWithBatch(sheetData, batchData);
+      if (result.success) {
+        setSuccess(`✓ تم إضافة ${result.linked ? 'الدفعة للبقية الموجودة' : 'البقية والدفعة'} بنجاح`);
+        setTimeout(() => setSuccess(''), 3000);
+        handleCloseAddRemnantDialog();
+        refreshAll();
+        closeConfirm();
+      } else {
+        setError('فشل الحفظ: ' + result.error);
+        closeConfirm();
+      }
+    } catch (err) {
+      setError('حدث خطأ: ' + err.message);
+      closeConfirm();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveNewRemnant = () => {
+    openConfirm('save', remnantForm, handleActualSaveRemnant);
+  };
+
+  // ──────────────────────────────────────────────────────────────
 
   const handleActualSaveSheet = async () => {
     if (!validateSheetForm() || !validateBatchForm()) {
@@ -1077,6 +1257,15 @@ export default function InventoryTab() {
                   >
                     إعادة ضبط
                   </Button>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    startIcon={<AddIcon />}
+                    onClick={handleOpenAddRemnantDialog}
+                    sx={{ fontWeight: 700 }}
+                  >
+                    إضافة بقية جديدة
+                  </Button>
                 </Grid>
               </Grid>
 
@@ -1637,6 +1826,380 @@ export default function InventoryTab() {
               </AccordionDetails>
             </Accordion>
           )}
+        </Box>
+      </UnifiedFormDialog>
+
+      {/* Dialog: Add Remnant + Initial Batch */}
+      <UnifiedFormDialog
+        open={openAddRemnantDialog}
+        onClose={handleCloseAddRemnantDialog}
+        onSubmit={handleSaveNewRemnant}
+        title="إضافة بقية جديدة"
+        subtitle="أدخل معلومات البقية والدفعة الأولى"
+        submitText="حفظ"
+        loading={loading}
+        maxWidth="md"
+      >
+        {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+        <Box sx={{ mb: 2 }}>
+          {/* Remnant Info Accordion */}
+          <Accordion defaultExpanded>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="h6" fontWeight={700}>
+                <AddBoxIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
+                معلومات البقية
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Grid container spacing={2}>
+                {/* Piece Source Selection */}
+                <Grid item xs={12}>
+                  <FormLabel component="legend">
+                    <Typography fontWeight={600} fontSize="1rem">مصدر القطعة *</Typography>
+                  </FormLabel>
+                  <RadioGroup
+                    row
+                    value={remnantForm.piece_source}
+                    onChange={(e) => {
+                      const newSource = e.target.value;
+                      setRemnantForm(prev => ({ ...prev, piece_source: newSource }));
+                      if (newSource === 'company_stock') {
+                        const companySupplier = suppliers.find(s => s.name === 'الشركة' || s.name.includes('الشركة'));
+                        if (companySupplier) {
+                          setRemnantBatchForm(prev => ({ ...prev, supplier_id: companySupplier.id }));
+                        }
+                      } else {
+                        setRemnantBatchForm(prev => ({ ...prev, supplier_id: '' }));
+                      }
+                    }}
+                  >
+                    <FormControlLabel
+                      value="company_stock"
+                      control={<Radio />}
+                      label={<Typography fontSize="1rem">مخزون الشركة</Typography>}
+                    />
+                    <FormControlLabel
+                      value="from_sheet_cutting"
+                      control={<Radio />}
+                      label={<Typography fontSize="1rem">من قص صفيحة</Typography>}
+                    />
+                  </RadioGroup>
+                </Grid>
+
+                <Grid item xs={12}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={autoGenerateCode}
+                        onChange={(e) => {
+                          setAutoGenerateCode(e.target.checked);
+                          if (!e.target.checked) {
+                            setRemnantForm(prev => ({ ...prev, code: '' }));
+                          }
+                        }}
+                        color="primary"
+                      />
+                    }
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <AutoFixHighIcon fontSize="small" />
+                        <Typography fontSize="1rem">توليد الكود تلقائياً</Typography>
+                      </Box>
+                    }
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <UnifiedFormField
+                    label="الكود"
+                    value={remnantForm.code}
+                    onChange={(e) => {
+                      setRemnantForm({ ...remnantForm, code: e.target.value });
+                      if (remnantErrors.code) {
+                        setRemnantErrors({ ...remnantErrors, code: null });
+                      }
+                    }}
+                    name="code"
+                    required
+                    error={remnantErrors.code}
+                    disabled={autoGenerateCode}
+                    helperText={autoGenerateCode ? "سيتم توليد الكود تلقائياً (R...)" : ""}
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <UnifiedFormField
+                    label="نوع المعدن"
+                    value={remnantForm.metal_type_id}
+                    onChange={(e) => {
+                      const newMetalId = e.target.value;
+                      setRemnantForm({
+                        ...remnantForm,
+                        metal_type_id: newMetalId,
+                        grade_id: '',
+                        finish_id: ''
+                      });
+                      if (newMetalId) {
+                        setGrades(getGrades(newMetalId, true));
+                        setFinishes(getFinishes(newMetalId, true));
+                      }
+                      if (remnantErrors.metal_type_id) {
+                        setRemnantErrors({ ...remnantErrors, metal_type_id: null });
+                      }
+                    }}
+                    name="metal_type_id"
+                    select
+                    required
+                    error={remnantErrors.metal_type_id}
+                  >
+                    <MenuItem value="">-- اختر النوع --</MenuItem>
+                    {metalTypes.filter(m => m.is_active).map(metal => (
+                      <MenuItem key={metal.id} value={metal.id}>{metal.name_ar}</MenuItem>
+                    ))}
+                  </UnifiedFormField>
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <UnifiedFormField
+                    label="الدرجة"
+                    value={remnantForm.grade_id}
+                    onChange={(e) => setRemnantForm({ ...remnantForm, grade_id: e.target.value })}
+                    name="grade_id"
+                    select
+                    disabled={!remnantForm.metal_type_id || grades.length === 0}
+                  >
+                    <MenuItem value="">-- بدون درجة --</MenuItem>
+                    {grades.map(grade => (
+                      <MenuItem key={grade.id} value={grade.id}>{grade.name}</MenuItem>
+                    ))}
+                  </UnifiedFormField>
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <UnifiedFormField
+                    label="التشطيب"
+                    value={remnantForm.finish_id}
+                    onChange={(e) => setRemnantForm({ ...remnantForm, finish_id: e.target.value })}
+                    name="finish_id"
+                    select
+                    disabled={!remnantForm.metal_type_id || finishes.length === 0}
+                  >
+                    <MenuItem value="">-- بدون تشطيب --</MenuItem>
+                    {finishes.map(finish => (
+                      <MenuItem key={finish.id} value={finish.id}>
+                        {finish.name_ar} ({finish.name_en})
+                      </MenuItem>
+                    ))}
+                  </UnifiedFormField>
+                </Grid>
+
+                <Grid item xs={12} md={4}>
+                  <UnifiedFormField
+                    label="الطول (مم)"
+                    value={remnantForm.length_mm}
+                    onChange={(e) => {
+                      setRemnantForm({ ...remnantForm, length_mm: e.target.value });
+                      if (remnantErrors.length_mm) {
+                        setRemnantErrors({ ...remnantErrors, length_mm: null });
+                      }
+                    }}
+                    name="length_mm"
+                    type="number"
+                    required
+                    error={remnantErrors.length_mm}
+                    inputProps={{ min: 1 }}
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={4}>
+                  <UnifiedFormField
+                    label="العرض (مم)"
+                    value={remnantForm.width_mm}
+                    onChange={(e) => {
+                      setRemnantForm({ ...remnantForm, width_mm: e.target.value });
+                      if (remnantErrors.width_mm) {
+                        setRemnantErrors({ ...remnantErrors, width_mm: null });
+                      }
+                    }}
+                    name="width_mm"
+                    type="number"
+                    required
+                    error={remnantErrors.width_mm}
+                    inputProps={{ min: 1 }}
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={4}>
+                  <UnifiedFormField
+                    label="السماكة (مم)"
+                    value={remnantForm.thickness_mm}
+                    onChange={(e) => {
+                      setRemnantForm({ ...remnantForm, thickness_mm: e.target.value });
+                      if (remnantErrors.thickness_mm) {
+                        setRemnantErrors({ ...remnantErrors, thickness_mm: null });
+                      }
+                    }}
+                    name="thickness_mm"
+                    type="number"
+                    required
+                    error={remnantErrors.thickness_mm}
+                    inputProps={{ step: 0.1, min: 0.1 }}
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <UnifiedFormField
+                    label="الوزن لكل قطعة (كغ)"
+                    value={remnantForm.weight_per_sheet_kg}
+                    onChange={(e) => setRemnantForm({ ...remnantForm, weight_per_sheet_kg: e.target.value })}
+                    name="weight_per_sheet_kg"
+                    type="number"
+                    inputProps={{ step: 0.001, min: 0 }}
+                    helperText="اختياري"
+                  />
+                </Grid>
+
+                {remnantForm.piece_source === 'from_sheet_cutting' && (
+                  <Grid item xs={12}>
+                    <UnifiedFormField
+                      label="الصفيحة الأم"
+                      value={remnantForm.parent_sheet_id || ''}
+                      onChange={(e) => setRemnantForm({ ...remnantForm, parent_sheet_id: e.target.value || null })}
+                      name="parent_sheet_id"
+                      select
+                      required
+                      error={remnantErrors.parent_sheet_id}
+                      helperText="اختر الصفيحة التي تم قصها"
+                    >
+                      <MenuItem value="">-- اختر الصفيحة الأم --</MenuItem>
+                      {sheets.map(sheet => (
+                        <MenuItem key={sheet.id} value={sheet.id}>
+                          {sheet.code} - {sheet.metal_name}
+                        </MenuItem>
+                      ))}
+                    </UnifiedFormField>
+                  </Grid>
+                )}
+              </Grid>
+            </AccordionDetails>
+          </Accordion>
+
+          {/* Batch Info Accordion */}
+          <Accordion defaultExpanded sx={{ mt: 2 }}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="h6" fontWeight={700}>
+                <LocalShippingIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
+                معلومات الدفعة
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <UnifiedFormField
+                    label="المورد"
+                    value={remnantBatchForm.supplier_id}
+                    onChange={(e) => setRemnantBatchForm({ ...remnantBatchForm, supplier_id: e.target.value })}
+                    name="supplier_id"
+                    select
+                    disabled={remnantForm.piece_source === 'company_stock'}
+                  >
+                    <MenuItem value="">بدون مورد</MenuItem>
+                    {suppliers.map(supplier => (
+                      <MenuItem key={supplier.id} value={supplier.id}>{supplier.name}</MenuItem>
+                    ))}
+                  </UnifiedFormField>
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <UnifiedFormField
+                    label="الكمية"
+                    value={remnantBatchForm.quantity}
+                    onChange={(e) => {
+                      setRemnantBatchForm({ ...remnantBatchForm, quantity: e.target.value });
+                      if (remnantBatchErrors.quantity) {
+                        setRemnantBatchErrors({ ...remnantBatchErrors, quantity: null });
+                      }
+                    }}
+                    name="quantity"
+                    type="number"
+                    required
+                    error={remnantBatchErrors.quantity}
+                    inputProps={{ min: 1 }}
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <WeightPriceEntry
+                    mode="price"
+                    pricingMode={remnantBatchForm.pricing_mode}
+                    label="التسعير"
+                    pricePerKg={remnantBatchForm.price_per_kg || ''}
+                    pricePerPiece=""
+                    totalCost={remnantBatchForm.total_cost || ''}
+                    quantity={remnantBatchForm.quantity || ''}
+                    weight={effBatchWeight(
+                      remnantBatchForm.quantity,
+                      remnantForm.weight_per_sheet_kg,
+                      remnantBatchForm.batch_weight_kg
+                    )}
+                    onChange={(field, value) => {
+                      if (field === 'pricing_mode') {
+                        setRemnantBatchForm({ ...remnantBatchForm, pricing_mode: value });
+                      } else if (field === 'price_per_kg') {
+                        setRemnantBatchForm({ ...remnantBatchForm, price_per_kg: value });
+                      } else if (field === 'total_cost') {
+                        setRemnantBatchForm({ ...remnantBatchForm, total_cost: value });
+                      }
+                    }}
+                    currencySymbol={baseCurrencyInfo.symbol}
+                    showBatchPrice={true}
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <UnifiedFormField
+                    label="الوزن الإجمالي للدفعة (كغ)"
+                    value={remnantBatchForm.batch_weight_kg}
+                    onChange={(e) => setRemnantBatchForm({ ...remnantBatchForm, batch_weight_kg: e.target.value })}
+                    name="batch_weight_kg"
+                    type="number"
+                    inputProps={{ step: 0.001, min: 0 }}
+                    helperText="اختياري"
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <UnifiedFormField
+                    label="تاريخ الاستلام"
+                    value={remnantBatchForm.received_date}
+                    onChange={(e) => setRemnantBatchForm({ ...remnantBatchForm, received_date: e.target.value })}
+                    name="received_date"
+                    type="date"
+                  />
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <UnifiedFormField
+                    label="موقع التخزين"
+                    value={remnantBatchForm.storage_location}
+                    onChange={(e) => setRemnantBatchForm({ ...remnantBatchForm, storage_location: e.target.value })}
+                    name="storage_location"
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <UnifiedFormField
+                    label="ملاحظات"
+                    value={remnantBatchForm.notes}
+                    onChange={(e) => setRemnantBatchForm({ ...remnantBatchForm, notes: e.target.value })}
+                    name="notes"
+                    multiline
+                    rows={2}
+                  />
+                </Grid>
+              </Grid>
+            </AccordionDetails>
+          </Accordion>
         </Box>
       </UnifiedFormDialog>
 
