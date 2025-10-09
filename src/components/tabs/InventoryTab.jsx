@@ -24,6 +24,10 @@ import PaymentIcon from '@mui/icons-material/Payment';
 import EditIcon from '@mui/icons-material/Edit';
 import CloseIcon from '@mui/icons-material/Close';
 
+// Import unified components
+import ResponsiveTable from '../common/ResponsiveTable';
+import WeightPriceEntry from '../common/WeightPriceEntry';
+
 import {
   getAllSheets,
   addSheetWithBatch,
@@ -1230,145 +1234,62 @@ export default function InventoryTab() {
                     />
                   </Grid>
 
-                  {/* اختيار طريقة إدخال الوزن */}
+                  {/* وزن الصفائح - مُدخل موحد */}
                   <Grid item xs={12}>
-                    <FormLabel component="legend">طريقة إدخال الوزن</FormLabel>
-                    <RadioGroup
-                      row
-                      value={batchForm.weight_input_mode || 'per_sheet'}
-                      onChange={(e) => {
-                        const mode = e.target.value;
-                        setBatchForm({ ...batchForm, weight_input_mode: mode });
-                        // حساب تلقائي عند تغيير الوضع
-                        if (mode === 'total' && batchForm.weight_per_sheet && batchForm.quantity) {
-                          const totalWeight = Number(batchForm.weight_per_sheet) * Number(batchForm.quantity);
-                          setBatchForm(prev => ({ ...prev, total_weight: totalWeight.toFixed(3) }));
-                        } else if (mode === 'per_sheet' && batchForm.total_weight && batchForm.quantity) {
-                          const perSheet = Number(batchForm.total_weight) / Number(batchForm.quantity);
-                          setBatchForm(prev => ({ ...prev, weight_per_sheet: perSheet.toFixed(3) }));
+                    <WeightPriceEntry
+                      mode="weight"
+                      weightMode={batchForm.weight_input_mode || 'per_sheet'}
+                      label="الوزن"
+                      value={batchForm.weight_per_sheet || ''}
+                      totalWeight={batchForm.total_weight || ''}
+                      quantity={batchForm.quantity || ''}
+                      onChange={(field, value) => {
+                        if (field === 'weight_mode') {
+                          setBatchForm({ ...batchForm, weight_input_mode: value });
+                        } else if (field === 'weight_per_sheet') {
+                          setBatchForm({ ...batchForm, weight_per_sheet: value });
+                          // حساب الوزن الإجمالي
+                          if (value && batchForm.quantity) {
+                            const total = Number(value) * Number(batchForm.quantity);
+                            setBatchForm(prev => ({ ...prev, total_weight: total.toFixed(3) }));
+                          }
+                        } else if (field === 'total_weight') {
+                          setBatchForm({ ...batchForm, total_weight: value });
+                          // حساب وزن القطعة
+                          if (value && batchForm.quantity) {
+                            const perSheet = Number(value) / Number(batchForm.quantity);
+                            setBatchForm(prev => ({ ...prev, weight_per_sheet: perSheet.toFixed(3) }));
+                          }
                         }
                       }}
-                    >
-                      <FormControlLabel value="per_sheet" control={<Radio />} label="وزن القطعة الواحدة" />
-                      <FormControlLabel value="total" control={<Radio />} label="الوزن الإجمالي للدفعة" />
-                    </RadioGroup>
+                      currencySymbol={baseCurrencyInfo.symbol}
+                    />
                   </Grid>
 
-                  {/* حقول الوزن حسب الاختيار */}
-                  {batchForm.weight_input_mode === 'per_sheet' || !batchForm.weight_input_mode ? (
-                    <>
-                      <Grid item xs={12} md={6}>
-                        <TextField
-                          fullWidth
-                          type="number"
-                          label="وزن القطعة الواحدة (كغ) *"
-                          value={batchForm.weight_per_sheet || ''}
-                          onChange={(e) => {
-                            const weight = e.target.value;
-                            setBatchForm({ ...batchForm, weight_per_sheet: weight });
-                            // حساب الوزن الإجمالي تلقائياً
-                            if (weight && batchForm.quantity) {
-                              const total = Number(weight) * Number(batchForm.quantity);
-                              setBatchForm(prev => ({ ...prev, total_weight: total.toFixed(3) }));
-                            }
-                          }}
-                          inputProps={{ step: 0.001, min: 0 }}
-                          InputLabelProps={{ shrink: true }}
-                        />
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <TextField
-                          fullWidth
-                          type="number"
-                          label="الوزن الإجمالي (كغ)"
-                          value={batchForm.total_weight || ''}
-                          disabled
-                          helperText="يُحسب تلقائياً"
-                          InputLabelProps={{ shrink: true }}
-                        />
-                      </Grid>
-                    </>
-                  ) : (
-                    <>
-                      <Grid item xs={12} md={6}>
-                        <TextField
-                          fullWidth
-                          type="number"
-                          label="الوزن الإجمالي للدفعة (كغ) *"
-                          value={batchForm.total_weight || ''}
-                          onChange={(e) => {
-                            const totalWeight = e.target.value;
-                            setBatchForm({ ...batchForm, total_weight: totalWeight });
-                            // حساب وزن القطعة تلقائياً
-                            if (totalWeight && batchForm.quantity) {
-                              const perSheet = Number(totalWeight) / Number(batchForm.quantity);
-                              setBatchForm(prev => ({ ...prev, weight_per_sheet: perSheet.toFixed(3) }));
-                            }
-                          }}
-                          inputProps={{ step: 0.001, min: 0 }}
-                          InputLabelProps={{ shrink: true }}
-                        />
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <TextField
-                          fullWidth
-                          type="number"
-                          label="وزن القطعة الواحدة (كغ)"
-                          value={batchForm.weight_per_sheet || ''}
-                          disabled
-                          helperText="يُحسب تلقائياً"
-                          InputLabelProps={{ shrink: true }}
-                        />
-                      </Grid>
-                    </>
-                  )}
-
-                  {/* طريقة التسعير */}
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      select
-                      fullWidth
-                      label="طريقة التسعير"
-                      value={batchForm.pricing_mode}
-                      onChange={(e) => setBatchForm({ ...batchForm, pricing_mode: e.target.value })}
-                      SelectProps={{ native: true }}
-                    >
-                      <option value="per_kg">بالكيلو</option>
-                      <option value="per_batch">بالدفعة الكاملة</option>
-                    </TextField>
+                  {/* التسعير - مُدخل موحد مع إظهار سعر الدفعة */}
+                  <Grid item xs={12}>
+                    <WeightPriceEntry
+                      mode="price"
+                      pricingMode={batchForm.pricing_mode || 'per_kg'}
+                      label="التسعير"
+                      pricePerKg={batchForm.price_per_kg || ''}
+                      pricePerPiece=""
+                      totalCost={batchForm.total_cost || ''}
+                      quantity={batchForm.quantity || ''}
+                      weight={batchForm.total_weight || (Number(batchForm.weight_per_sheet || 0) * Number(batchForm.quantity || 0))}
+                      onChange={(field, value) => {
+                        if (field === 'pricing_mode') {
+                          setBatchForm({ ...batchForm, pricing_mode: value });
+                        } else if (field === 'price_per_kg') {
+                          setBatchForm({ ...batchForm, price_per_kg: value });
+                        } else if (field === 'total_cost') {
+                          setBatchForm({ ...batchForm, total_cost: value });
+                        }
+                      }}
+                      currencySymbol={baseCurrencyInfo.symbol}
+                      showBatchPrice={true}
+                    />
                   </Grid>
-
-                  {batchForm.pricing_mode === 'per_kg' ? (
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        fullWidth
-                        type="number"
-                        label="السعر لكل كيلو"
-                        value={batchForm.price_per_kg}
-                        onChange={(e) => setBatchForm({ ...batchForm, price_per_kg: e.target.value })}
-                        inputProps={{ step: 0.01, min: 0 }}
-                        InputProps={{
-                          endAdornment: <InputAdornment position="end">{baseCurrencyInfo.symbol}</InputAdornment>
-                        }}
-                        InputLabelProps={{ shrink: true }}
-                      />
-                    </Grid>
-                  ) : (
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        fullWidth
-                        type="number"
-                        label="التكلفة الإجمالية"
-                        value={batchForm.total_cost}
-                        onChange={(e) => setBatchForm({ ...batchForm, total_cost: e.target.value })}
-                        inputProps={{ step: 0.01, min: 0 }}
-                        InputProps={{
-                          endAdornment: <InputAdornment position="end">{baseCurrencyInfo.symbol}</InputAdornment>
-                        }}
-                        InputLabelProps={{ shrink: true }}
-                      />
-                    </Grid>
-                  )}
 
                   <Grid item xs={12} md={6}>
                     <TextField

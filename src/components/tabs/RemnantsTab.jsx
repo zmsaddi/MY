@@ -21,6 +21,10 @@ import CategoryIcon from '@mui/icons-material/Category';
 import AddBoxIcon from '@mui/icons-material/AddBox';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 
+// Import unified components
+import ResponsiveTable from '../common/ResponsiveTable';
+import WeightPriceEntry from '../common/WeightPriceEntry';
+
 import {
   getAllSheets,
   addSheetWithBatch,
@@ -519,92 +523,106 @@ export default function RemnantsTab() {
         </CardContent>
       </Card>
 
-      <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
-        <Table>
-          <TableHead sx={{ bgcolor: 'grey.100' }}>
-            <TableRow>
-              <TableCell><Typography fontWeight={700} fontSize="1rem">الكود</Typography></TableCell>
-              <TableCell><Typography fontWeight={700} fontSize="1rem">النوع</Typography></TableCell>
-              <TableCell><Typography fontWeight={700} fontSize="1rem">الأبعاد (مم)</Typography></TableCell>
-              <TableCell><Typography fontWeight={700} fontSize="1rem">السماكة</Typography></TableCell>
-              <TableCell><Typography fontWeight={700} fontSize="1rem">الوزن/قطعة</Typography></TableCell>
-              <TableCell><Typography fontWeight={700} fontSize="1rem">الصفيحة الأم</Typography></TableCell>
-              <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الكمية</Typography></TableCell>
-              <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">السعر/كغ</Typography></TableCell>
-              <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الإجراءات</Typography></TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredRemnants.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} align="center">
-                  <Typography color="text.secondary" py={3} fontSize="1rem">لا توجد بقايا</Typography>
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredRemnants.map((remnant) => (
-                <TableRow key={remnant.id} hover>
-                  <TableCell>
-                    <Typography fontWeight={600} fontSize="0.9375rem">{remnant.code}</Typography>
-                  </TableCell>
-                  <TableCell><Typography fontSize="0.9375rem">{remnant.metal_name}</Typography></TableCell>
-                  <TableCell><Typography fontSize="0.9375rem">{remnant.length_mm} × {remnant.width_mm}</Typography></TableCell>
-                  <TableCell><Typography fontSize="0.9375rem">{remnant.thickness_mm} مم</Typography></TableCell>
-                  <TableCell>
-                    <Typography fontSize="0.9375rem">
-                      {remnant.weight_per_sheet_kg ? `${fmt(remnant.weight_per_sheet_kg)} كغ` : '---'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    {remnant.parent_sheet_id ? (
-                      <Chip
-                        label={getParentName(remnant.parent_sheet_id) || `#${remnant.parent_sheet_id}`}
-                        size="small"
-                        color="info"
-                        icon={<CategoryIcon fontSize="small" />}
-                      />
-                    ) : (
-                      <Typography variant="caption" color="text.secondary" fontSize="0.875rem">---</Typography>
-                    )}
-                  </TableCell>
-                  <TableCell align="center">
-                    <Chip
-                      label={remnant.total_quantity}
-                      color={getStockColor(remnant.total_quantity)}
-                      size="small"
-                      sx={{ fontWeight: 700, fontSize: '0.875rem' }}
-                    />
-                  </TableCell>
-                  <TableCell align="center">
-                    {remnant.min_price ? (
-                      remnant.min_price === remnant.max_price ? (
-                        <Typography variant="body2" fontWeight={600} fontSize="0.9375rem">
-                          {fmt(remnant.min_price)} {baseCurrencyInfo.symbol}
-                        </Typography>
-                      ) : (
-                        <Typography variant="body2" fontWeight={600} fontSize="0.9375rem">
-                          {fmt(remnant.min_price)} - {fmt(remnant.max_price)} {baseCurrencyInfo.symbol}
-                        </Typography>
-                      )
-                    ) : <Typography fontSize="0.9375rem">---</Typography>}
-                  </TableCell>
-                  <TableCell align="center">
-                    <Tooltip title="عرض الدفعات / إضافة دفعة">
-                      <IconButton
-                        size="small"
-                        color="primary"
-                        onClick={() => handleShowBatches(remnant)}
-                      >
-                        <InfoIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      <ResponsiveTable
+        columns={[
+          {
+            field: 'code',
+            label: 'الكود',
+            priority: 'primary',
+            bold: true,
+            mobileWidth: 6
+          },
+          {
+            field: 'metal_name',
+            label: 'النوع',
+            priority: 'primary',
+            mobileWidth: 6
+          },
+          {
+            field: 'dimensions',
+            label: 'الأبعاد (مم)',
+            priority: 'secondary',
+            type: 'custom',
+            render: (value, row) => `${row.length_mm} × ${row.width_mm}`,
+            mobileWidth: 6
+          },
+          {
+            field: 'thickness_mm',
+            label: 'السماكة',
+            priority: 'secondary',
+            type: 'custom',
+            render: (value) => `${value} مم`,
+            mobileWidth: 6
+          },
+          {
+            field: 'weight_per_sheet_kg',
+            label: 'الوزن/قطعة',
+            priority: 'secondary',
+            type: 'custom',
+            render: (value) => value ? `${fmt(value)} كغ` : '---'
+          },
+          {
+            field: 'parent_sheet_id',
+            label: 'الصفيحة الأم',
+            priority: 'secondary',
+            type: 'custom',
+            render: (value) => value ? (
+              <Chip
+                label={getParentName(value) || `#${value}`}
+                size="small"
+                color="info"
+                icon={<CategoryIcon fontSize="small" />}
+              />
+            ) : '---'
+          },
+          {
+            field: 'total_quantity',
+            label: 'الكمية',
+            align: 'center',
+            priority: 'primary',
+            type: 'custom',
+            render: (value) => (
+              <Chip
+                label={value}
+                color={getStockColor(value)}
+                size="small"
+                sx={{ fontWeight: 700 }}
+              />
+            ),
+            mobileWidth: 6
+          },
+          {
+            field: 'price_range',
+            label: 'السعر/كغ',
+            align: 'center',
+            priority: 'primary',
+            type: 'custom',
+            render: (value, row) => {
+              if (!row.min_price) return '---';
+              if (row.min_price === row.max_price) {
+                return `${fmt(row.min_price)} ${baseCurrencyInfo.symbol}`;
+              }
+              return `${fmt(row.min_price)} - ${fmt(row.max_price)} ${baseCurrencyInfo.symbol}`;
+            },
+            mobileWidth: 6
+          }
+        ]}
+        data={filteredRemnants}
+        actions={(row) => (
+          <Tooltip title="عرض الدفعات / إضافة دفعة">
+            <IconButton
+              size="small"
+              color="primary"
+              onClick={() => handleShowBatches(row)}
+            >
+              <InfoIcon />
+            </IconButton>
+          </Tooltip>
+        )}
+        keyField="id"
+        emptyMessage="لا توجد بقايا"
+        mobileBreakpoint="md"
+      />
 
       {/* Dialog: Add Remnant + Initial Batch */}
       <Dialog open={openAddDialog} onClose={handleCloseAddDialog} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
@@ -793,15 +811,20 @@ export default function RemnantsTab() {
                       InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="الوزن لكل قطعة (كغ) — إدخال يدوي"
-                      value={remnantForm.weight_per_sheet_kg}
-                      onChange={(e) => setRemnantForm({ ...remnantForm, weight_per_sheet_kg: e.target.value })}
-                      inputProps={{ step: 0.001, min: 0 }}
-                      InputLabelProps={{ shrink: true }}
+                  <Grid item xs={12}>
+                    <WeightPriceEntry
+                      mode="weight"
+                      weightMode="per_sheet"
+                      label="الوزن"
+                      value={remnantForm.weight_per_sheet_kg || ''}
+                      totalWeight=""
+                      quantity=""
+                      onChange={(field, value) => {
+                        if (field === 'weight_per_sheet') {
+                          setRemnantForm({ ...remnantForm, weight_per_sheet_kg: value });
+                        }
+                      }}
+                      currencySymbol={baseCurrencyInfo.symbol}
                     />
                   </Grid>
                   <Grid item xs={12} md={6}>
@@ -879,18 +902,32 @@ export default function RemnantsTab() {
                     />
                   </Grid>
 
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      select
-                      fullWidth
-                      label="طريقة التسعير"
-                      value={batchForm.pricing_mode}
-                      onChange={(e) => setBatchForm({ ...batchForm, pricing_mode: e.target.value })}
-                      SelectProps={{ native: true }}
-                    >
-                      <option value="per_kg">بالكيلو</option>
-                      <option value="per_batch">بالدفعة</option>
-                    </TextField>
+                  <Grid item xs={12}>
+                    <WeightPriceEntry
+                      mode="price"
+                      pricingMode={batchForm.pricing_mode}
+                      label="التسعير"
+                      pricePerKg={batchForm.price_per_kg || ''}
+                      pricePerPiece=""
+                      totalCost={batchForm.total_cost || ''}
+                      quantity={batchForm.quantity || ''}
+                      weight={effBatchWeight(
+                        batchForm.quantity,
+                        remnantForm.weight_per_sheet_kg,
+                        batchForm.batch_weight_kg
+                      )}
+                      onChange={(field, value) => {
+                        if (field === 'pricing_mode') {
+                          setBatchForm({ ...batchForm, pricing_mode: value });
+                        } else if (field === 'price_per_kg') {
+                          setBatchForm({ ...batchForm, price_per_kg: value });
+                        } else if (field === 'total_cost') {
+                          setBatchForm({ ...batchForm, total_cost: value });
+                        }
+                      }}
+                      currencySymbol={baseCurrencyInfo.symbol}
+                      showBatchPrice={true}
+                    />
                   </Grid>
 
                   <Grid item xs={12} md={6}>
@@ -902,40 +939,9 @@ export default function RemnantsTab() {
                       onChange={(e) => setBatchForm({ ...batchForm, batch_weight_kg: e.target.value })}
                       inputProps={{ step: 0.001, min: 0 }}
                       InputLabelProps={{ shrink: true }}
+                      helperText="اتركه فارغاً لحساب الوزن تلقائياً من الكمية"
                     />
                   </Grid>
-
-                  {batchForm.pricing_mode === 'per_kg' ? (
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        fullWidth
-                        type="number"
-                        label="السعر لكل كيلو"
-                        value={batchForm.price_per_kg}
-                        onChange={(e) => setBatchForm({ ...batchForm, price_per_kg: e.target.value })}
-                        inputProps={{ step: 0.01, min: 0 }}
-                        InputProps={{
-                          endAdornment: <InputAdornment position="end">{baseCurrencyInfo.symbol}</InputAdornment>
-                        }}
-                        InputLabelProps={{ shrink: true }}
-                      />
-                    </Grid>
-                  ) : (
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        fullWidth
-                        type="number"
-                        label="التكلفة الإجمالية"
-                        value={batchForm.total_cost}
-                        onChange={(e) => setBatchForm({ ...batchForm, total_cost: e.target.value })}
-                        inputProps={{ step: 0.01, min: 0 }}
-                        InputProps={{
-                          endAdornment: <InputAdornment position="end">{baseCurrencyInfo.symbol}</InputAdornment>
-                        }}
-                        InputLabelProps={{ shrink: true }}
-                      />
-                    </Grid>
-                  )}
 
                   <Grid item xs={12} md={6}>
                     <TextField
@@ -1043,18 +1049,32 @@ export default function RemnantsTab() {
                 />
               </Grid>
 
-              <Grid item xs={12} md={6}>
-                <TextField
-                  select
-                  fullWidth
-                  label="طريقة التسعير"
-                  value={existingBatchForm.pricing_mode}
-                  onChange={(e) => setExistingBatchForm({ ...existingBatchForm, pricing_mode: e.target.value })}
-                  SelectProps={{ native: true }}
-                >
-                  <option value="per_kg">بالكيلو</option>
-                  <option value="per_batch">بالدفعة</option>
-                </TextField>
+              <Grid item xs={12}>
+                <WeightPriceEntry
+                  mode="price"
+                  pricingMode={existingBatchForm.pricing_mode}
+                  label="التسعير"
+                  pricePerKg={existingBatchForm.price_per_kg || ''}
+                  pricePerPiece=""
+                  totalCost={existingBatchForm.total_cost || ''}
+                  quantity={existingBatchForm.quantity || ''}
+                  weight={selectedRemnant ? effBatchWeight(
+                    existingBatchForm.quantity,
+                    selectedRemnant.weight_per_sheet_kg,
+                    existingBatchForm.batch_weight_kg
+                  ) : 0}
+                  onChange={(field, value) => {
+                    if (field === 'pricing_mode') {
+                      setExistingBatchForm({ ...existingBatchForm, pricing_mode: value });
+                    } else if (field === 'price_per_kg') {
+                      setExistingBatchForm({ ...existingBatchForm, price_per_kg: value });
+                    } else if (field === 'total_cost') {
+                      setExistingBatchForm({ ...existingBatchForm, total_cost: value });
+                    }
+                  }}
+                  currencySymbol={baseCurrencyInfo.symbol}
+                  showBatchPrice={true}
+                />
               </Grid>
 
               <Grid item xs={12} md={6}>
@@ -1066,40 +1086,9 @@ export default function RemnantsTab() {
                   onChange={(e) => setExistingBatchForm({ ...existingBatchForm, batch_weight_kg: e.target.value })}
                   inputProps={{ step: 0.001, min: 0 }}
                   InputLabelProps={{ shrink: true }}
+                  helperText="اتركه فارغاً لحساب الوزن تلقائياً من الكمية"
                 />
               </Grid>
-
-              {existingBatchForm.pricing_mode === 'per_kg' ? (
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    type="number"
-                    label="السعر لكل كيلو"
-                    value={existingBatchForm.price_per_kg}
-                    onChange={(e) => setExistingBatchForm({ ...existingBatchForm, price_per_kg: e.target.value })}
-                    inputProps={{ step: 0.01, min: 0 }}
-                    InputProps={{
-                      endAdornment: <InputAdornment position="end">{baseCurrencyInfo.symbol}</InputAdornment>
-                    }}
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-              ) : (
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    type="number"
-                    label="التكلفة الإجمالية"
-                    value={existingBatchForm.total_cost}
-                    onChange={(e) => setExistingBatchForm({ ...existingBatchForm, total_cost: e.target.value })}
-                    inputProps={{ step: 0.01, min: 0 }}
-                    InputProps={{
-                      endAdornment: <InputAdornment position="end">{baseCurrencyInfo.symbol}</InputAdornment>
-                    }}
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-              )}
 
               <Grid item xs={12} md={6}>
                 <TextField
