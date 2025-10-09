@@ -1,6 +1,7 @@
 // src/utils/database/profile.js
 import { db, saveDatabase, safe, getCurrentUser } from './core.js';
 import { validators, parseDbError } from '../validators.js';
+import { withErrorHandler } from './errorHandler.js';
 
 /* ============================================
    COMPANY PROFILE
@@ -103,6 +104,7 @@ export function updateCompanyProfile(data) {
     
   } catch (e) {
     console.error('Update company profile error:', e);
+    withErrorHandler(() => { throw e; }, 'تحديث بيانات الشركة', { details: { profileData } });
     return { success: false, error: parseDbError(e) };
   }
 }

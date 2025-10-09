@@ -1,6 +1,7 @@
 // src/utils/database/expenses.js
 import { db, saveDatabase, safe, lastId, getCurrentUser } from './core.js';
 import { validators, parseDbError } from '../validators.js';
+import { withErrorHandler } from './errorHandler.js';
 
 /* ============================================
    EXPENSE CATEGORIES
@@ -180,6 +181,7 @@ export function addExpense(data) {
     
   } catch (e) {
     console.error('Add expense error:', e);
+    withErrorHandler(() => { throw e; }, 'إضافة مصروف', { details: { data } });
     return { success: false, error: parseDbError(e) };
   }
 }
@@ -229,6 +231,7 @@ export function updateExpense(expenseId, data) {
     
   } catch (e) {
     console.error('Update expense error:', e);
+    withErrorHandler(() => { throw e; }, 'تحديث المصروف', { details: { expenseId, data } });
     return { success: false, error: parseDbError(e) };
   }
 }
@@ -244,6 +247,7 @@ export function deleteExpense(expenseId) {
     
   } catch (e) {
     console.error('Delete expense error:', e);
+    withErrorHandler(() => { throw e; }, 'حذف المصروف', { details: { expenseId } });
     return { success: false, error: parseDbError(e) };
   }
 }

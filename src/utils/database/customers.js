@@ -1,6 +1,7 @@
 // src/utils/database/customers.js
 import { db, saveDatabase, lastId, getCurrentUser } from './core.js';
 import { validators, parseDbError } from '../validators.js';
+import { withErrorHandler } from './errorHandler.js';
 
 /* ============================================
    CUSTOMERS MANAGEMENT
@@ -71,6 +72,7 @@ export function addCustomer(data) {
 
   } catch (e) {
     console.error('Add customer error:', e);
+    withErrorHandler(() => { throw e; }, 'إضافة عميل', { details: { data } });
     return { success: false, error: parseDbError(e) };
   }
 }
@@ -113,6 +115,7 @@ export function updateCustomer(customerId, data) {
 
   } catch (e) {
     console.error('Update customer error:', e);
+    withErrorHandler(() => { throw e; }, 'تحديث بيانات العميل', { details: { customerId, data } });
     return { success: false, error: parseDbError(e) };
   }
 }
@@ -144,6 +147,7 @@ export function deleteCustomer(customerId) {
     
   } catch (e) {
     console.error('Delete customer error:', e);
+    withErrorHandler(() => { throw e; }, 'حذف العميل', { details: { customerId } });
     return { success: false, error: parseDbError(e) };
   }
 }

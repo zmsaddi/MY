@@ -2,6 +2,7 @@
 import { db, saveDatabase, lastId, safe, getCurrentUser } from './core.js';
 import { validators, parseDbError } from '../validators.js';
 import { insertSupplierTransactionInline } from './accounting.js';
+import { withErrorHandler } from './errorHandler.js';
 
 /* ============================================
    SUPPLIERS MANAGEMENT
@@ -72,6 +73,7 @@ export function addSupplier(data) {
     
   } catch (e) {
     console.error('Add supplier error:', e);
+    withErrorHandler(() => { throw e; }, 'إضافة مورد', { details: { data } });
     return { success: false, error: parseDbError(e) };
   }
 }
@@ -114,6 +116,7 @@ export function updateSupplier(supplierId, data) {
     
   } catch (e) {
     console.error('Update supplier error:', e);
+    withErrorHandler(() => { throw e; }, 'تحديث بيانات المورد', { details: { supplierId, data } });
     return { success: false, error: parseDbError(e) };
   }
 }
@@ -145,6 +148,7 @@ export function deleteSupplier(supplierId) {
     
   } catch (e) {
     console.error('Delete supplier error:', e);
+    withErrorHandler(() => { throw e; }, 'حذف المورد', { details: { supplierId } });
     return { success: false, error: parseDbError(e) };
   }
 }
@@ -193,6 +197,7 @@ export function addSupplierPayment(paymentData) {
     
   } catch (e) {
     console.error('Add supplier payment error:', e);
+    withErrorHandler(() => { throw e; }, 'إضافة دفعة للمورد', { details: { supplierId, amount, paymentDate } });
     return { success: false, error: parseDbError(e) };
   }
 }
