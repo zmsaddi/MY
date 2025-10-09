@@ -183,6 +183,9 @@ function createInventoryTables() {
     is_remnant INTEGER NOT NULL DEFAULT 0,
     parent_sheet_id INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_by TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_by TEXT,
     FOREIGN KEY (metal_type_id) REFERENCES metal_types(id),
     FOREIGN KEY (grade_id) REFERENCES grades(id),
     FOREIGN KEY (finish_id) REFERENCES finishes(id),
@@ -750,6 +753,17 @@ export function runMigrations() {
   }
   if (!hasColumn('grades', 'is_active')) {
     db.run(`ALTER TABLE grades ADD COLUMN is_active INTEGER DEFAULT 1`);
+  }
+
+  // Add created_by and updated_by columns to sheets table
+  if (!hasColumn('sheets', 'created_by')) {
+    db.run(`ALTER TABLE sheets ADD COLUMN created_by TEXT`);
+  }
+  if (!hasColumn('sheets', 'updated_by')) {
+    db.run(`ALTER TABLE sheets ADD COLUMN updated_by TEXT`);
+  }
+  if (!hasColumn('sheets', 'updated_at')) {
+    db.run(`ALTER TABLE sheets ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP`);
   }
   if (!hasColumn('finishes', 'is_active')) {
     db.run(`ALTER TABLE finishes ADD COLUMN is_active INTEGER DEFAULT 1`);

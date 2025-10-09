@@ -2,6 +2,7 @@
 import { db, tx, saveDatabase, safe, lastId, generateSheetCode, getCurrentUser } from './core.js';
 import { validators, parseDbError } from '../validators.js';
 import { insertSupplierTransactionInline } from './accounting.js';
+import { withErrorHandler } from './errorHandler.js';
 
 /* ============================================
    INVENTORY MOVEMENTS
@@ -253,6 +254,14 @@ export function addSheetWithBatch(sheetData, batchData) {
   } catch (e) {
     tx.rollback();
     console.error('Add sheet with batch error:', e);
+
+    // Show global error notification
+    withErrorHandler(
+      () => { throw e; },
+      'حفظ الصفيحة والدفعة',
+      { details: { sheetData, batchData } }
+    );
+
     return { success: false, error: parseDbError(e) };
   }
 }

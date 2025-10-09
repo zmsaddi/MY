@@ -5,6 +5,7 @@ import { getCompanyProfile } from './profile.js';
 import { getCurrencies } from './currencies.js';
 import { getBatchesBySheetId, recordInventoryMovement, pruneEmptyBatches } from './inventory.js';
 import { insertCustomerTransactionInline } from './accounting.js';
+import { withErrorHandler } from './errorHandler.js';
 
 // Re-export for convenience
 export { generateInvoiceNumber };
@@ -450,6 +451,14 @@ export function processSale(saleData) {
   } catch (e) {
     tx.rollback();
     console.error('Process sale error:', e);
+
+    // Show global error notification
+    withErrorHandler(
+      () => { throw e; },
+      'حفظ عملية البيع',
+      { details: { saleData, items } }
+    );
+
     return { success: false, error: parseDbError(e) };
   }
 }
