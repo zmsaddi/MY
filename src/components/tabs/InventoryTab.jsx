@@ -20,6 +20,8 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import AddBoxIcon from '@mui/icons-material/AddBox';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import PaymentIcon from '@mui/icons-material/Payment';
+import EditIcon from '@mui/icons-material/Edit';
+import CloseIcon from '@mui/icons-material/Close';
 
 import {
   getAllSheets,
@@ -28,6 +30,7 @@ import {
   getSuppliers,
   getBaseCurrencyInfo,
   addBatchToSheet,
+  updateBatch,
   pruneEmptyBatches,
   generateSheetCode,
   getMetalTypes,
@@ -61,10 +64,13 @@ export default function InventoryTab() {
   // Dialogs
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [openBatchesDialog, setOpenBatchesDialog] = useState(false);
+  const [openBatchViewDialog, setOpenBatchViewDialog] = useState(false);
 
   // Selected
   const [selectedSheet, setSelectedSheet] = useState(null);
   const [batches, setBatches] = useState([]);
+  const [selectedBatch, setSelectedBatch] = useState(null);
+  const [isEditingBatch, setIsEditingBatch] = useState(false);
 
   // Auto-code generation
   const [autoGenerateCode, setAutoGenerateCode] = useState(true);
@@ -113,6 +119,15 @@ export default function InventoryTab() {
     payment_amount: '',
     payment_method: '',
     payment_notes: ''
+  });
+
+  // Form — Edit batch
+  const [editBatchForm, setEditBatchForm] = useState({
+    quantity_original: '',
+    price_per_kg: '',
+    received_date: '',
+    storage_location: '',
+    notes: ''
   });
 
   // Alerts
@@ -165,6 +180,9 @@ export default function InventoryTab() {
       setSheetForm(prev => ({ ...prev, code: generated }));
     }
   }, [autoGenerateCode, sheetForm.metal_type_id, sheetForm.length_mm, sheetForm.width_mm, sheetForm.thickness_mm, sheetForm.grade_id, sheetForm.finish_id]);
+
+  // Note: Auto-calculation of total weight happens in the effBatchWeight helper function
+  // The UI displays the calculated total weight in real-time based on quantity and batch_weight_kg
 
   const resetFilters = () => {
     setSearchTerm('');
@@ -276,6 +294,8 @@ export default function InventoryTab() {
       return setError('الأبعاد مطلوبة');
     if (!batchForm.quantity || Number(batchForm.quantity) <= 0)
       return setError('الكمية يجب أن تكون أكبر من صفر');
+    if (!batchForm.batch_weight_kg || Number(batchForm.batch_weight_kg) <= 0)
+      return setError('الوزن لكل قطعة مطلوب ويجب أن يكون أكبر من صفر');
 
     const preview = computeTotalsPreview(
       batchForm.pricing_mode,
@@ -366,6 +386,8 @@ export default function InventoryTab() {
     if (!selectedSheet) return;
     if (!existingBatchForm.quantity || Number(existingBatchForm.quantity) <= 0)
       return setError('الكمية يجب أن تكون أكبر من صفر');
+    if (!existingBatchForm.batch_weight_kg || Number(existingBatchForm.batch_weight_kg) <= 0)
+      return setError('الوزن لكل قطعة مطلوب ويجب أن يكون أكبر من صفر');
 
     const preview = computeTotalsPreview(
       existingBatchForm.pricing_mode,
@@ -435,6 +457,78 @@ export default function InventoryTab() {
     if (quantity === 0) return 'error';
     if (quantity < 10) return 'warning';
     return 'success';
+  };
+
+  // ──────────────────────────────────────────────────────────────
+  // Batch view and edit handlers
+  const handleViewBatch = (batch) => {
+    setSelectedBatch(batch);
+    setEditBatchForm({
+      quantity_original: batch.quantity_original || '',
+      price_per_kg: batch.price_per_kg || '',
+      received_date: batch.received_date || '',
+      storage_location: batch.storage_location || '',
+      notes: batch.notes || ''
+    });
+    setIsEditingBatch(false);
+    setOpenBatchViewDialog(true);
+  };
+
+  const handleEditBatch = () => {
+    setIsEditingBatch(true);
+  };
+
+  const handleCancelEditBatch = () => {
+    setIsEditingBatch(false);
+    setEditBatchForm({
+      quantity_original: selectedBatch.quantity_original || '',
+      price_per_kg: selectedBatch.price_per_kg || '',
+      received_date: selectedBatch.received_date || '',
+      storage_location: selectedBatch.storage_location || '',
+      notes: selectedBatch.notes || ''
+    });
+  };
+
+  const handleSaveEditBatch = () => {
+    if (!selectedBatch) return;
+
+    // Calculate total_cost from price_per_kg and weight
+    const weight = selectedSheet?.weight_per_sheet_kg
+      ? Number(editBatchForm.quantity_original) * Number(selectedSheet.weight_per_sheet_kg)
+      : null;
+
+    const total_cost = weight && editBatchForm.price_per_kg
+      ? Number(editBatchForm.price_per_kg) * weight
+      : null;
+
+    const updates = {
+      quantity_original: Number(editBatchForm.quantity_original),
+      price_per_kg: editBatchForm.price_per_kg ? Number(editBatchForm.price_per_kg) : null,
+      total_cost: total_cost,
+      storage_location: editBatchForm.storage_location || null,
+      notes: editBatchForm.notes || null
+    };
+
+    const result = updateBatch(selectedBatch.id, updates);
+    if (result.success) {
+      setSuccess('✓ تم تحديث الدفعة بنجاح');
+      setTimeout(() => setSuccess(''), 3000);
+      setIsEditingBatch(false);
+      setOpenBatchViewDialog(false);
+
+      // Refresh batches list
+      const list = getBatchesBySheetId(selectedSheet.id);
+      setBatches(list);
+      refreshAll();
+    } else {
+      setError('فشل تحديث الدفعة: ' + result.error);
+    }
+  };
+
+  const handleCloseBatchView = () => {
+    setOpenBatchViewDialog(false);
+    setIsEditingBatch(false);
+    setSelectedBatch(null);
   };
 
   // ──────────────────────────────────────────────────────────────
@@ -851,11 +945,27 @@ export default function InventoryTab() {
                     <TextField
                       fullWidth
                       type="number"
-                      label="الوزن الإجمالي للدفعة (كغ) — اختياري"
+                      label="الوزن لكل قطعة (كغ) *"
                       value={batchForm.batch_weight_kg}
                       onChange={(e) => setBatchForm({ ...batchForm, batch_weight_kg: e.target.value })}
                       inputProps={{ step: 0.001, min: 0 }}
-                      helperText="إذا لم يُدخل، سيتم استخدام (الكمية × وزن الورقة)"
+                      helperText="الوزن لكل قطعة واحدة"
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="الوزن الإجمالي (كغ)"
+                      value={
+                        batchForm.quantity && batchForm.batch_weight_kg
+                          ? (Number(batchForm.quantity) * Number(batchForm.batch_weight_kg)).toFixed(3)
+                          : ''
+                      }
+                      disabled
+                      helperText="يُحسب تلقائياً: الكمية × الوزن لكل قطعة"
                       InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
@@ -1089,6 +1199,35 @@ export default function InventoryTab() {
                 </TextField>
               </Grid>
 
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="الوزن لكل قطعة (كغ) *"
+                  value={existingBatchForm.batch_weight_kg}
+                  onChange={(e) => setExistingBatchForm({ ...existingBatchForm, batch_weight_kg: e.target.value })}
+                  inputProps={{ step: 0.001, min: 0 }}
+                  helperText="الوزن لكل قطعة واحدة"
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="الوزن الإجمالي (كغ)"
+                  value={
+                    existingBatchForm.quantity && existingBatchForm.batch_weight_kg
+                      ? (Number(existingBatchForm.quantity) * Number(existingBatchForm.batch_weight_kg)).toFixed(3)
+                      : ''
+                  }
+                  disabled
+                  helperText="يُحسب تلقائياً: الكمية × الوزن لكل قطعة"
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+
               {existingBatchForm.pricing_mode === 'per_kg' ? (
                 <Grid item xs={12} md={6}>
                   <TextField
@@ -1246,26 +1385,44 @@ export default function InventoryTab() {
                     <TableCell><Typography fontWeight={700} fontSize="1rem">المتبقي</Typography></TableCell>
                     <TableCell><Typography fontWeight={700} fontSize="1rem">السعر/كغ</Typography></TableCell>
                     <TableCell><Typography fontWeight={700} fontSize="1rem">التاريخ</Typography></TableCell>
+                    <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الإجراءات</Typography></TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {batches.map((batch) => (
-                    <TableRow key={batch.id}>
-                      <TableCell><Typography fontSize="0.9375rem">{batch.supplier_name || 'بدون مورد'}</Typography></TableCell>
-                      <TableCell><Typography fontSize="0.9375rem">{batch.quantity_original}</Typography></TableCell>
-                      <TableCell>
+                    <TableRow key={batch.id} hover sx={{ cursor: 'pointer' }}>
+                      <TableCell onClick={() => handleViewBatch(batch)}>
+                        <Typography fontSize="0.9375rem">{batch.supplier_name || 'بدون مورد'}</Typography>
+                      </TableCell>
+                      <TableCell onClick={() => handleViewBatch(batch)}>
+                        <Typography fontSize="0.9375rem">{batch.quantity_original}</Typography>
+                      </TableCell>
+                      <TableCell onClick={() => handleViewBatch(batch)}>
                         <Chip
                           label={batch.quantity_remaining}
                           color={getStockColor(batch.quantity_remaining)}
                           size="small"
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell onClick={() => handleViewBatch(batch)}>
                         <Typography fontSize="0.9375rem">
                           {batch.price_per_kg ? `${fmt(batch.price_per_kg)} ${baseCurrencyInfo.symbol}` : '—'}
                         </Typography>
                       </TableCell>
-                      <TableCell><Typography fontSize="0.9375rem">{batch.received_date}</Typography></TableCell>
+                      <TableCell onClick={() => handleViewBatch(batch)}>
+                        <Typography fontSize="0.9375rem">{batch.received_date}</Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Tooltip title="عرض التفاصيل">
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => handleViewBatch(batch)}
+                          >
+                            <InfoIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1275,6 +1432,196 @@ export default function InventoryTab() {
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3 }}>
           <Button onClick={() => setOpenBatchesDialog(false)} size="large">إغلاق</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog: Batch View/Edit */}
+      <Dialog
+        open={openBatchViewDialog}
+        onClose={handleCloseBatchView}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          {isEditingBatch ? 'تعديل الدفعة' : 'تفاصيل الدفعة'}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            {!isEditingBatch ? (
+              // View Mode
+              <Grid container spacing={2.5}>
+                <Grid item xs={12}>
+                  <Typography variant="body2" color="text.secondary" fontSize="0.875rem">المورد</Typography>
+                  <Typography variant="body1" fontWeight={600} fontSize="1rem">
+                    {selectedBatch?.supplier_name || 'بدون مورد'}
+                  </Typography>
+                </Grid>
+
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary" fontSize="0.875rem">الكمية الأصلية</Typography>
+                  <Typography variant="body1" fontWeight={600} fontSize="1rem">
+                    {selectedBatch?.quantity_original || 0}
+                  </Typography>
+                </Grid>
+
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary" fontSize="0.875rem">الكمية المتبقية</Typography>
+                  <Chip
+                    label={selectedBatch?.quantity_remaining || 0}
+                    color={getStockColor(selectedBatch?.quantity_remaining || 0)}
+                    size="small"
+                    sx={{ fontWeight: 700 }}
+                  />
+                </Grid>
+
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary" fontSize="0.875rem">السعر لكل كيلو</Typography>
+                  <Typography variant="body1" fontWeight={600} fontSize="1rem">
+                    {selectedBatch?.price_per_kg
+                      ? `${fmt(selectedBatch.price_per_kg)} ${baseCurrencyInfo.symbol}`
+                      : '—'}
+                  </Typography>
+                </Grid>
+
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary" fontSize="0.875rem">التكلفة الإجمالية</Typography>
+                  <Typography variant="body1" fontWeight={600} fontSize="1rem">
+                    {selectedBatch?.total_cost
+                      ? `${fmt(selectedBatch.total_cost)} ${baseCurrencyInfo.symbol}`
+                      : '—'}
+                  </Typography>
+                </Grid>
+
+                {selectedSheet?.weight_per_sheet_kg && (
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="text.secondary" fontSize="0.875rem">الوزن الإجمالي</Typography>
+                    <Typography variant="body1" fontWeight={600} fontSize="1rem">
+                      {fmt(selectedBatch?.quantity_original * selectedSheet.weight_per_sheet_kg)} كغ
+                    </Typography>
+                  </Grid>
+                )}
+
+                <Grid item xs={12}>
+                  <Typography variant="body2" color="text.secondary" fontSize="0.875rem">تاريخ الاستلام</Typography>
+                  <Typography variant="body1" fontWeight={600} fontSize="1rem">
+                    {selectedBatch?.received_date || '—'}
+                  </Typography>
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Typography variant="body2" color="text.secondary" fontSize="0.875rem">موقع التخزين</Typography>
+                  <Typography variant="body1" fontWeight={600} fontSize="1rem">
+                    {selectedBatch?.storage_location || '—'}
+                  </Typography>
+                </Grid>
+
+                {selectedBatch?.notes && (
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="text.secondary" fontSize="0.875rem">ملاحظات</Typography>
+                    <Typography variant="body1" fontSize="1rem">
+                      {selectedBatch.notes}
+                    </Typography>
+                  </Grid>
+                )}
+              </Grid>
+            ) : (
+              // Edit Mode
+              <Grid container spacing={2.5}>
+                <Grid item xs={12}>
+                  <Alert severity="info" sx={{ fontSize: '0.9375rem' }}>
+                    تحديث الكمية الأصلية لن يؤثر على الكمية المتبقية. الكمية المتبقية تتغير فقط من خلال المبيعات.
+                  </Alert>
+                </Grid>
+
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="الكمية الأصلية *"
+                    value={editBatchForm.quantity_original}
+                    onChange={(e) => setEditBatchForm({ ...editBatchForm, quantity_original: e.target.value })}
+                    inputProps={{ min: 1 }}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="السعر لكل كيلو"
+                    value={editBatchForm.price_per_kg}
+                    onChange={(e) => setEditBatchForm({ ...editBatchForm, price_per_kg: e.target.value })}
+                    inputProps={{ step: 0.01, min: 0 }}
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end">{baseCurrencyInfo.symbol}</InputAdornment>
+                    }}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    type="date"
+                    label="تاريخ الاستلام"
+                    value={editBatchForm.received_date}
+                    onChange={(e) => setEditBatchForm({ ...editBatchForm, received_date: e.target.value })}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="موقع التخزين"
+                    value={editBatchForm.storage_location}
+                    onChange={(e) => setEditBatchForm({ ...editBatchForm, storage_location: e.target.value })}
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={3}
+                    label="ملاحظات"
+                    value={editBatchForm.notes}
+                    onChange={(e) => setEditBatchForm({ ...editBatchForm, notes: e.target.value })}
+                  />
+                </Grid>
+              </Grid>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          {!isEditingBatch ? (
+            <>
+              <Button onClick={handleCloseBatchView} size="large">إغلاق</Button>
+              <Button
+                onClick={handleEditBatch}
+                variant="contained"
+                size="large"
+                startIcon={<EditIcon />}
+              >
+                تعديل
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button onClick={handleCancelEditBatch} size="large" startIcon={<CloseIcon />}>
+                إلغاء
+              </Button>
+              <Button
+                onClick={handleSaveEditBatch}
+                variant="contained"
+                size="large"
+              >
+                حفظ
+              </Button>
+            </>
+          )}
         </DialogActions>
       </Dialog>
     </Box>
