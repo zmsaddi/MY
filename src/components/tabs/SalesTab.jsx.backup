@@ -1,26 +1,40 @@
 // src/components/tabs/SalesTab.jsx
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Fragment } from 'react';
 import {
   Box, Card, CardContent, Grid, TextField, Button, Typography,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  Alert, InputAdornment, Divider,
-  Stepper, Step, StepLabel, Autocomplete
+  Alert, Chip, Paper, InputAdornment, MenuItem, Divider,
+  Stepper, Step, StepLabel, Autocomplete, IconButton, Tooltip,
+  Collapse, RadioGroup, Radio, FormControlLabel, FormLabel
 } from '@mui/material';
 
 import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import BuildIcon from '@mui/icons-material/Build';
+import InventoryIcon from '@mui/icons-material/Inventory2';
 
 import {
   getAllSales, getSaleById, processSale, generateInvoiceNumber, deleteSale,
   getCustomers, getAllSheets, getServiceTypes, getPaymentMethodsForUI,
-  getCompanyProfile, getBaseCurrencyInfo, getCurrencies
+  getCompanyProfile, getBaseCurrencyInfo, getCurrencies, addSheetWithBatch
 } from '../../utils/database';
-
-// Import new components
-import { SalesTable, SaleItemsForm, RemnantCreationDialog } from '../sales';
 
 const fmt = (n) => Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 const STEPS = ['معلومات الفاتورة', 'الأصناف', 'الإجماليات والدفع'];
+
+// Price color coding helper
+const getPriceColor = (sellingPrice, originalCost) => {
+  if (!sellingPrice || !originalCost) return 'inherit';
+  const ratio = sellingPrice / originalCost;
+  if (ratio < 1) return 'error.main';     // Loss (red)
+  if (ratio === 1) return 'text.primary'; // Break-even (black)
+  return 'success.main';                  // Profit (green)
+};
 
 export default function SalesTab() {
   // Data
@@ -429,14 +443,115 @@ export default function SalesTab() {
       </Box>
 
       {/* Sales Table */}
-      <SalesTable
-        sales={sales}
-        baseCurrencyInfo={baseCurrencyInfo}
-        expandedSale={expandedSale}
-        onToggleExpand={(saleId) => setExpandedSale(expandedSale === saleId ? null : saleId)}
-        onViewSale={handleViewSale}
-        onDeleteSale={handleDeleteSale}
-      />
+      <TableContainer
+        component={Paper}
+        sx={{
+          borderRadius: 3,
+          overflowX: 'auto',
+          border: '1px solid',
+          borderColor: 'divider'
+        }}
+      >
+        <Table size="medium">
+          <TableHead sx={{ bgcolor: 'grey.100' }}>
+            <TableRow>
+              <TableCell width={56} />
+              <TableCell><Typography fontWeight={700} fontSize="1rem">رقم الفاتورة</Typography></TableCell>
+              <TableCell><Typography fontWeight={700} fontSize="1rem">الزبون</Typography></TableCell>
+              <TableCell><Typography fontWeight={700} fontSize="1rem">التاريخ</Typography></TableCell>
+              <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الإجمالي</Typography></TableCell>
+              <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">المدفوع</Typography></TableCell>
+              <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">المتبقي</Typography></TableCell>
+              <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الحالة</Typography></TableCell>
+              <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">إجراءات</Typography></TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {sales.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9} align="center">
+                  <Typography color="text.secondary" py={3} fontSize="1rem">لا توجد فواتير</Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              sales.map((sale) => (
+                <Fragment key={sale.id}>
+                  <TableRow hover sx={{ '&:hover': { bgcolor: 'grey.50' } }}>
+                    <TableCell>
+                      <IconButton
+                        size="small"
+                        onClick={() => setExpandedSale(expandedSale === sale.id ? null : sale.id)}
+                      >
+                        {expandedSale === sale.id ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                      </IconButton>
+                    </TableCell>
+                    <TableCell>
+                      <Typography fontWeight={700} fontSize="1rem">{sale.invoice_number}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography fontSize="0.9375rem">{sale.customer_name || 'زبون غير محدد'}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography fontSize="0.9375rem">{sale.sale_date}</Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Typography fontSize="0.9375rem">
+                        {fmt(sale.total_amount)} {baseCurrencyInfo.symbol}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Typography fontSize="0.9375rem">
+                        {fmt(sale.total_paid)} {baseCurrencyInfo.symbol}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Typography fontWeight={700} color={sale.remaining > 0 ? 'error.main' : 'success.main'} fontSize="0.9375rem">
+                        {fmt(sale.remaining)} {baseCurrencyInfo.symbol}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Chip
+                        label={getPaymentStatusLabel(sale.payment_status)}
+                        color={getPaymentStatusColor(sale.payment_status)}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Box sx={{ display: 'inline-flex', gap: 1 }}>
+                        <Tooltip title="عرض التفاصيل">
+                          <IconButton size="small" color="primary" onClick={() => handleViewSale(sale.id)}>
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="حذف">
+                          <IconButton size="small" color="error" onClick={() => handleDeleteSale(sale.id)}>
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+
+                  <TableRow>
+                    <TableCell colSpan={9} sx={{ p: 0, border: 0 }}>
+                      <Collapse in={expandedSale === sale.id} timeout="auto" unmountOnExit>
+                        <Box sx={{ p: 2, bgcolor: 'grey.50', borderTop: '1px solid', borderColor: 'divider' }}>
+                          <Typography variant="subtitle2" fontWeight={700} gutterBottom fontSize="1rem">
+                            ملاحظات:
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">
+                            {sale.notes || 'لا توجد ملاحظات'}
+                          </Typography>
+                        </Box>
+                      </Collapse>
+                    </TableCell>
+                  </TableRow>
+                </Fragment>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
 
       {/* Create Invoice Dialog */}
       <Dialog
