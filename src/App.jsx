@@ -29,7 +29,7 @@ const SalesTab = lazy(() => import('./components/tabs/SalesTab'));
 const CustomersTab = lazy(() => import('./components/tabs/CustomersTab'));
 const SuppliersTab = lazy(() => import('./components/tabs/SuppliersTab'));
 const InventoryTab = lazy(() => import('./components/tabs/InventoryTab'));
-const RemnantsTab = lazy(() => import('./components/tabs/RemnantsTab'));
+// RemnantsTab removed - Remnants are now integrated within InventoryTab
 const ExpensesTab = lazy(() => import('./components/tabs/ExpensesTab'));
 const PaymentsTab = lazy(() => import('./components/tabs/PaymentsTab'));
 const ReportsTab = lazy(() => import('./components/tabs/ReportsTab'));
@@ -185,11 +185,10 @@ function App() {
           {selectedTab === 2 && <CustomersTab />}
           {selectedTab === 3 && <SuppliersTab />}
           {selectedTab === 4 && <InventoryTab />}
-          {selectedTab === 5 && <RemnantsTab />}
-          {selectedTab === 6 && <ExpensesTab />}
-          {selectedTab === 7 && <PaymentsTab />}
-          {selectedTab === 8 && <ReportsTab />}
-          {selectedTab === 9 && <SettingsTab />}
+          {selectedTab === 5 && <ExpensesTab />}
+          {selectedTab === 6 && <PaymentsTab />}
+          {selectedTab === 7 && <ReportsTab />}
+          {selectedTab === 8 && <SettingsTab />}
         </TabErrorBoundary>
       </Suspense>
     );
