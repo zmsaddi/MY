@@ -146,30 +146,22 @@ export default function WeightPriceEntry({
   };
 
   const handleWeightChange = (field, value) => {
+    // Just update the field directly without calculation while typing
     const updatedData = { ...formData, [field]: value };
-    const finalData = calculateDerivedValues('weight', updatedData);
-    setFormData(finalData);
+    setFormData(updatedData);
+
     if (onChange) {
       onChange(field, value);
-      // Also send the calculated value if it changed
-      if (field === 'weight_per_sheet' && finalData.total_weight !== formData.total_weight) {
-        onChange('total_weight', finalData.total_weight);
-      } else if (field === 'total_weight' && finalData.weight_per_sheet !== formData.weight_per_sheet) {
-        onChange('weight_per_sheet', finalData.weight_per_sheet);
-      }
     }
   };
 
   const handlePriceChange = (field, value) => {
+    // Just update the field directly without calculation while typing
     const updatedData = { ...formData, [field]: value };
-    const finalData = calculateDerivedValues('price', updatedData);
-    setFormData(finalData);
+    setFormData(updatedData);
+
     if (onChange) {
       onChange(field, value);
-      // Also send the calculated total cost if it changed
-      if (finalData.total_cost !== formData.total_cost) {
-        onChange('total_cost', finalData.total_cost);
-      }
     }
   };
 
