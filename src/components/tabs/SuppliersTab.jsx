@@ -410,13 +410,14 @@ export default function SuppliersTab() {
                 <TableCell><Typography fontWeight={700} fontSize="1rem">الشركة</Typography></TableCell>
                 <TableCell><Typography fontWeight={700} fontSize="1rem">الهاتف</Typography></TableCell>
                 <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الرصيد</Typography></TableCell>
+                <TableCell><Typography fontWeight={700} fontSize="1rem">أضيف بواسطة</Typography></TableCell>
                 <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">إجراءات</Typography></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} align="center">
+                  <TableCell colSpan={6} align="center">
                     <Typography color="text.secondary" py={3} fontSize="1rem">لا توجد بيانات</Typography>
                   </TableCell>
                 </TableRow>
@@ -442,6 +443,11 @@ export default function SuppliersTab() {
                         size="small"
                         sx={{ fontWeight: 700, fontSize: '0.875rem' }}
                       />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" fontSize="0.875rem">
+                        {s.created_by || '---'}
+                      </Typography>
                     </TableCell>
                     <TableCell align="center">
                       <Tooltip title="كشف حساب">

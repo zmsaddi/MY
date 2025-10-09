@@ -128,7 +128,9 @@ export function getAllExpenses(fromDate = null, toDate = null) {
         expense_date: row.expense_date,
         notes: row.notes,
         created_at: row.created_at,
-        updated_at: row.updated_at
+        updated_at: row.updated_at,
+        created_by: row.created_by,
+        updated_by: row.updated_by
       });
     }
     stmt.free();

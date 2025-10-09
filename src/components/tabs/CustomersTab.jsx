@@ -408,13 +408,14 @@ export default function CustomersTab() {
                 <TableCell><Typography fontWeight={700} fontSize="1rem">الشركة</Typography></TableCell>
                 <TableCell><Typography fontWeight={700} fontSize="1rem">الهاتف</Typography></TableCell>
                 <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الرصيد</Typography></TableCell>
+                <TableCell><Typography fontWeight={700} fontSize="1rem">أضيف بواسطة</Typography></TableCell>
                 <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الإجراءات</Typography></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {filteredCustomers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} align="center">
+                  <TableCell colSpan={6} align="center">
                     <Typography color="text.secondary" py={3} fontSize="1rem">لا يوجد زبائن</Typography>
                   </TableCell>
                 </TableRow>
@@ -431,6 +432,11 @@ export default function CustomersTab() {
                         size="small"
                         sx={{ fontWeight: 700, fontSize: '0.875rem' }}
                       />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" fontSize="0.875rem">
+                        {customer.created_by || '---'}
+                      </Typography>
                     </TableCell>
                     <TableCell align="center">
                       <Tooltip title="كشف حساب">

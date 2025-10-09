@@ -31,7 +31,9 @@ export function getCustomers(activeOnly = true) {
         tax_number: row.tax_number,
         notes: row.notes,
         is_active: row.is_active,
-        created_at: row.created_at
+        created_at: row.created_at,
+        created_by: row.created_by,
+        updated_by: row.updated_by
       });
     }
     stmt.free();

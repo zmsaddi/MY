@@ -2588,6 +2588,28 @@ export default function InventoryTab() {
 
               <Grid item xs={12}>
                 <Divider sx={{ my: 1 }} />
+              </Grid>
+
+              {selectedBatch?.created_by && (
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary" fontSize="0.875rem">أضيفت بواسطة</Typography>
+                  <Typography variant="body1" fontWeight={600} fontSize="0.9375rem">
+                    {selectedBatch.created_by}
+                  </Typography>
+                </Grid>
+              )}
+
+              {selectedBatch?.updated_by && (
+                <Grid item xs={6}>
+                  <Typography variant="body2" color="text.secondary" fontSize="0.875rem">آخر تعديل بواسطة</Typography>
+                  <Typography variant="body1" fontWeight={600} fontSize="0.9375rem">
+                    {selectedBatch.updated_by}
+                  </Typography>
+                </Grid>
+              )}
+
+              <Grid item xs={12}>
+                <Divider sx={{ my: 1 }} />
                 <Box sx={{ display: 'flex', gap: 1 }}>
                   <Button
                     variant="outlined"

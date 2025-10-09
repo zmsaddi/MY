@@ -114,6 +114,8 @@ export function getSaleById(saleId) {
         total_paid: totalPaid,
         remaining: round2(totalAmount - totalPaid),
         created_at: row.created_at,
+        created_by: row.created_by,
+        updated_by: row.updated_by,
         items: []
       };
     }

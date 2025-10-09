@@ -1476,6 +1476,26 @@ export default function SalesTab() {
                     </Grid>
                   </>
                 )}
+
+                <Grid item xs={12}><Divider /></Grid>
+
+                {selectedSale.created_by && (
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="text.secondary" fontSize="0.875rem">أضيفت بواسطة:</Typography>
+                    <Typography variant="body1" fontWeight={600} fontSize="0.9375rem">
+                      {selectedSale.created_by}
+                    </Typography>
+                  </Grid>
+                )}
+
+                {selectedSale.updated_by && (
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="text.secondary" fontSize="0.875rem">آخر تعديل بواسطة:</Typography>
+                    <Typography variant="body1" fontWeight={600} fontSize="0.9375rem">
+                      {selectedSale.updated_by}
+                    </Typography>
+                  </Grid>
+                )}
               </Grid>
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 3 }}>

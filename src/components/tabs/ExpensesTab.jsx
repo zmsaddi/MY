@@ -460,13 +460,14 @@ export default function ExpensesTab() {
                 <TableCell><Typography fontWeight={700} fontSize="1rem">الوصف</Typography></TableCell>
                 <TableCell align="right"><Typography fontWeight={700} fontSize="1rem">المبلغ</Typography></TableCell>
                 <TableCell><Typography fontWeight={700} fontSize="1rem">ملاحظات</Typography></TableCell>
+                <TableCell><Typography fontWeight={700} fontSize="1rem">أضيفت بواسطة</Typography></TableCell>
                 <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">إجراءات</Typography></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {expenses.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
+                  <TableCell colSpan={7} align="center">
                     <Typography color="text.secondary" py={3} fontSize="1rem">لا توجد مصروفات</Typography>
                   </TableCell>
                 </TableRow>
@@ -491,6 +492,11 @@ export default function ExpensesTab() {
                     <TableCell>
                       <Typography variant="body2" color="text.secondary" fontSize="0.875rem">
                         {safeNotes(expense.notes) || '---'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" fontSize="0.875rem">
+                        {expense.created_by || '---'}
                       </Typography>
                     </TableCell>
                     <TableCell align="center">

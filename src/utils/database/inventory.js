@@ -378,7 +378,9 @@ export function getBatchById(batchId) {
         storage_location: row.storage_location,
         received_date: row.received_date,
         notes: row.notes,
-        created_at: row.created_at
+        created_at: row.created_at,
+        created_by: row.created_by,
+        updated_by: row.updated_by
       };
     }
     stmt.free();
