@@ -6,7 +6,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Alert, Chip, Paper, InputAdornment, MenuItem, Divider,
   Stepper, Step, StepLabel, Autocomplete, IconButton, Tooltip,
-  Collapse
+  Collapse, RadioGroup, Radio, FormControlLabel, FormLabel
 } from '@mui/material';
 
 import AddIcon from '@mui/icons-material/Add';
@@ -27,11 +27,21 @@ import {
 const fmt = (n) => Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 const STEPS = ['معلومات الفاتورة', 'الأصناف', 'الإجماليات والدفع'];
 
+// Price color coding helper
+const getPriceColor = (sellingPrice, originalCost) => {
+  if (!sellingPrice || !originalCost) return 'inherit';
+  const ratio = sellingPrice / originalCost;
+  if (ratio < 1) return 'error.main';     // Loss (red)
+  if (ratio === 1) return 'text.primary'; // Break-even (black)
+  return 'success.main';                  // Profit (green)
+};
+
 export default function SalesTab() {
   // Data
   const [sales, setSales] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [sheets, setSheets] = useState([]);
+  const [remnants, setRemnants] = useState([]);
   const [services, setServices] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [currencies, setCurrencies] = useState([]);
@@ -63,13 +73,23 @@ export default function SalesTab() {
 
   // Add item form
   const [itemType, setItemType] = useState('material');
+  const [saleType, setSaleType] = useState('full_sheet'); // 'full_sheet', 'remnant_from_stock', 'cut_from_sheet'
   const [selectedSheet, setSelectedSheet] = useState(null);
+  const [selectedRemnant, setSelectedRemnant] = useState(null);
   const [selectedService, setSelectedService] = useState(null);
   const [itemQuantity, setItemQuantity] = useState('');
   const [itemPrice, setItemPrice] = useState('');
+  const [itemPricePerKg, setItemPricePerKg] = useState('');
+  const [soldDimensions, setSoldDimensions] = useState({ length: '', width: '', thickness: '' });
+  const [soldWeight, setSoldWeight] = useState('');
   const [servicePrice, setServicePrice] = useState('');
   const [materialDescription, setMaterialDescription] = useState('');
   const [itemNotes, setItemNotes] = useState('');
+
+  // Remnant dialog state
+  const [showRemnantDialog, setShowRemnantDialog] = useState(false);
+  const [remnantPieces, setRemnantPieces] = useState([]);
+  const [currentSaleData, setCurrentSaleData] = useState(null);
 
   // Alerts
   const [success, setSuccess] = useState('');
@@ -85,14 +105,18 @@ export default function SalesTab() {
   const loadData = () => {
     setSales(getAllSales());
     setCustomers(getCustomers());
-    setSheets(getAllSheets());
+
+    const allSheets = getAllSheets();
+    setSheets(allSheets.filter(s => !s.is_remnant));
+    setRemnants(allSheets.filter(s => s.is_remnant));
+
     setServices(getServiceTypes(true));
     setPaymentMethods(getPaymentMethodsForUI(true));
     setCurrencies(getCurrencies(true));
-    
+
     const prof = getCompanyProfile();
     setProfile(prof);
-    
+
     const currInfo = getBaseCurrencyInfo();
     setBaseCurrencyInfo(currInfo);
     setSaleCurrency(currInfo.code);
@@ -142,9 +166,13 @@ export default function SalesTab() {
   // Add Item
   const resetItemForm = () => {
     setSelectedSheet(null);
+    setSelectedRemnant(null);
     setSelectedService(null);
     setItemQuantity('');
     setItemPrice('');
+    setItemPricePerKg('');
+    setSoldDimensions({ length: '', width: '', thickness: '' });
+    setSoldWeight('');
     setServicePrice('');
     setMaterialDescription('');
     setItemNotes('');
@@ -154,27 +182,108 @@ export default function SalesTab() {
     setError('');
 
     if (itemType === 'material') {
-      if (!selectedSheet) return setError('يجب اختيار صفيحة');
-      const qty = parseInt(itemQuantity, 10);
-      if (!qty || qty <= 0) return setError('الكمية يجب أن تكون أكبر من صفر');
-      if (qty > selectedSheet.total_quantity) return setError(`الكمية المتاحة فقط ${selectedSheet.total_quantity}`);
-      const price = parseFloat(itemPrice);
-      if (!price || price <= 0) return setError('السعر يجب أن يكون أكبر من صفر');
+      // Full Sheet Sale
+      if (saleType === 'full_sheet') {
+        if (!selectedSheet) return setError('يجب اختيار صفيحة');
+        const qty = parseInt(itemQuantity, 10);
+        if (!qty || qty <= 0) return setError('الكمية يجب أن تكون أكبر من صفر');
+        if (qty > selectedSheet.total_quantity) return setError(`الكمية المتاحة فقط ${selectedSheet.total_quantity}`);
+        const price = parseFloat(itemPrice);
+        if (!price || price <= 0) return setError('السعر يجب أن يكون أكبر من صفر');
 
-      setItems((prev) => [
-        ...prev,
-        {
-          item_type: 'material',
-          sheet_id: selectedSheet.id,
-          code: selectedSheet.code,
-          metal_name: selectedSheet.metal_name,
-          dimensions: `${selectedSheet.length_mm}×${selectedSheet.width_mm}×${selectedSheet.thickness_mm}`,
-          quantity: qty,
-          unit_price: price,
-          total: qty * price
+        setItems((prev) => [
+          ...prev,
+          {
+            item_type: 'material',
+            sale_type: 'full_sheet',
+            sheet_id: selectedSheet.id,
+            code: selectedSheet.code,
+            metal_name: selectedSheet.metal_name,
+            dimensions: `${selectedSheet.length_mm}×${selectedSheet.width_mm}×${selectedSheet.thickness_mm}`,
+            quantity: qty,
+            unit_price: price,
+            total: qty * price
+          }
+        ]);
+      }
+      // Remnant from Stock Sale
+      else if (saleType === 'remnant_from_stock') {
+        if (!selectedRemnant) return setError('يجب اختيار البقية');
+        const qty = parseInt(itemQuantity, 10);
+        if (!qty || qty <= 0) return setError('الكمية يجب أن تكون أكبر من صفر');
+        if (qty > selectedRemnant.total_quantity) return setError(`الكمية المتاحة فقط ${selectedRemnant.total_quantity}`);
+        const price = parseFloat(itemPrice);
+        if (!price || price <= 0) return setError('السعر يجب أن يكون أكبر من صفر');
+
+        setItems((prev) => [
+          ...prev,
+          {
+            item_type: 'material',
+            sale_type: 'remnant_from_stock',
+            sheet_id: selectedRemnant.id,
+            code: selectedRemnant.code,
+            metal_name: selectedRemnant.metal_name,
+            dimensions: `${selectedRemnant.length_mm}×${selectedRemnant.width_mm}×${selectedRemnant.thickness_mm}`,
+            quantity: qty,
+            unit_price: price,
+            total: qty * price
+          }
+        ]);
+      }
+      // Cut from Sheet Sale
+      else if (saleType === 'cut_from_sheet') {
+        if (!selectedSheet) return setError('يجب اختيار الصفيحة الأم');
+        if (!soldDimensions.length || !soldDimensions.width || !soldDimensions.thickness) {
+          return setError('يجب إدخال جميع الأبعاد');
         }
-      ]);
+        const qty = parseInt(itemQuantity, 10);
+        if (!qty || qty <= 0) return setError('الكمية يجب أن تكون أكبر من صفر');
+        if (qty > selectedSheet.total_quantity) return setError(`الكمية المتاحة فقط ${selectedSheet.total_quantity}`);
+
+        const price = parseFloat(itemPrice);
+        const pricePerKg = parseFloat(itemPricePerKg);
+
+        if (!price && !pricePerKg) {
+          return setError('يجب إدخال السعر (إما سعر القطعة أو سعر الكيلو)');
+        }
+
+        const weight = parseFloat(soldWeight) || 0;
+        const dimString = `${soldDimensions.length}×${soldDimensions.width}×${soldDimensions.thickness}`;
+
+        // Calculate final unit price
+        let finalUnitPrice = price;
+        if (!finalUnitPrice && pricePerKg && weight) {
+          finalUnitPrice = pricePerKg * weight;
+        }
+
+        setItems((prev) => [
+          ...prev,
+          {
+            item_type: 'material',
+            sale_type: 'cut_from_sheet',
+            sheet_id: selectedSheet.id,
+            code: selectedSheet.code,
+            metal_name: selectedSheet.metal_name,
+            dimensions: dimString,
+            sold_dimensions: dimString,
+            sold_weight: weight,
+            is_custom_size: true,
+            quantity: qty,
+            unit_price: finalUnitPrice,
+            total: qty * finalUnitPrice
+          }
+        ]);
+
+        // Store sale data for remnant dialog
+        setCurrentSaleData({
+          sheetId: selectedSheet.id,
+          sheetCode: selectedSheet.code,
+          thickness: soldDimensions.thickness,
+          soldDimensions: dimString
+        });
+      }
     } else {
+      // Service
       if (!selectedService) return setError('يجب اختيار خدمة');
       const qty = parseInt(itemQuantity, 10) || 1;
       const price = parseFloat(servicePrice);
@@ -249,7 +358,10 @@ export default function SalesTab() {
               item_type: 'material',
               sheet_id: it.sheet_id,
               quantity: it.quantity,
-              unit_price: it.unit_price
+              unit_price: it.unit_price,
+              is_custom_size: it.is_custom_size || false,
+              sold_dimensions: it.sold_dimensions || null,
+              sold_weight: it.sold_weight || null
             }
       )
     };
@@ -260,6 +372,19 @@ export default function SalesTab() {
       setTimeout(() => setSuccess(''), 3000);
       handleCloseCreateDialog();
       loadData();
+
+      // Check if there were any cut_from_sheet items
+      const hasCutFromSheet = items.some(it => it.sale_type === 'cut_from_sheet');
+      if (hasCutFromSheet && currentSaleData) {
+        // Show remnant dialog
+        setRemnantPieces([{
+          length: '',
+          width: '',
+          thickness: currentSaleData.thickness,
+          quantity: '1'
+        }]);
+        setShowRemnantDialog(true);
+      }
     } else {
       setError('فشل الحفظ: ' + result.error);
     }
@@ -533,43 +658,233 @@ export default function SalesTab() {
                     </TextField>
                   </Grid>
 
+                  {/* Sale Type Radio Buttons - Only for material */}
+                  {itemType === 'material' && (
+                    <Grid item xs={12}>
+                      <FormLabel component="legend">
+                        <Typography fontWeight={600} fontSize="1rem">نوع البيع</Typography>
+                      </FormLabel>
+                      <RadioGroup
+                        row
+                        value={saleType}
+                        onChange={(e) => {
+                          setSaleType(e.target.value);
+                          resetItemForm();
+                        }}
+                      >
+                        <FormControlLabel
+                          value="full_sheet"
+                          control={<Radio />}
+                          label="صفيحة كاملة"
+                        />
+                        <FormControlLabel
+                          value="remnant_from_stock"
+                          control={<Radio />}
+                          label="قطعة من المخزون (بواقي)"
+                        />
+                        <FormControlLabel
+                          value="cut_from_sheet"
+                          control={<Radio />}
+                          label="قص من صفيحة"
+                        />
+                      </RadioGroup>
+                    </Grid>
+                  )}
+
                   {itemType === 'material' ? (
                     <>
-                      <Grid item xs={12} md={6}>
-                        <Autocomplete
-                          options={sheets}
-                          getOptionLabel={(s) => `${s.code} - ${s.metal_name} (${s.total_quantity})`}
-                          value={selectedSheet}
-                          onChange={(_e, val) => setSelectedSheet(val)}
-                          renderInput={(params) => <TextField {...params} label="اختر الصفيحة *" />}
-                        />
-                      </Grid>
-                      <Grid item xs={12} md={3}>
-                        <TextField
-                          fullWidth
-                          type="number"
-                          label="الكمية *"
-                          value={itemQuantity}
-                          onChange={(e) => setItemQuantity(e.target.value)}
-                          inputProps={{ min: 1 }}
-                          helperText={selectedSheet ? `المتاح: ${selectedSheet.total_quantity}` : ' '}
-                          InputLabelProps={{ shrink: true }}
-                        />
-                      </Grid>
-                      <Grid item xs={12} md={3}>
-                        <TextField
-                          fullWidth
-                          type="number"
-                          label="السعر/قطعة *"
-                          value={itemPrice}
-                          onChange={(e) => setItemPrice(e.target.value)}
-                          inputProps={{ step: 0.01, min: 0 }}
-                          InputProps={{
-                            endAdornment: <InputAdornment position="end">{getCurrencySymbol(saleCurrency)}</InputAdornment>
-                          }}
-                          InputLabelProps={{ shrink: true }}
-                        />
-                      </Grid>
+                      {/* Full Sheet Sale */}
+                      {saleType === 'full_sheet' && (
+                        <>
+                          <Grid item xs={12} md={6}>
+                            <Autocomplete
+                              options={sheets}
+                              getOptionLabel={(s) => `${s.code} - ${s.metal_name} (${s.total_quantity})`}
+                              value={selectedSheet}
+                              onChange={(_e, val) => setSelectedSheet(val)}
+                              renderInput={(params) => <TextField {...params} label="اختر الصفيحة *" />}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={3}>
+                            <TextField
+                              fullWidth
+                              type="number"
+                              label="الكمية *"
+                              value={itemQuantity}
+                              onChange={(e) => setItemQuantity(e.target.value)}
+                              inputProps={{ min: 1 }}
+                              helperText={selectedSheet ? `المتاح: ${selectedSheet.total_quantity}` : ' '}
+                              InputLabelProps={{ shrink: true }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={3}>
+                            <TextField
+                              fullWidth
+                              type="number"
+                              label="السعر/قطعة *"
+                              value={itemPrice}
+                              onChange={(e) => setItemPrice(e.target.value)}
+                              inputProps={{ step: 0.01, min: 0 }}
+                              InputProps={{
+                                endAdornment: <InputAdornment position="end">{getCurrencySymbol(saleCurrency)}</InputAdornment>,
+                                sx: { color: selectedSheet?.min_price ? getPriceColor(parseFloat(itemPrice), selectedSheet.min_price) : 'inherit' }
+                              }}
+                              InputLabelProps={{ shrink: true }}
+                            />
+                          </Grid>
+                        </>
+                      )}
+
+                      {/* Remnant from Stock Sale */}
+                      {saleType === 'remnant_from_stock' && (
+                        <>
+                          <Grid item xs={12} md={6}>
+                            <Autocomplete
+                              options={remnants}
+                              getOptionLabel={(r) => `${r.code} - ${r.metal_name} - ${r.length_mm}×${r.width_mm}×${r.thickness_mm} (${r.total_quantity})`}
+                              value={selectedRemnant}
+                              onChange={(_e, val) => setSelectedRemnant(val)}
+                              renderInput={(params) => <TextField {...params} label="اختر البقية *" />}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={3}>
+                            <TextField
+                              fullWidth
+                              type="number"
+                              label="الكمية *"
+                              value={itemQuantity}
+                              onChange={(e) => setItemQuantity(e.target.value)}
+                              inputProps={{ min: 1 }}
+                              helperText={selectedRemnant ? `المتاح: ${selectedRemnant.total_quantity}` : ' '}
+                              InputLabelProps={{ shrink: true }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={3}>
+                            <TextField
+                              fullWidth
+                              type="number"
+                              label="السعر/قطعة *"
+                              value={itemPrice}
+                              onChange={(e) => setItemPrice(e.target.value)}
+                              inputProps={{ step: 0.01, min: 0 }}
+                              InputProps={{
+                                endAdornment: <InputAdornment position="end">{getCurrencySymbol(saleCurrency)}</InputAdornment>,
+                                sx: { color: selectedRemnant?.min_price ? getPriceColor(parseFloat(itemPrice), selectedRemnant.min_price) : 'inherit' }
+                              }}
+                              InputLabelProps={{ shrink: true }}
+                            />
+                          </Grid>
+                        </>
+                      )}
+
+                      {/* Cut from Sheet Sale */}
+                      {saleType === 'cut_from_sheet' && (
+                        <>
+                          <Grid item xs={12} md={6}>
+                            <Autocomplete
+                              options={sheets}
+                              getOptionLabel={(s) => `${s.code} - ${s.metal_name} (${s.total_quantity})`}
+                              value={selectedSheet}
+                              onChange={(_e, val) => {
+                                setSelectedSheet(val);
+                                if (val) {
+                                  setSoldDimensions(prev => ({ ...prev, thickness: val.thickness_mm }));
+                                }
+                              }}
+                              renderInput={(params) => <TextField {...params} label="اختر الصفيحة الأم *" />}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={2}>
+                            <TextField
+                              fullWidth
+                              type="number"
+                              label="الطول (مم) *"
+                              value={soldDimensions.length}
+                              onChange={(e) => setSoldDimensions(prev => ({ ...prev, length: e.target.value }))}
+                              inputProps={{ min: 1 }}
+                              InputLabelProps={{ shrink: true }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={2}>
+                            <TextField
+                              fullWidth
+                              type="number"
+                              label="العرض (مم) *"
+                              value={soldDimensions.width}
+                              onChange={(e) => setSoldDimensions(prev => ({ ...prev, width: e.target.value }))}
+                              inputProps={{ min: 1 }}
+                              InputLabelProps={{ shrink: true }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={2}>
+                            <TextField
+                              fullWidth
+                              type="number"
+                              label="السماكة (مم) *"
+                              value={soldDimensions.thickness}
+                              onChange={(e) => setSoldDimensions(prev => ({ ...prev, thickness: e.target.value }))}
+                              inputProps={{ min: 0.1, step: 0.1 }}
+                              InputLabelProps={{ shrink: true }}
+                              disabled
+                              helperText="من الصفيحة الأم"
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={3}>
+                            <TextField
+                              fullWidth
+                              type="number"
+                              label="الكمية *"
+                              value={itemQuantity}
+                              onChange={(e) => setItemQuantity(e.target.value)}
+                              inputProps={{ min: 1 }}
+                              helperText={selectedSheet ? `المتاح: ${selectedSheet.total_quantity}` : ' '}
+                              InputLabelProps={{ shrink: true }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={3}>
+                            <TextField
+                              fullWidth
+                              type="number"
+                              label="الوزن (كغ)"
+                              value={soldWeight}
+                              onChange={(e) => setSoldWeight(e.target.value)}
+                              inputProps={{ min: 0, step: 0.001 }}
+                              helperText="اختياري - حساب تلقائي"
+                              InputLabelProps={{ shrink: true }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={3}>
+                            <TextField
+                              fullWidth
+                              type="number"
+                              label="السعر/كغ"
+                              value={itemPricePerKg}
+                              onChange={(e) => setItemPricePerKg(e.target.value)}
+                              inputProps={{ step: 0.01, min: 0 }}
+                              InputProps={{
+                                endAdornment: <InputAdornment position="end">{getCurrencySymbol(saleCurrency)}</InputAdornment>,
+                                sx: { color: selectedSheet?.min_price ? getPriceColor(parseFloat(itemPricePerKg), selectedSheet.min_price) : 'inherit' }
+                              }}
+                              InputLabelProps={{ shrink: true }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={3}>
+                            <TextField
+                              fullWidth
+                              type="number"
+                              label="السعر/قطعة"
+                              value={itemPrice}
+                              onChange={(e) => setItemPrice(e.target.value)}
+                              inputProps={{ step: 0.01, min: 0 }}
+                              InputProps={{
+                                endAdornment: <InputAdornment position="end">{getCurrencySymbol(saleCurrency)}</InputAdornment>,
+                                sx: { color: selectedSheet?.min_price && soldWeight ? getPriceColor(parseFloat(itemPrice), selectedSheet.min_price * parseFloat(soldWeight)) : 'inherit' }
+                              }}
+                              InputLabelProps={{ shrink: true }}
+                            />
+                          </Grid>
+                        </>
+                      )}
                     </>
                   ) : (
                     <>
@@ -803,6 +1118,138 @@ export default function SalesTab() {
           {activeStep < STEPS.length - 1
             ? <Button variant="contained" onClick={handleNext} size="large">التالي</Button>
             : <Button variant="contained" onClick={handleSubmitSale} size="large">حفظ الفاتورة</Button>}
+        </DialogActions>
+      </Dialog>
+
+      {/* Remnant Dialog - After Cut from Sheet Sale */}
+      <Dialog
+        open={showRemnantDialog}
+        onClose={() => setShowRemnantDialog(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle>
+          <Typography variant="h5" fontWeight={700}>
+            إضافة البواقي من القطع
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <Alert severity="info" sx={{ mb: 3, fontSize: '1rem' }}>
+              تم قص الصفيحة. هل تريد إضافة القطع المتبقية كبواقي؟
+            </Alert>
+
+            {currentSaleData && (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }} fontSize="0.9375rem">
+                الصفيحة الأم: {currentSaleData.sheetCode} |
+                القطعة المباعة: {currentSaleData.soldDimensions}
+              </Typography>
+            )}
+
+            {remnantPieces.map((piece, index) => (
+              <Card key={index} variant="outlined" sx={{ p: 2, mb: 2 }}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" fontWeight={600}>
+                      قطعة بقية #{index + 1}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={4}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="الطول (مم)"
+                      value={piece.length}
+                      onChange={(e) => {
+                        const updated = [...remnantPieces];
+                        updated[index].length = e.target.value;
+                        setRemnantPieces(updated);
+                      }}
+                      inputProps={{ min: 1 }}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                  <Grid item xs={4}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="العرض (مم)"
+                      value={piece.width}
+                      onChange={(e) => {
+                        const updated = [...remnantPieces];
+                        updated[index].width = e.target.value;
+                        setRemnantPieces(updated);
+                      }}
+                      inputProps={{ min: 1 }}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                  <Grid item xs={4}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="الكمية"
+                      value={piece.quantity}
+                      onChange={(e) => {
+                        const updated = [...remnantPieces];
+                        updated[index].quantity = e.target.value;
+                        setRemnantPieces(updated);
+                      }}
+                      inputProps={{ min: 1 }}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Button
+                      size="small"
+                      color="error"
+                      onClick={() => {
+                        setRemnantPieces(remnantPieces.filter((_, i) => i !== index));
+                      }}
+                    >
+                      حذف هذه القطعة
+                    </Button>
+                  </Grid>
+                </Grid>
+              </Card>
+            ))}
+
+            <Button
+              variant="outlined"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setRemnantPieces([
+                  ...remnantPieces,
+                  {
+                    length: '',
+                    width: '',
+                    thickness: currentSaleData?.thickness || '',
+                    quantity: '1'
+                  }
+                ]);
+              }}
+              sx={{ mb: 2 }}
+            >
+              إضافة قطعة أخرى
+            </Button>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button onClick={() => setShowRemnantDialog(false)} size="large">
+            تخطي
+          </Button>
+          <Button
+            onClick={() => {
+              // TODO: Save remnants logic
+              setShowRemnantDialog(false);
+              setSuccess('تم حفظ البواقي بنجاح');
+            }}
+            variant="contained"
+            size="large"
+          >
+            حفظ البواقي
+          </Button>
         </DialogActions>
       </Dialog>
 

@@ -6,7 +6,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, IconButton,
   Alert, Chip, Paper, InputAdornment, Tooltip,
   Accordion, AccordionSummary, AccordionDetails, Collapse, Autocomplete,
-  FormControlLabel, Switch
+  FormControlLabel, Switch, RadioGroup, Radio, FormLabel
 } from '@mui/material';
 
 import AddIcon from '@mui/icons-material/Add';
@@ -78,6 +78,7 @@ export default function RemnantsTab() {
     thickness_mm: '',
     weight_per_sheet_kg: '',
     parent_sheet_id: null,
+    piece_source: 'company_stock', // 'company_stock' or 'from_sheet_cutting'
   });
 
   // Forms — Initial batch for remnant
@@ -219,7 +220,7 @@ export default function RemnantsTab() {
   // Add new remnant
   const handleOpenAddDialog = () => {
     const defaultMetalType = metalTypes.find(m => m.is_active)?.id || '';
-    
+
     setRemnantForm({
       code: '',
       metal_type_id: defaultMetalType,
@@ -230,6 +231,7 @@ export default function RemnantsTab() {
       thickness_mm: '',
       weight_per_sheet_kg: '',
       parent_sheet_id: null,
+      piece_source: 'company_stock',
     });
     
     // Load grades/finishes for default metal type
@@ -265,6 +267,11 @@ export default function RemnantsTab() {
       return setError('الأبعاد مطلوبة');
     if (!batchForm.quantity || Number(batchForm.quantity) <= 0)
       return setError('الكمية يجب أن تكون أكبر من صفر');
+
+    // Validation for from_sheet_cutting
+    if (remnantForm.piece_source === 'from_sheet_cutting' && !remnantForm.parent_sheet_id) {
+      return setError('يجب اختيار الصفيحة الأم عند اختيار "من قص صفيحة"');
+    }
 
     const preview = computeTotalsPreview(
       batchForm.pricing_mode,
@@ -615,6 +622,46 @@ export default function RemnantsTab() {
               </AccordionSummary>
               <AccordionDetails>
                 <Grid container spacing={2.5}>
+                  {/* NEW: Piece Source Selection */}
+                  <Grid item xs={12}>
+                    <FormLabel component="legend">
+                      <Typography fontWeight={600} fontSize="1rem">مصدر القطعة *</Typography>
+                    </FormLabel>
+                    <RadioGroup
+                      row
+                      value={remnantForm.piece_source}
+                      onChange={(e) => {
+                        const newSource = e.target.value;
+                        setRemnantForm(prev => ({ ...prev, piece_source: newSource }));
+
+                        // If switching to company_stock, set supplier to "الشركة"
+                        if (newSource === 'company_stock') {
+                          const companySupplier = suppliers.find(s => s.name === 'الشركة' || s.name.includes('الشركة'));
+                          if (companySupplier) {
+                            setBatchForm(prev => ({ ...prev, supplier_id: companySupplier.id }));
+                          }
+                        } else {
+                          setBatchForm(prev => ({ ...prev, supplier_id: '' }));
+                        }
+                      }}
+                    >
+                      <FormControlLabel
+                        value="company_stock"
+                        control={<Radio />}
+                        label={
+                          <Typography fontSize="1rem">مخزون الشركة (سعر مرجعي فقط)</Typography>
+                        }
+                      />
+                      <FormControlLabel
+                        value="from_sheet_cutting"
+                        control={<Radio />}
+                        label={
+                          <Typography fontSize="1rem">من قص صفيحة (وراثة السعر)</Typography>
+                        }
+                      />
+                    </RadioGroup>
+                  </Grid>
+
                   <Grid item xs={12}>
                     <FormControlLabel
                       control={
@@ -763,13 +810,25 @@ export default function RemnantsTab() {
                       getOptionLabel={(option) => `${option.code} - ${option.metal_name}`}
                       value={parentSheets.find(p => p.id === remnantForm.parent_sheet_id) || null}
                       onChange={(e, newValue) => {
-                        setRemnantForm({ ...remnantForm, parent_sheet_id: newValue?.id || null });
+                        setRemnantForm(prev => ({ ...prev, parent_sheet_id: newValue?.id || null }));
+
+                        // Auto-populate weight and dimensions from parent sheet for cutting option
+                        if (remnantForm.piece_source === 'from_sheet_cutting' && newValue) {
+                          if (!remnantForm.thickness_mm) {
+                            setRemnantForm(prev => ({ ...prev, thickness_mm: newValue.thickness_mm }));
+                          }
+                        }
                       }}
+                      disabled={remnantForm.piece_source === 'company_stock'}
                       renderInput={(params) => (
                         <TextField
                           {...params}
-                          label="الصفيحة الأم (اختياري)"
-                          helperText="يمكن ربط البقية بصفيحة أساسية"
+                          label={remnantForm.piece_source === 'from_sheet_cutting' ? 'الصفيحة الأم *' : 'الصفيحة الأم (اختياري)'}
+                          helperText={
+                            remnantForm.piece_source === 'from_sheet_cutting'
+                              ? 'اختر الصفيحة التي تم قصها'
+                              : 'يمكن ربط البقية بصفيحة أساسية'
+                          }
                         />
                       )}
                     />
@@ -795,6 +854,12 @@ export default function RemnantsTab() {
                       value={batchForm.supplier_id}
                       onChange={(e) => setBatchForm({ ...batchForm, supplier_id: e.target.value })}
                       SelectProps={{ native: true }}
+                      disabled={remnantForm.piece_source === 'company_stock'}
+                      helperText={
+                        remnantForm.piece_source === 'company_stock'
+                          ? 'المورد: الشركة (سعر مرجعي فقط - لا يؤثر على المحاسبة)'
+                          : ''
+                      }
                     >
                       <option value="">بدون مورد</option>
                       {suppliers.map(supplier => (
