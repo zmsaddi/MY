@@ -39,14 +39,9 @@ function createUsersTable() {
     console.log('║  Username: admin                               ║');
     console.log('║  Password: (not set - leave blank)            ║');
     console.log('║                                                ║');
-    console.log('║  ⚠️  IMPORTANT: Change this password on        ║');
-    console.log('║     first login for security!                 ║');
+    console.log('║  ⚠️  IMPORTANT: Set password on first login    ║');
+    console.log('║     for security!                             ║');
     console.log('╚════════════════════════════════════════════════╝\n');
-
-    // Store password temporarily in a secure way (will be cleared after first login)
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('_initial_setup_pwd', btoa(randomPassword));
-    }
   }
 }
 
