@@ -17,6 +17,19 @@ export default function UnifiedFormField({
   autoFocus = false,
   ...otherProps
 }) {
+  // Handle number inputs with regex validation instead of type="number"
+  const handleChange = (e) => {
+    if (type === 'number') {
+      const inputValue = e.target.value;
+      // Allow empty, digits, and single decimal point
+      if (inputValue === '' || /^\d*\.?\d*$/.test(inputValue)) {
+        onChange(e);
+      }
+    } else {
+      onChange(e);
+    }
+  };
+
   return (
     <Box sx={{ mb: 2 }}>
       {label && (
@@ -41,9 +54,9 @@ export default function UnifiedFormField({
       )}
       <TextField
         value={value}
-        onChange={onChange}
+        onChange={handleChange}
         name={name}
-        type={type}
+        type={type === 'number' ? 'text' : type}
         error={!!error}
         helperText={error || helperText}
         disabled={disabled}
