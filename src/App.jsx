@@ -21,8 +21,10 @@ import LogoutIcon from '@mui/icons-material/Logout';
 // Eager load critical components
 import ErrorBoundary from './components/ErrorBoundary';
 import TabErrorBoundary from './components/common/ErrorBoundary';
+import ErrorNotification from './components/ErrorNotification';
 import Login from './components/Login';
 import DashboardTab from './components/Dashboard';
+import { useErrorHandler } from './hooks/useErrorHandler';
 
 // Lazy load tab components for better performance
 const SalesTab = lazy(() => import('./components/tabs/SalesTab'));
@@ -62,6 +64,9 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUserState] = useState(null);
 
+  // Global error handler
+  const { error, handleError, clearError } = useErrorHandler();
+
   useEffect(() => {
     initDatabase()
       .then(() => {
@@ -74,7 +79,14 @@ function App() {
           setIsAuthenticated(true);
         }
       })
-      .catch((error) => setDbError(error.message));
+      .catch((error) => {
+        setDbError(error.message);
+        handleError(error, {
+          title: 'خطأ في تهيئة قاعدة البيانات',
+          code: 'DB_INIT',
+          details: error
+        });
+      });
   }, []);
 
   // Auto-logout on inactivity - check every minute
@@ -294,6 +306,7 @@ function App() {
         <ThemeProvider theme={theme}>
           <CssBaseline />
           <Login onLogin={handleLogin} />
+          <ErrorNotification error={error} onClose={clearError} />
         </ThemeProvider>
       </CacheProvider>
     );
@@ -304,12 +317,12 @@ function App() {
       <CacheProvider value={cacheRtl}>
         <ThemeProvider theme={theme}>
           <CssBaseline />
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            height: '100vh', 
-            flexDirection: 'column', 
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100vh',
+            flexDirection: 'column',
             gap: 2,
             p: 2
           }}>
@@ -345,6 +358,7 @@ function App() {
               </>
             )}
           </Box>
+          <ErrorNotification error={error} onClose={clearError} />
         </ThemeProvider>
       </CacheProvider>
     );
@@ -392,9 +406,9 @@ function App() {
                 ModalProps={{ keepMounted: true }}
                 sx={{
                   display: { xs: 'block', md: 'none' },
-                  '& .MuiDrawer-paper': { 
-                    boxSizing: 'border-box', 
-                    width: DRAWER_WIDTH 
+                  '& .MuiDrawer-paper': {
+                    boxSizing: 'border-box',
+                    width: DRAWER_WIDTH
                   },
                 }}
               >
@@ -405,8 +419,8 @@ function App() {
                 variant="permanent"
                 sx={{
                   display: { xs: 'none', md: 'block' },
-                  '& .MuiDrawer-paper': { 
-                    boxSizing: 'border-box', 
+                  '& .MuiDrawer-paper': {
+                    boxSizing: 'border-box',
                     width: DRAWER_WIDTH,
                     borderRight: 1,
                     borderColor: 'divider'
@@ -429,10 +443,10 @@ function App() {
               }}
             >
               <Toolbar sx={{ display: { xs: 'block', md: 'none' }, minHeight: { xs: 56, sm: 64 } }} />
-              
-              <Container 
-                maxWidth={false} 
-                sx={{ 
+
+              <Container
+                maxWidth={false}
+                sx={{
                   py: { xs: 2, sm: 3, md: 4 },
                   px: { xs: 2, sm: 3, md: 4 }
                 }}
@@ -441,6 +455,7 @@ function App() {
               </Container>
             </Box>
           </Box>
+          <ErrorNotification error={error} onClose={clearError} />
         </ErrorBoundary>
       </ThemeProvider>
     </CacheProvider>
