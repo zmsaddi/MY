@@ -30,36 +30,6 @@ export default defineConfig(({ mode }) => ({
     chunkSizeWarningLimit: 1000, // Increase to 1MB before warning
     rollupOptions: {
       output: {
-        // Manual chunk splitting for better caching
-        manualChunks: (id) => {
-          // Vendor chunks
-          if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom')) {
-              return 'react-vendor';
-            }
-            if (id.includes('@mui/material')) {
-              return 'mui-material';
-            }
-            if (id.includes('@mui/icons-material')) {
-              return 'mui-icons';
-            }
-            if (id.includes('@emotion')) {
-              return 'emotion';
-            }
-            if (id.includes('sql.js')) {
-              return 'sql-vendor';
-            }
-            return 'vendor'; // Other dependencies
-          }
-
-          // Component chunks
-          if (id.includes('src/components/tabs/')) {
-            return 'tabs';
-          }
-          if (id.includes('src/utils/database/')) {
-            return 'database';
-          }
-        },
         // Optimized file naming
         chunkFileNames: 'assets/js/[name]-[hash].js',
         entryFileNames: 'assets/js/[name]-[hash].js',
