@@ -67,7 +67,7 @@ export function hasColumn(table, col) {
 // Auto backup when database exceeds this size (in MB)
 const AUTO_BACKUP_SIZE_MB = 4.0;
 
-export function saveDatabase() {
+export async function saveDatabase() {
   if (!db) return { success: false, error: 'No database' };
 
   try {
