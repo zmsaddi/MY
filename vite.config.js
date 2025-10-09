@@ -37,8 +37,14 @@ export default defineConfig(({ mode }) => ({
             if (id.includes('react') || id.includes('react-dom')) {
               return 'react-vendor';
             }
-            if (id.includes('@mui') || id.includes('@emotion')) {
-              return 'mui-vendor';
+            if (id.includes('@mui/material')) {
+              return 'mui-material';
+            }
+            if (id.includes('@mui/icons-material')) {
+              return 'mui-icons';
+            }
+            if (id.includes('@emotion')) {
+              return 'emotion';
             }
             if (id.includes('sql.js')) {
               return 'sql-vendor';
