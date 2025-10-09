@@ -1,5 +1,5 @@
 // src/components/common/WeightPriceEntry.jsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Grid,
   TextField,
@@ -19,15 +19,51 @@ import PropTypes from 'prop-types';
  * Provides consistent weight and pricing input across all forms
  */
 export default function WeightPriceEntry({
-  formData,
-  setFormData,
+  mode = 'both', // 'weight', 'price', or 'both'
+  weightMode: initialWeightMode,
+  pricingMode: initialPricingMode,
+  label,
+  value,
+  totalWeight,
+  pricePerKg,
+  pricePerPiece,
+  totalCost,
   quantity = 1,
+  weight,
+  onChange,
   currencySymbol = '$',
-  showWeight = true,
-  showPricing = true,
+  showBatchPrice = false,
   disabled = false,
-  errors = {}
+  errors: propErrors = {}
 }) {
+  // Initialize formData from props
+  const [formData, setFormDataState] = useState(() => ({
+    weight_input_mode: initialWeightMode || 'per_sheet',
+    weight_per_sheet: value || '',
+    total_weight: totalWeight || '',
+    pricing_mode: initialPricingMode || 'per_kg',
+    price_per_kg: pricePerKg || '',
+    price_per_piece: pricePerPiece || '',
+    total_cost: totalCost || '',
+  }));
+
+  const [errors, setErrors] = useState(propErrors);
+
+  // Update formData when props change
+  useEffect(() => {
+    setFormDataState(prev => ({
+      ...prev,
+      weight_per_sheet: value || prev.weight_per_sheet,
+      total_weight: totalWeight || prev.total_weight,
+      price_per_kg: pricePerKg || prev.price_per_kg,
+      price_per_piece: pricePerPiece || prev.price_per_piece,
+      total_cost: totalCost || prev.total_cost,
+    }));
+  }, [value, totalWeight, pricePerKg, pricePerPiece, totalCost]);
+
+  const setFormData = (newData) => {
+    setFormDataState(newData);
+  };
   // Calculate derived values
   const calculateDerivedValues = (mode, data) => {
     const qty = Number(quantity) || 1;
@@ -73,7 +109,11 @@ export default function WeightPriceEntry({
       updatedData.weight_per_sheet = '';
     }
 
-    setFormData(calculateDerivedValues('weight', updatedData));
+    const finalData = calculateDerivedValues('weight', updatedData);
+    setFormData(finalData);
+    if (onChange) {
+      onChange('weight_mode', newMode);
+    }
   };
 
   const handlePricingModeChange = (e) => {
@@ -92,17 +132,39 @@ export default function WeightPriceEntry({
       updatedData.price_per_piece = '';
     }
 
-    setFormData(calculateDerivedValues('price', updatedData));
+    const finalData = calculateDerivedValues('price', updatedData);
+    setFormData(finalData);
+    if (onChange) {
+      onChange('pricing_mode', newMode);
+    }
   };
 
   const handleWeightChange = (field, value) => {
     const updatedData = { ...formData, [field]: value };
-    setFormData(calculateDerivedValues('weight', updatedData));
+    const finalData = calculateDerivedValues('weight', updatedData);
+    setFormData(finalData);
+    if (onChange) {
+      onChange(field, value);
+      // Also send the calculated value if it changed
+      if (field === 'weight_per_sheet' && finalData.total_weight !== formData.total_weight) {
+        onChange('total_weight', finalData.total_weight);
+      } else if (field === 'total_weight' && finalData.weight_per_sheet !== formData.weight_per_sheet) {
+        onChange('weight_per_sheet', finalData.weight_per_sheet);
+      }
+    }
   };
 
   const handlePriceChange = (field, value) => {
     const updatedData = { ...formData, [field]: value };
-    setFormData(calculateDerivedValues('price', updatedData));
+    const finalData = calculateDerivedValues('price', updatedData);
+    setFormData(finalData);
+    if (onChange) {
+      onChange(field, value);
+      // Also send the calculated total cost if it changed
+      if (finalData.total_cost !== formData.total_cost) {
+        onChange('total_cost', finalData.total_cost);
+      }
+    }
   };
 
   // Calculate price summary
@@ -144,6 +206,9 @@ export default function WeightPriceEntry({
   };
 
   const summary = getPriceSummary();
+
+  const showWeight = mode === 'weight' || mode === 'both';
+  const showPricing = mode === 'price' || mode === 'both';
 
   return (
     <Box>
