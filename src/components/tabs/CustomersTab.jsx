@@ -533,6 +533,7 @@ export default function CustomersTab() {
                   InputProps={{
                     endAdornment: <InputAdornment position="end">{baseCurrencyInfo.symbol}</InputAdornment>
                   }}
+                  InputLabelProps={{ shrink: true }}
                 />
               </Grid>
 

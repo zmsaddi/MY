@@ -1,4 +1,4 @@
-name: Deploy to Vercel
+name: Build and Deploy
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -30,7 +30,8 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Deploy to Vercel
+      - name: Deploy to Vercel (Optional)
+        if: github.event_name == 'push' && secrets.VERCEL_TOKEN != ''
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}

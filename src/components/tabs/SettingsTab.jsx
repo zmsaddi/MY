@@ -754,12 +754,13 @@ function CurrencyRow({ currency, onUpdated }) {
       </TableCell>
       <TableCell>
         {editing ? (
-          <TextField 
-            size="small" 
-            type="number" 
-            value={row.exchange_rate} 
+          <TextField
+            size="small"
+            type="number"
+            value={row.exchange_rate}
             onChange={(e) => setRow((r) => ({ ...r, exchange_rate: e.target.value }))}
             inputProps={{ step: 0.01, min: 0.01 }}
+            InputLabelProps={{ shrink: true }}
           />
         ) : (
           <Typography fontSize="0.95rem">{currency.exchange_rate}</Typography>
@@ -1443,6 +1444,7 @@ export default function SettingsTab() {
                     disabled={!profile.vat_enabled}
                     inputProps={{ step: 0.1, min: 0, max: 100 }}
                     InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+                    InputLabelProps={{ shrink: true }}
                   />
                 </Grid>
               </Grid>
@@ -1571,6 +1573,7 @@ export default function SettingsTab() {
                         label="الكثافة"
                         value={newMaterial.density}
                         onChange={(e) => setNewMaterial((m) => ({ ...m, density: e.target.value }))}
+                        InputLabelProps={{ shrink: true }}
                       />
                     </Grid>
                     <Grid item xs={12} md={2}>
@@ -1662,6 +1665,7 @@ export default function SettingsTab() {
                         value={newCurrency.exchange_rate}
                         onChange={(e) => setNewCurrency((c) => ({ ...c, exchange_rate: parseFloat(e.target.value) || 1 }))}
                         inputProps={{ step: 0.01, min: 0.01 }}
+                        InputLabelProps={{ shrink: true }}
                       />
                     </Grid>
                     <Grid item xs={12} md={2}>

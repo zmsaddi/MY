@@ -498,6 +498,7 @@ export default function ExpensesTab() {
                 InputProps={{
                   endAdornment: <Typography sx={{ ml: 1, color: 'text.secondary' }}>{baseCurrencyInfo.symbol}</Typography>
                 }}
+                InputLabelProps={{ shrink: true }}
               />
             </Grid>
             <Grid item xs={12}>

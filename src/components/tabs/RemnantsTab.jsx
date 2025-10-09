@@ -473,6 +473,7 @@ export default function RemnantsTab() {
                     label="أدنى سماكة (مم)"
                     value={filterThkMin}
                     onChange={(e) => setFilterThkMin(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
                   />
                 </Grid>
                 <Grid item xs={6} md={3}>
@@ -482,6 +483,7 @@ export default function RemnantsTab() {
                     label="أقصى سماكة (مم)"
                     value={filterThkMax}
                     onChange={(e) => setFilterThkMax(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
                   />
                 </Grid>
                 <Grid item xs={6} md={3}>
@@ -491,6 +493,7 @@ export default function RemnantsTab() {
                     label="أدنى كمية"
                     value={filterQtyMin}
                     onChange={(e) => setFilterQtyMin(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
                   />
                 </Grid>
                 <Grid item xs={6} md={3}>
@@ -500,6 +503,7 @@ export default function RemnantsTab() {
                     label="أقصى كمية"
                     value={filterQtyMax}
                     onChange={(e) => setFilterQtyMax(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
                   />
                 </Grid>
               </Grid>
@@ -717,6 +721,7 @@ export default function RemnantsTab() {
                       value={remnantForm.length_mm}
                       onChange={(e) => setRemnantForm({ ...remnantForm, length_mm: e.target.value })}
                       inputProps={{ min: 1 }}
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                   <Grid item xs={12} md={4}>
@@ -727,6 +732,7 @@ export default function RemnantsTab() {
                       value={remnantForm.width_mm}
                       onChange={(e) => setRemnantForm({ ...remnantForm, width_mm: e.target.value })}
                       inputProps={{ min: 1 }}
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                   <Grid item xs={12} md={4}>
@@ -737,6 +743,7 @@ export default function RemnantsTab() {
                       value={remnantForm.thickness_mm}
                       onChange={(e) => setRemnantForm({ ...remnantForm, thickness_mm: e.target.value })}
                       inputProps={{ step: 0.1, min: 0.1 }}
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                   <Grid item xs={12} md={6}>
@@ -747,6 +754,7 @@ export default function RemnantsTab() {
                       value={remnantForm.weight_per_sheet_kg}
                       onChange={(e) => setRemnantForm({ ...remnantForm, weight_per_sheet_kg: e.target.value })}
                       inputProps={{ step: 0.001, min: 0 }}
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
                   <Grid item xs={12} md={6}>
@@ -802,6 +810,7 @@ export default function RemnantsTab() {
                       value={batchForm.quantity}
                       onChange={(e) => setBatchForm({ ...batchForm, quantity: e.target.value })}
                       inputProps={{ min: 1 }}
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
 
@@ -827,6 +836,7 @@ export default function RemnantsTab() {
                       value={batchForm.batch_weight_kg}
                       onChange={(e) => setBatchForm({ ...batchForm, batch_weight_kg: e.target.value })}
                       inputProps={{ step: 0.001, min: 0 }}
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
 
@@ -842,6 +852,7 @@ export default function RemnantsTab() {
                         InputProps={{
                           endAdornment: <InputAdornment position="end">{baseCurrencyInfo.symbol}</InputAdornment>
                         }}
+                        InputLabelProps={{ shrink: true }}
                       />
                     </Grid>
                   ) : (
@@ -856,6 +867,7 @@ export default function RemnantsTab() {
                         InputProps={{
                           endAdornment: <InputAdornment position="end">{baseCurrencyInfo.symbol}</InputAdornment>
                         }}
+                        InputLabelProps={{ shrink: true }}
                       />
                     </Grid>
                   )}
@@ -962,6 +974,7 @@ export default function RemnantsTab() {
                   value={existingBatchForm.quantity}
                   onChange={(e) => setExistingBatchForm({ ...existingBatchForm, quantity: e.target.value })}
                   inputProps={{ min: 1 }}
+                  InputLabelProps={{ shrink: true }}
                 />
               </Grid>
 
@@ -987,6 +1000,7 @@ export default function RemnantsTab() {
                   value={existingBatchForm.batch_weight_kg}
                   onChange={(e) => setExistingBatchForm({ ...existingBatchForm, batch_weight_kg: e.target.value })}
                   inputProps={{ step: 0.001, min: 0 }}
+                  InputLabelProps={{ shrink: true }}
                 />
               </Grid>
 
@@ -1002,6 +1016,7 @@ export default function RemnantsTab() {
                     InputProps={{
                       endAdornment: <InputAdornment position="end">{baseCurrencyInfo.symbol}</InputAdornment>
                     }}
+                    InputLabelProps={{ shrink: true }}
                   />
                 </Grid>
               ) : (
@@ -1016,6 +1031,7 @@ export default function RemnantsTab() {
                     InputProps={{
                       endAdornment: <InputAdornment position="end">{baseCurrencyInfo.symbol}</InputAdornment>
                     }}
+                    InputLabelProps={{ shrink: true }}
                   />
                 </Grid>
               )}
