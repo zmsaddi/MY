@@ -43,13 +43,13 @@ export function usePrint() {
 
       switch (options.action) {
         case 'print':
-          printPDF(finalDoc);
+          await printPDF(finalDoc);
           break;
         case 'pdf':
-          generatePDF(finalDoc, filename, true);
+          await generatePDF(finalDoc, filename, true);
           break;
         case 'preview':
-          generatePDF(finalDoc, 'preview.pdf', false);
+          await generatePDF(finalDoc, 'preview.pdf', false);
           break;
       }
 
@@ -71,7 +71,7 @@ export function usePrint() {
   const quickPrint = useCallback(async (docDefinition) => {
     setIsPrinting(true);
     try {
-      printPDF(docDefinition);
+      await printPDF(docDefinition);
       await new Promise(resolve => setTimeout(resolve, 500));
     } catch (error) {
       console.error('Quick print error:', error);
@@ -84,7 +84,7 @@ export function usePrint() {
   const quickPDF = useCallback(async (docDefinition, filename = 'document.pdf') => {
     setIsPrinting(true);
     try {
-      generatePDF(docDefinition, filename, true);
+      await generatePDF(docDefinition, filename, true);
       await new Promise(resolve => setTimeout(resolve, 500));
     } catch (error) {
       console.error('Quick PDF error:', error);

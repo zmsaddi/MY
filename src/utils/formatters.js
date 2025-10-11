@@ -1,150 +1,312 @@
 // src/utils/formatters.js
+//
+// Arabic-aware formatting helpers used across the application.
+// These helpers keep all number/date/size formatting consistent while
+// allowing us to control the digit style (eastern Arabic vs latin).
 
-/**
- * Centralized formatting utilities
- * Provides consistent formatting across the application
- */
+const DEFAULT_NUMBER_LOCALE = 'ar-SY';
+const DEFAULT_DATE_LOCALE = 'ar-SY';
 
-/**
- * Format number with locale and options
- */
-export function formatNumber(value, decimals = 2) {
-  const num = Number(value ?? 0);
-  return num.toLocaleString(undefined, {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
+const EASTERN_ARABIC_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+const EASTERN_TO_LATIN_MAP = {
+  '٠': '0',
+  '١': '1',
+  '٢': '2',
+  '٣': '3',
+  '٤': '4',
+  '٥': '5',
+  '٦': '6',
+  '٧': '7',
+  '٨': '8',
+  '٩': '9'
+};
+
+function ensureNumber(value) {
+  if (value === null || value === undefined || value === '') return 0;
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
 }
 
-/**
- * Format currency
- */
-export function formatCurrency(value, currencySymbol = '$', decimals = 2) {
-  return `${currencySymbol}${formatNumber(value, decimals)}`;
-}
+function applyDigitStyle(value, digitStyle = 'eastern') {
+  if (!value) return value;
 
-/**
- * Format date
- */
-export function formatDate(dateString, format = 'long') {
-  if (!dateString) return '';
-
-  const date = new Date(dateString);
-
-  if (format === 'short') {
-    return date.toLocaleDateString('ar-SA');
+  if (digitStyle === 'latin') {
+    return toLatinDigits(value);
   }
 
-  if (format === 'long') {
-    return date.toLocaleDateString('ar-SA', {
+  if (digitStyle === 'eastern') {
+    return toArabicDigits(value);
+  }
+
+  return value;
+}
+
+export function toArabicDigits(value) {
+  if (value === null || value === undefined) return '';
+  return value
+    .toString()
+    .replace(/\d/g, (digit) => EASTERN_ARABIC_DIGITS[Number(digit)]);
+}
+
+export function toLatinDigits(value) {
+  if (value === null || value === undefined) return '';
+  return value
+    .toString()
+    .replace(/[٠-٩]/g, (digit) => EASTERN_TO_LATIN_MAP[digit] ?? digit);
+}
+
+export function formatNumber(value, options = {}) {
+  const {
+    minimumFractionDigits = 0,
+    maximumFractionDigits = 2,
+    locale = DEFAULT_NUMBER_LOCALE,
+    digitStyle = 'eastern'
+  } = options;
+
+  const num = ensureNumber(value);
+
+  const formatted = num.toLocaleString(locale, {
+    minimumFractionDigits,
+    maximumFractionDigits
+  });
+
+  return applyDigitStyle(formatted, digitStyle);
+}
+
+export function formatCurrency(value, options = {}) {
+  const {
+    symbol = '',
+    locale = DEFAULT_NUMBER_LOCALE,
+    digitStyle = 'eastern',
+    minimumFractionDigits = 2,
+    maximumFractionDigits = 2,
+    symbolPosition = 'suffix', // 'suffix' | 'prefix'
+    separator = '\u00A0'
+  } = options;
+
+  const number = formatNumber(value, {
+    locale,
+    digitStyle,
+    minimumFractionDigits,
+    maximumFractionDigits
+  });
+
+  if (!symbol) {
+    return number;
+  }
+
+  return symbolPosition === 'prefix'
+    ? `${symbol}${separator}${number}`
+    : `${number}${separator}${symbol}`;
+}
+
+export function formatDate(dateValue, format = 'long', options = {}) {
+  if (!dateValue) return '';
+
+  const { locale = DEFAULT_DATE_LOCALE, digitStyle = 'eastern' } = options;
+  const date = new Date(dateValue);
+
+  const formatOptionsMap = {
+    short: {},
+    long: {
       year: 'numeric',
       month: 'long',
-      day: 'numeric',
-    });
-  }
-
-  if (format === 'time') {
-    return date.toLocaleTimeString('ar-SA', {
+      day: 'numeric'
+    },
+    time: {
       hour: '2-digit',
-      minute: '2-digit',
-    });
-  }
+      minute: '2-digit'
+    },
+    datetime: null
+  };
 
   if (format === 'datetime') {
-    return `${formatDate(dateString, 'long')} ${formatDate(dateString, 'time')}`;
+    const dayPart = formatDate(dateValue, 'long', { locale, digitStyle });
+    const timePart = formatDate(dateValue, 'time', { locale, digitStyle });
+    return `${dayPart} ${timePart}`.trim();
   }
 
-  return dateString;
+  const formatOptions = formatOptionsMap[format] ?? formatOptionsMap.long;
+  const formatted = date.toLocaleString(locale, formatOptions);
+
+  return applyDigitStyle(formatted, digitStyle);
 }
 
-/**
- * Format percentage
- */
-export function formatPercentage(value, decimals = 1) {
-  const num = Number(value ?? 0);
-  return `${num.toFixed(decimals)}%`;
+export function formatPercentage(value, options = {}) {
+  const {
+    digitStyle = 'eastern',
+    locale = DEFAULT_NUMBER_LOCALE,
+    minimumFractionDigits = 1,
+    maximumFractionDigits = 1
+  } = options;
+
+  const num = ensureNumber(value);
+  const formatted = `${formatNumber(num, {
+    locale,
+    digitStyle,
+    minimumFractionDigits,
+    maximumFractionDigits
+  })}%`;
+
+  return formatted;
 }
 
-/**
- * Format phone number
- */
-export function formatPhone(phone) {
+export function formatPhone(phone, options = {}) {
   if (!phone) return '';
 
-  // Remove all non-digits
-  const digits = phone.replace(/\D/g, '');
+  const { digitStyle = 'eastern', separator = ' ' } = options;
+  const digitsOnly = toLatinDigits(phone).replace(/\D/g, '');
 
-  // Format based on length
-  if (digits.length === 10) {
-    return digits.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+  if (!digitsOnly) return phone;
+
+  const grouped =
+    digitsOnly.length === 10
+      ? digitsOnly.replace(/(\d{3})(\d{3})(\d{4})/, `$1${separator}$2${separator}$3`)
+      : digitsOnly.replace(/(\d{4})(?=\d)/g, `$1${separator}`);
+
+  return applyDigitStyle(grouped, digitStyle);
+}
+
+export function formatFileSize(bytes, options = {}) {
+  const { digitStyle = 'eastern', locale = DEFAULT_NUMBER_LOCALE } = options;
+
+  if (!bytes || bytes === 0) {
+    return applyDigitStyle('0 بايت', digitStyle);
   }
 
-  return phone;
-}
-
-/**
- * Format file size
- */
-export function formatFileSize(bytes) {
-  if (bytes === 0) return '0 Bytes';
-
   const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const units = ['بايت', 'ك.ب', 'م.ب', 'ج.ب', 'ت.ب'];
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), units.length - 1);
+  const size = bytes / Math.pow(k, index);
 
-  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+  const formattedSize = formatNumber(size, {
+    locale,
+    digitStyle,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: size >= 10 ? 1 : 2
+  });
+
+  return `${formattedSize} ${units[index]}`;
 }
 
-/**
- * Format relative time (e.g., "2 hours ago")
- */
-export function formatRelativeTime(dateString) {
-  if (!dateString) return '';
+export function formatRelativeTime(dateValue, options = {}) {
+  if (!dateValue) return '';
 
-  const date = new Date(dateString);
+  const { digitStyle = 'eastern', locale = DEFAULT_NUMBER_LOCALE } = options;
+  const date = new Date(dateValue);
   const now = new Date();
-  const diffInSeconds = Math.floor((now - date) / 1000);
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
   if (diffInSeconds < 60) return 'الآن';
-  if (diffInSeconds < 3600) return `منذ ${Math.floor(diffInSeconds / 60)} دقيقة`;
-  if (diffInSeconds < 86400) return `منذ ${Math.floor(diffInSeconds / 3600)} ساعة`;
-  if (diffInSeconds < 2592000) return `منذ ${Math.floor(diffInSeconds / 86400)} يوم`;
-  if (diffInSeconds < 31536000) return `منذ ${Math.floor(diffInSeconds / 2592000)} شهر`;
-  return `منذ ${Math.floor(diffInSeconds / 31536000)} سنة`;
+
+  const minutes = Math.floor(diffInSeconds / 60);
+  if (minutes < 60) {
+    return `منذ ${formatNumber(minutes, { locale, digitStyle })} دقيقة`;
+  }
+
+  const hours = Math.floor(diffInSeconds / 3600);
+  if (hours < 24) {
+    return `منذ ${formatNumber(hours, { locale, digitStyle })} ساعة`;
+  }
+
+  const days = Math.floor(diffInSeconds / 86400);
+  if (days < 30) {
+    return `منذ ${formatNumber(days, { locale, digitStyle })} يوم`;
+  }
+
+  const months = Math.floor(diffInSeconds / 2592000);
+  if (months < 12) {
+    return `منذ ${formatNumber(months, { locale, digitStyle })} شهر`;
+  }
+
+  const years = Math.floor(diffInSeconds / 31536000);
+  return `منذ ${formatNumber(years, { locale, digitStyle })} سنة`;
 }
 
-/**
- * Parse number from formatted string
- */
 export function parseFormattedNumber(formattedValue) {
   if (typeof formattedValue === 'number') return formattedValue;
   if (!formattedValue) return 0;
 
-  return Number(formattedValue.toString().replace(/[^0-9.-]/g, ''));
+  const normalized = toLatinDigits(formattedValue)
+    .replace(/[^\d.-]/g, '')
+    .trim();
+
+  return Number(normalized || 0);
 }
 
-/**
- * Short format for large numbers (e.g., 1.5K, 2.3M)
- */
-export function formatCompact(value) {
-  const num = Number(value ?? 0);
+export function formatCompact(value, options = {}) {
+  const { digitStyle = 'eastern', locale = DEFAULT_NUMBER_LOCALE } = options;
+  const num = ensureNumber(value);
 
-  if (num >= 1000000) {
-    return `${(num / 1000000).toFixed(1)}M`;
+  if (Math.abs(num) >= 1_000_000_000) {
+    const amount = num / 1_000_000_000;
+    return `${formatNumber(amount, {
+      locale,
+      digitStyle,
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1
+    })} مليار`;
   }
 
-  if (num >= 1000) {
-    return `${(num / 1000).toFixed(1)}K`;
+  if (Math.abs(num) >= 1_000_000) {
+    const amount = num / 1_000_000;
+    return `${formatNumber(amount, {
+      locale,
+      digitStyle,
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1
+    })} مليون`;
   }
 
-  return num.toString();
+  if (Math.abs(num) >= 1_000) {
+    const amount = num / 1_000;
+    return `${formatNumber(amount, {
+      locale,
+      digitStyle,
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1
+    })} ألف`;
+  }
+
+  return formatNumber(num, { locale, digitStyle, minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
-/**
- * Truncate text with ellipsis
- */
-export function truncate(text, maxLength = 50) {
+export function truncate(text, maxLength = 50, suffix = '…') {
   if (!text) return '';
   if (text.length <= maxLength) return text;
-  return text.substring(0, maxLength) + '...';
+  return `${text.substring(0, maxLength)}${suffix}`;
 }
+
+/**
+ * Get language-appropriate name from object with name_ar and name_en properties
+ * @param {Object} item - Object with name_ar and name_en properties
+ * @param {string} language - Current language ('ar' or 'en')
+ * @returns {string} - The appropriate name based on language
+ */
+export const getLocalizedName = (item, language = 'ar') => {
+  if (!item) return '';
+  if (language === 'en' && item.name_en) {
+    return item.name_en;
+  }
+  return item.name_ar || item.name_en || '';
+};
+
+export function fmt(value, options = {}) {
+  const num = ensureNumber(value);
+  const {
+    maximumFractionDigits = 2,
+    minimumFractionDigits = 0
+  } = options;
+
+  return num.toLocaleString(undefined, {
+    maximumFractionDigits,
+    minimumFractionDigits
+  });
+}
+
+export const localeHelpers = {
+  DEFAULT_NUMBER_LOCALE,
+  DEFAULT_DATE_LOCALE,
+  applyDigitStyle,
+  ensureNumber
+};
