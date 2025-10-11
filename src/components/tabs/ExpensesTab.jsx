@@ -1,5 +1,5 @@
-// src/components/tabs/ExpensesTab.jsx
-import { useState, useEffect } from 'react';
+﻿// src/components/tabs/ExpensesTab.jsx
+import { useState, useEffect, useMemo } from 'react';
 import {
   Box, Card, CardContent, Grid, TextField, Button, Typography,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -15,8 +15,8 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 
 import UnifiedFormField from '../common/forms/UnifiedFormField';
 import UnifiedFormDialog from '../common/forms/UnifiedFormDialog';
-import UnifiedConfirmDialog from '../common/dialogs/UnifiedConfirmDialog';
-import { confirmationMessages } from '../../theme/designSystem';
+import UnifiedDialog from '../common/dialogs/UnifiedDialog';
+import getConfirmationConfig from '../../utils/dialogs/getConfirmationConfig';
 
 import {
   getAllExpenses,
@@ -121,25 +121,30 @@ export default function ExpensesTab() {
     setConfirmDialog({ ...confirmDialog, open: false });
   };
 
+  const confirmationDialogConfig = useMemo(
+    () => getConfirmationConfig(confirmDialog.type),
+    [confirmDialog.type]
+  );
+
   // ===== Expense Validation =====
   const validateExpenseForm = () => {
     const newErrors = {};
 
     if (!expenseForm.category_id) {
-      newErrors.category_id = 'الفئة مطلوبة';
+      newErrors.category_id = 'Ø§Ù„ÙØ¦Ø© Ù…Ø·Ù„ÙˆØ¨Ø©';
     }
 
     const amount = parseFloat(expenseForm.amount);
     if (!expenseForm.amount || amount <= 0) {
-      newErrors.amount = 'المبلغ يجب أن يكون أكبر من صفر';
+      newErrors.amount = 'Ø§Ù„Ù…Ø¨Ù„Øº ÙŠØ¬Ø¨ Ø£Ù† ÙŠÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±';
     }
 
     if (!expenseForm.description.trim()) {
-      newErrors.description = 'الوصف مطلوب';
+      newErrors.description = 'Ø§Ù„ÙˆØµÙ Ù…Ø·Ù„ÙˆØ¨';
     }
 
     if (!expenseForm.expense_date) {
-      newErrors.expense_date = 'تاريخ المصروف مطلوب';
+      newErrors.expense_date = 'ØªØ§Ø±ÙŠØ® Ø§Ù„Ù…ØµØ±ÙˆÙ Ù…Ø·Ù„ÙˆØ¨';
     }
 
     setErrors(newErrors);
@@ -207,15 +212,15 @@ export default function ExpensesTab() {
       }
 
       if (result.success) {
-        setSuccess(selectedExpense ? 'تم تحديث المصروف بنجاح' : 'تم إضافة المصروف بنجاح');
+        setSuccess(selectedExpense ? 'ØªÙ… ØªØ­Ø¯ÙŠØ« Ø§Ù„Ù…ØµØ±ÙˆÙ Ø¨Ù†Ø¬Ø§Ø­' : 'ØªÙ… Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ù…ØµØ±ÙˆÙ Ø¨Ù†Ø¬Ø§Ø­');
         setTimeout(() => setSuccess(''), 3000);
         handleCloseExpenseDialog();
         loadExpenses(fromDate, toDate);
       } else {
-        setError('فشل الحفظ: ' + result.error);
+        setError('ÙØ´Ù„ Ø§Ù„Ø­ÙØ¸: ' + result.error);
       }
     } catch (err) {
-      setError('حدث خطأ: ' + err.message);
+      setError('Ø­Ø¯Ø« Ø®Ø·Ø£: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -238,14 +243,14 @@ export default function ExpensesTab() {
     try {
       const result = deleteExpense(expenseId);
       if (result.success) {
-        setSuccess('تم حذف المصروف بنجاح');
+        setSuccess('ØªÙ… Ø­Ø°Ù Ø§Ù„Ù…ØµØ±ÙˆÙ Ø¨Ù†Ø¬Ø§Ø­');
         setTimeout(() => setSuccess(''), 2500);
         loadExpenses(fromDate, toDate);
       } else {
-        setError('فشل الحذف: ' + result.error);
+        setError('ÙØ´Ù„ Ø§Ù„Ø­Ø°Ù: ' + result.error);
       }
     } catch (err) {
-      setError('حدث خطأ: ' + err.message);
+      setError('Ø­Ø¯Ø« Ø®Ø·Ø£: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -260,7 +265,7 @@ export default function ExpensesTab() {
     const newErrors = {};
 
     if (!categoryForm.name_ar.trim()) {
-      newErrors.name_ar = 'اسم الفئة بالعربي مطلوب';
+      newErrors.name_ar = 'Ø§Ø³Ù… Ø§Ù„ÙØ¦Ø© Ø¨Ø§Ù„Ø¹Ø±Ø¨ÙŠ Ù…Ø·Ù„ÙˆØ¨';
     }
 
     setCategoryErrors(newErrors);
@@ -320,15 +325,15 @@ export default function ExpensesTab() {
       }
 
       if (result.success) {
-        setSuccess(selectedCategory ? 'تم تحديث الفئة بنجاح' : 'تم إضافة الفئة بنجاح');
+        setSuccess(selectedCategory ? 'ØªÙ… ØªØ­Ø¯ÙŠØ« Ø§Ù„ÙØ¦Ø© Ø¨Ù†Ø¬Ø§Ø­' : 'ØªÙ… Ø¥Ø¶Ø§ÙØ© Ø§Ù„ÙØ¦Ø© Ø¨Ù†Ø¬Ø§Ø­');
         setTimeout(() => setSuccess(''), 3000);
         handleCloseCategoryDialog();
         loadData();
       } else {
-        setError('فشل الحفظ: ' + result.error);
+        setError('ÙØ´Ù„ Ø§Ù„Ø­ÙØ¸: ' + result.error);
       }
     } catch (err) {
-      setError('حدث خطأ: ' + err.message);
+      setError('Ø­Ø¯Ø« Ø®Ø·Ø£: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -353,10 +358,10 @@ export default function ExpensesTab() {
     <Box>
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" fontWeight={700} gutterBottom>
-          إدارة المصروفات
+          Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ù…ØµØ±ÙˆÙØ§Øª
         </Typography>
         <Typography variant="body1" color="text.secondary" fontSize="1.0625rem">
-          تسجيل وإدارة مصروفات الشركة
+          ØªØ³Ø¬ÙŠÙ„ ÙˆØ¥Ø¯Ø§Ø±Ø© Ù…ØµØ±ÙˆÙØ§Øª Ø§Ù„Ø´Ø±ÙƒØ©
         </Typography>
       </Box>
 
@@ -367,12 +372,12 @@ export default function ExpensesTab() {
         <Tab
           icon={<ReceiptLongIcon />}
           iconPosition="start"
-          label={<Typography fontSize="1rem" fontWeight={600}>المصروفات</Typography>}
+          label={<Typography fontSize="1rem" fontWeight={600}>Ø§Ù„Ù…ØµØ±ÙˆÙØ§Øª</Typography>}
         />
         <Tab
           icon={<CategoryIcon />}
           iconPosition="start"
-          label={<Typography fontSize="1rem" fontWeight={600}>الفئات</Typography>}
+          label={<Typography fontSize="1rem" fontWeight={600}>Ø§Ù„ÙØ¦Ø§Øª</Typography>}
         />
       </Tabs>
 
@@ -387,13 +392,13 @@ export default function ExpensesTab() {
               </Grid>
               <Grid item xs>
                 <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)' }} fontSize="1rem">
-                  إجمالي المصروفات
+                  Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…ØµØ±ÙˆÙØ§Øª
                 </Typography>
                 <Typography variant="h4" fontWeight={700} sx={{ color: 'white' }}>
                   {fmt(totalExpenses)} {baseCurrencyInfo.symbol}
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>
-                  من {fromDate} إلى {toDate}
+                  Ù…Ù† {fromDate} Ø¥Ù„Ù‰ {toDate}
                 </Typography>
               </Grid>
             </Grid>
@@ -408,7 +413,7 @@ export default function ExpensesTab() {
                 <TextField
                   fullWidth
                   type="date"
-                  label="من تاريخ"
+                  label="Ù…Ù† ØªØ§Ø±ÙŠØ®"
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
                   InputLabelProps={{ shrink: true }}
@@ -418,7 +423,7 @@ export default function ExpensesTab() {
                 <TextField
                   fullWidth
                   type="date"
-                  label="إلى تاريخ"
+                  label="Ø¥Ù„Ù‰ ØªØ§Ø±ÙŠØ®"
                   value={toDate}
                   onChange={(e) => setToDate(e.target.value)}
                   InputLabelProps={{ shrink: true }}
@@ -431,7 +436,7 @@ export default function ExpensesTab() {
                   size="large"
                   onClick={handleFilterExpenses}
                 >
-                  تطبيق الفلتر
+                  ØªØ·Ø¨ÙŠÙ‚ Ø§Ù„ÙÙ„ØªØ±
                 </Button>
               </Grid>
               <Grid item xs={12} md={3}>
@@ -443,7 +448,7 @@ export default function ExpensesTab() {
                   onClick={() => handleOpenExpenseDialog()}
                   sx={{ fontWeight: 700 }}
                 >
-                  إضافة مصروف
+                  Ø¥Ø¶Ø§ÙØ© Ù…ØµØ±ÙˆÙ
                 </Button>
               </Grid>
             </Grid>
@@ -455,20 +460,20 @@ export default function ExpensesTab() {
           <Table>
             <TableHead sx={{ bgcolor: 'grey.100' }}>
               <TableRow>
-                <TableCell><Typography fontWeight={700} fontSize="1rem">التاريخ</Typography></TableCell>
-                <TableCell><Typography fontWeight={700} fontSize="1rem">الفئة</Typography></TableCell>
-                <TableCell><Typography fontWeight={700} fontSize="1rem">الوصف</Typography></TableCell>
-                <TableCell align="right"><Typography fontWeight={700} fontSize="1rem">المبلغ</Typography></TableCell>
-                <TableCell><Typography fontWeight={700} fontSize="1rem">ملاحظات</Typography></TableCell>
-                <TableCell><Typography fontWeight={700} fontSize="1rem">أضيفت بواسطة</Typography></TableCell>
-                <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">إجراءات</Typography></TableCell>
+                <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„ØªØ§Ø±ÙŠØ®</Typography></TableCell>
+                <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„ÙØ¦Ø©</Typography></TableCell>
+                <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„ÙˆØµÙ</Typography></TableCell>
+                <TableCell align="right"><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ù…Ø¨Ù„Øº</Typography></TableCell>
+                <TableCell><Typography fontWeight={700} fontSize="1rem">Ù…Ù„Ø§Ø­Ø¸Ø§Øª</Typography></TableCell>
+                <TableCell><Typography fontWeight={700} fontSize="1rem">Ø£Ø¶ÙŠÙØª Ø¨ÙˆØ§Ø³Ø·Ø©</Typography></TableCell>
+                <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª</Typography></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {expenses.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} align="center">
-                    <Typography color="text.secondary" py={3} fontSize="1rem">لا توجد مصروفات</Typography>
+                    <Typography color="text.secondary" py={3} fontSize="1rem">Ù„Ø§ ØªÙˆØ¬Ø¯ Ù…ØµØ±ÙˆÙØ§Øª</Typography>
                   </TableCell>
                 </TableRow>
               ) : (
@@ -500,12 +505,12 @@ export default function ExpensesTab() {
                       </Typography>
                     </TableCell>
                     <TableCell align="center">
-                      <Tooltip title="تعديل">
+                      <Tooltip title="ØªØ¹Ø¯ÙŠÙ„">
                         <IconButton size="small" color="primary" onClick={() => handleOpenExpenseDialog(expense)}>
                           <EditIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title="حذف">
+                      <Tooltip title="Ø­Ø°Ù">
                         <IconButton size="small" color="error" onClick={() => handleDeleteExpense(expense.id)}>
                           <DeleteIcon fontSize="small" />
                         </IconButton>
@@ -529,7 +534,7 @@ export default function ExpensesTab() {
             onClick={() => handleOpenCategoryDialog()}
             sx={{ fontWeight: 700 }}
           >
-            إضافة فئة جديدة
+            Ø¥Ø¶Ø§ÙØ© ÙØ¦Ø© Ø¬Ø¯ÙŠØ¯Ø©
           </Button>
         </Box>
 
@@ -550,7 +555,7 @@ export default function ExpensesTab() {
                       )}
                     </Box>
                     <Chip
-                      label={category.is_active ? 'مفعّل' : 'موقوف'}
+                      label={category.is_active ? 'Ù…ÙØ¹Ù‘Ù„' : 'Ù…ÙˆÙ‚ÙˆÙ'}
                       color={category.is_active ? 'success' : 'default'}
                       size="small"
                     />
@@ -564,7 +569,7 @@ export default function ExpensesTab() {
                       startIcon={<EditIcon />}
                       onClick={() => handleOpenCategoryDialog(category)}
                     >
-                      تعديل
+                      ØªØ¹Ø¯ÙŠÙ„
                     </Button>
                   </Box>
                 </CardContent>
@@ -579,15 +584,15 @@ export default function ExpensesTab() {
         open={openExpenseDialog}
         onClose={handleCloseExpenseDialog}
         onSubmit={handleExpenseFormSubmit}
-        title={selectedExpense ? 'تعديل مصروف' : 'إضافة مصروف جديد'}
-        subtitle="أدخل البيانات المطلوبة أدناه"
-        submitText={selectedExpense ? 'تحديث' : 'حفظ'}
+        title={selectedExpense ? 'ØªØ¹Ø¯ÙŠÙ„ Ù…ØµØ±ÙˆÙ' : 'Ø¥Ø¶Ø§ÙØ© Ù…ØµØ±ÙˆÙ Ø¬Ø¯ÙŠØ¯'}
+        subtitle="Ø£Ø¯Ø®Ù„ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø·Ù„ÙˆØ¨Ø© Ø£Ø¯Ù†Ø§Ù‡"
+        submitText={selectedExpense ? 'ØªØ­Ø¯ÙŠØ«' : 'Ø­ÙØ¸'}
         loading={loading}
       >
         <Grid container spacing={2}>
           <Grid item xs={12} md={6}>
             <UnifiedFormField
-              label="الفئة"
+              label="Ø§Ù„ÙØ¦Ø©"
               value={expenseForm.category_id}
               onChange={handleExpenseInputChange}
               name="category_id"
@@ -595,7 +600,7 @@ export default function ExpensesTab() {
               required
               error={errors.category_id}
             >
-              <MenuItem value="">-- اختر الفئة --</MenuItem>
+              <MenuItem value="">-- Ø§Ø®ØªØ± Ø§Ù„ÙØ¦Ø© --</MenuItem>
               {categories.filter(c => c.is_active).map((cat) => (
                 <MenuItem key={cat.id} value={cat.id}>{cat.name_ar}</MenuItem>
               ))}
@@ -603,7 +608,7 @@ export default function ExpensesTab() {
           </Grid>
           <Grid item xs={12} md={6}>
             <UnifiedFormField
-              label="المبلغ"
+              label="Ø§Ù„Ù…Ø¨Ù„Øº"
               value={expenseForm.amount}
               onChange={handleExpenseInputChange}
               name="amount"
@@ -618,7 +623,7 @@ export default function ExpensesTab() {
           </Grid>
           <Grid item xs={12}>
             <UnifiedFormField
-              label="الوصف"
+              label="Ø§Ù„ÙˆØµÙ"
               value={expenseForm.description}
               onChange={handleExpenseInputChange}
               name="description"
@@ -629,7 +634,7 @@ export default function ExpensesTab() {
           </Grid>
           <Grid item xs={12} md={6}>
             <UnifiedFormField
-              label="تاريخ المصروف"
+              label="ØªØ§Ø±ÙŠØ® Ø§Ù„Ù…ØµØ±ÙˆÙ"
               value={expenseForm.expense_date}
               onChange={handleExpenseInputChange}
               name="expense_date"
@@ -640,7 +645,7 @@ export default function ExpensesTab() {
           </Grid>
           <Grid item xs={12}>
             <UnifiedFormField
-              label="ملاحظات"
+              label="Ù…Ù„Ø§Ø­Ø¸Ø§Øª"
               value={expenseForm.notes}
               onChange={handleExpenseInputChange}
               name="notes"
@@ -656,16 +661,16 @@ export default function ExpensesTab() {
         open={openCategoryDialog}
         onClose={handleCloseCategoryDialog}
         onSubmit={handleCategoryFormSubmit}
-        title={selectedCategory ? 'تعديل فئة' : 'إضافة فئة جديدة'}
-        subtitle="أدخل البيانات المطلوبة أدناه"
-        submitText={selectedCategory ? 'تحديث' : 'حفظ'}
+        title={selectedCategory ? 'ØªØ¹Ø¯ÙŠÙ„ ÙØ¦Ø©' : 'Ø¥Ø¶Ø§ÙØ© ÙØ¦Ø© Ø¬Ø¯ÙŠØ¯Ø©'}
+        subtitle="Ø£Ø¯Ø®Ù„ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ø·Ù„ÙˆØ¨Ø© Ø£Ø¯Ù†Ø§Ù‡"
+        submitText={selectedCategory ? 'ØªØ­Ø¯ÙŠØ«' : 'Ø­ÙØ¸'}
         loading={loading}
         maxWidth="sm"
       >
         <Grid container spacing={2}>
           <Grid item xs={12}>
             <UnifiedFormField
-              label="اسم الفئة (عربي)"
+              label="Ø§Ø³Ù… Ø§Ù„ÙØ¦Ø© (Ø¹Ø±Ø¨ÙŠ)"
               value={categoryForm.name_ar}
               onChange={handleCategoryInputChange}
               name="name_ar"
@@ -676,18 +681,18 @@ export default function ExpensesTab() {
           </Grid>
           <Grid item xs={12}>
             <UnifiedFormField
-              label="اسم الفئة (إنجليزي)"
+              label="Ø§Ø³Ù… Ø§Ù„ÙØ¦Ø© (Ø¥Ù†Ø¬Ù„ÙŠØ²ÙŠ)"
               value={categoryForm.name_en}
               onChange={handleCategoryInputChange}
               name="name_en"
-              helperText="اختياري"
+              helperText="Ø§Ø®ØªÙŠØ§Ø±ÙŠ"
             />
           </Grid>
           <Grid item xs={12}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Typography fontSize="1rem">الحالة:</Typography>
+              <Typography fontSize="1rem">Ø§Ù„Ø­Ø§Ù„Ø©:</Typography>
               <Chip
-                label={categoryForm.is_active ? 'مفعّل' : 'موقوف'}
+                label={categoryForm.is_active ? 'Ù…ÙØ¹Ù‘Ù„' : 'Ù…ÙˆÙ‚ÙˆÙ'}
                 color={categoryForm.is_active ? 'success' : 'default'}
                 onClick={() => setCategoryForm({ ...categoryForm, is_active: !categoryForm.is_active })}
                 sx={{ cursor: 'pointer' }}
@@ -698,15 +703,31 @@ export default function ExpensesTab() {
       </UnifiedFormDialog>
 
       {/* Confirmation Dialog */}
-      <UnifiedConfirmDialog
+      <UnifiedDialog
         open={confirmDialog.open}
         onClose={closeConfirm}
-        onConfirm={async () => {
-          await confirmDialog.action();
-          closeConfirm();
+        variant={confirmationDialogConfig.variant}
+        title={confirmationDialogConfig.title}
+        description={confirmationDialogConfig.description}
+        primaryAction={{
+          label: confirmationDialogConfig.primaryLabel,
+          color: confirmationDialogConfig.primaryColor,
+          loading,
+          onClick: async () => {
+            if (confirmDialog.action) {
+              await confirmDialog.action();
+            }
+            closeConfirm();
+          }
         }}
-        {...confirmationMessages[confirmDialog.type]}
-        loading={loading}
+        secondaryAction={{
+          label: confirmationDialogConfig.secondaryLabel,
+          onClick: closeConfirm
+        }}
+        allowBackdropClose={confirmationDialogConfig.allowBackdropClose}
+        allowEscapeClose={confirmationDialogConfig.allowEscapeClose}
+        requireAcknowledgement={confirmationDialogConfig.requireAcknowledgement}
+        acknowledgementLabel={confirmationDialogConfig.acknowledgementLabel}
       />
     </Box>
   );

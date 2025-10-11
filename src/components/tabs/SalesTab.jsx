@@ -1,4 +1,4 @@
-// src/components/tabs/SalesTab.jsx
+﻿// src/components/tabs/SalesTab.jsx
 import { useState, useEffect, useMemo } from 'react';
 import {
   Box, Card, CardContent, Grid, TextField, Button, Typography,
@@ -16,10 +16,9 @@ import DeleteIcon from '@mui/icons-material/Delete';
 
 import UnifiedFormField from '../common/forms/UnifiedFormField';
 import UnifiedFormDialog from '../common/forms/UnifiedFormDialog';
-import UnifiedConfirmDialog from '../common/dialogs/UnifiedConfirmDialog';
+import UnifiedDialog from '../common/dialogs/UnifiedDialog';
 import PrintConfirmDialog from '../common/print/PrintConfirmDialog';
 import PrintButtons from '../common/print/PrintButtons';
-import { confirmationMessages } from '../../theme/designSystem';
 
 import { usePrint } from '../../hooks/usePrint';
 import { generateInvoicePDF } from '../../utils/pdf/templates/invoicePDF';
@@ -35,7 +34,7 @@ import { safeText, safeNotes, safeDescription } from '../../utils/displayHelpers
 import { SalesTable, SaleItemsForm, RemnantCreationDialog } from '../sales';
 
 const fmt = (n) => Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
-const STEPS = ['معلومات الفاتورة', 'الأصناف', 'الإجماليات والدفع'];
+const STEPS = ['Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„ÙØ§ØªÙˆØ±Ø©', 'Ø§Ù„Ø£ØµÙ†Ø§Ù', 'Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠØ§Øª ÙˆØ§Ù„Ø¯ÙØ¹'];
 
 export default function SalesTab() {
   // Data
@@ -131,6 +130,11 @@ export default function SalesTab() {
     setConfirmDialog({ ...confirmDialog, open: false });
   };
 
+  const confirmationDialogConfig = useMemo(
+    () => getConfirmationConfig(confirmDialog.type),
+    [confirmDialog.type]
+  );
+
   const loadData = () => {
     setSales(getAllSales());
     setCustomers(getCustomers());
@@ -151,30 +155,30 @@ export default function SalesTab() {
     setSaleCurrency(currInfo.code);
   };
 
-  // ─────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Validation
   const validateSaleForm = () => {
     const newErrors = {};
 
     // Step 0: Basic info validation
     if (!customerId) {
-      newErrors.customer_id = 'يجب اختيار زبون';
+      newErrors.customer_id = 'ÙŠØ¬Ø¨ Ø§Ø®ØªÙŠØ§Ø± Ø²Ø¨ÙˆÙ†';
     }
 
     if (!saleDate) {
-      newErrors.sale_date = 'تاريخ البيع مطلوب';
+      newErrors.sale_date = 'ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¨ÙŠØ¹ Ù…Ø·Ù„ÙˆØ¨';
     }
 
     // Step 1: Items validation
     if (items.length === 0) {
-      newErrors.items = 'يجب إضافة صنف واحد على الأقل';
+      newErrors.items = 'ÙŠØ¬Ø¨ Ø¥Ø¶Ø§ÙØ© ØµÙ†Ù ÙˆØ§Ø­Ø¯ Ø¹Ù„Ù‰ Ø§Ù„Ø£Ù‚Ù„';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // ─────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Create Invoice Dialog
   const handleOpenCreateDialog = () => {
     setInvoiceNumber(generateInvoiceNumber());
@@ -201,14 +205,14 @@ export default function SalesTab() {
     const newErrors = {};
 
     if (activeStep === 0 && !customerId) {
-      newErrors.customer_id = 'يجب اختيار زبون';
+      newErrors.customer_id = 'ÙŠØ¬Ø¨ Ø§Ø®ØªÙŠØ§Ø± Ø²Ø¨ÙˆÙ†';
       setErrors(newErrors);
       return;
     }
     if (activeStep === 1 && items.length === 0) {
-      newErrors.items = 'يجب إضافة صنف واحد على الأقل';
+      newErrors.items = 'ÙŠØ¬Ø¨ Ø¥Ø¶Ø§ÙØ© ØµÙ†Ù ÙˆØ§Ø­Ø¯ Ø¹Ù„Ù‰ Ø§Ù„Ø£Ù‚Ù„';
       setErrors(newErrors);
-      setError('يجب إضافة صنف واحد على الأقل');
+      setError('ÙŠØ¬Ø¨ Ø¥Ø¶Ø§ÙØ© ØµÙ†Ù ÙˆØ§Ø­Ø¯ Ø¹Ù„Ù‰ Ø§Ù„Ø£Ù‚Ù„');
       return;
     }
     setError('');
@@ -221,7 +225,7 @@ export default function SalesTab() {
     setActiveStep((prev) => prev - 1);
   };
 
-  // ─────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Add Item
   const resetItemForm = () => {
     setSelectedSheet(null);
@@ -243,12 +247,12 @@ export default function SalesTab() {
     if (itemType === 'material') {
       // Full Sheet Sale
       if (saleType === 'full_sheet') {
-        if (!selectedSheet) return setError('يجب اختيار صفيحة');
+        if (!selectedSheet) return setError('ÙŠØ¬Ø¨ Ø§Ø®ØªÙŠØ§Ø± ØµÙÙŠØ­Ø©');
         const qty = parseInt(itemQuantity, 10);
-        if (!qty || qty <= 0) return setError('الكمية يجب أن تكون أكبر من صفر');
-        if (qty > selectedSheet.total_quantity) return setError(`الكمية المتاحة فقط ${selectedSheet.total_quantity}`);
+        if (!qty || qty <= 0) return setError('Ø§Ù„ÙƒÙ…ÙŠØ© ÙŠØ¬Ø¨ Ø£Ù† ØªÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±');
+        if (qty > selectedSheet.total_quantity) return setError(`Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ù…ØªØ§Ø­Ø© ÙÙ‚Ø· ${selectedSheet.total_quantity}`);
         const price = parseFloat(itemPrice);
-        if (!price || price <= 0) return setError('السعر يجب أن يكون أكبر من صفر');
+        if (!price || price <= 0) return setError('Ø§Ù„Ø³Ø¹Ø± ÙŠØ¬Ø¨ Ø£Ù† ÙŠÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±');
 
         setItems((prev) => [
           ...prev,
@@ -258,7 +262,7 @@ export default function SalesTab() {
             sheet_id: selectedSheet.id,
             code: selectedSheet.code,
             metal_name: selectedSheet.metal_name,
-            dimensions: `${selectedSheet.length_mm}×${selectedSheet.width_mm}×${selectedSheet.thickness_mm}`,
+            dimensions: `${selectedSheet.length_mm}Ã—${selectedSheet.width_mm}Ã—${selectedSheet.thickness_mm}`,
             quantity: qty,
             unit_price: price,
             total: qty * price
@@ -267,12 +271,12 @@ export default function SalesTab() {
       }
       // Remnant from Stock Sale
       else if (saleType === 'remnant_from_stock') {
-        if (!selectedRemnant) return setError('يجب اختيار البقية');
+        if (!selectedRemnant) return setError('ÙŠØ¬Ø¨ Ø§Ø®ØªÙŠØ§Ø± Ø§Ù„Ø¨Ù‚ÙŠØ©');
         const qty = parseInt(itemQuantity, 10);
-        if (!qty || qty <= 0) return setError('الكمية يجب أن تكون أكبر من صفر');
-        if (qty > selectedRemnant.total_quantity) return setError(`الكمية المتاحة فقط ${selectedRemnant.total_quantity}`);
+        if (!qty || qty <= 0) return setError('Ø§Ù„ÙƒÙ…ÙŠØ© ÙŠØ¬Ø¨ Ø£Ù† ØªÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±');
+        if (qty > selectedRemnant.total_quantity) return setError(`Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ù…ØªØ§Ø­Ø© ÙÙ‚Ø· ${selectedRemnant.total_quantity}`);
         const price = parseFloat(itemPrice);
-        if (!price || price <= 0) return setError('السعر يجب أن يكون أكبر من صفر');
+        if (!price || price <= 0) return setError('Ø§Ù„Ø³Ø¹Ø± ÙŠØ¬Ø¨ Ø£Ù† ÙŠÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±');
 
         setItems((prev) => [
           ...prev,
@@ -282,7 +286,7 @@ export default function SalesTab() {
             sheet_id: selectedRemnant.id,
             code: selectedRemnant.code,
             metal_name: selectedRemnant.metal_name,
-            dimensions: `${selectedRemnant.length_mm}×${selectedRemnant.width_mm}×${selectedRemnant.thickness_mm}`,
+            dimensions: `${selectedRemnant.length_mm}Ã—${selectedRemnant.width_mm}Ã—${selectedRemnant.thickness_mm}`,
             quantity: qty,
             unit_price: price,
             total: qty * price
@@ -291,23 +295,23 @@ export default function SalesTab() {
       }
       // Cut from Sheet Sale
       else if (saleType === 'cut_from_sheet') {
-        if (!selectedSheet) return setError('يجب اختيار الصفيحة الأم');
+        if (!selectedSheet) return setError('ÙŠØ¬Ø¨ Ø§Ø®ØªÙŠØ§Ø± Ø§Ù„ØµÙÙŠØ­Ø© Ø§Ù„Ø£Ù…');
         if (!soldDimensions.length || !soldDimensions.width || !soldDimensions.thickness) {
-          return setError('يجب إدخال جميع الأبعاد');
+          return setError('ÙŠØ¬Ø¨ Ø¥Ø¯Ø®Ø§Ù„ Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø£Ø¨Ø¹Ø§Ø¯');
         }
         const qty = parseInt(itemQuantity, 10);
-        if (!qty || qty <= 0) return setError('الكمية يجب أن تكون أكبر من صفر');
-        if (qty > selectedSheet.total_quantity) return setError(`الكمية المتاحة فقط ${selectedSheet.total_quantity}`);
+        if (!qty || qty <= 0) return setError('Ø§Ù„ÙƒÙ…ÙŠØ© ÙŠØ¬Ø¨ Ø£Ù† ØªÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±');
+        if (qty > selectedSheet.total_quantity) return setError(`Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ù…ØªØ§Ø­Ø© ÙÙ‚Ø· ${selectedSheet.total_quantity}`);
 
         const price = parseFloat(itemPrice);
         const pricePerKg = parseFloat(itemPricePerKg);
 
         if (!price && !pricePerKg) {
-          return setError('يجب إدخال السعر (إما سعر القطعة أو سعر الكيلو)');
+          return setError('ÙŠØ¬Ø¨ Ø¥Ø¯Ø®Ø§Ù„ Ø§Ù„Ø³Ø¹Ø± (Ø¥Ù…Ø§ Ø³Ø¹Ø± Ø§Ù„Ù‚Ø·Ø¹Ø© Ø£Ùˆ Ø³Ø¹Ø± Ø§Ù„ÙƒÙŠÙ„Ùˆ)');
         }
 
         const weight = parseFloat(soldWeight) || 0;
-        const dimString = `${soldDimensions.length}×${soldDimensions.width}×${soldDimensions.thickness}`;
+        const dimString = `${soldDimensions.length}Ã—${soldDimensions.width}Ã—${soldDimensions.thickness}`;
 
         // Calculate final unit price
         let finalUnitPrice = price;
@@ -343,10 +347,10 @@ export default function SalesTab() {
       }
     } else {
       // Service
-      if (!selectedService) return setError('يجب اختيار خدمة');
+      if (!selectedService) return setError('ÙŠØ¬Ø¨ Ø§Ø®ØªÙŠØ§Ø± Ø®Ø¯Ù…Ø©');
       const qty = parseInt(itemQuantity, 10) || 1;
       const price = parseFloat(servicePrice);
-      if (!price || price <= 0) return setError('سعر الخدمة يجب أن يكون أكبر من صفر');
+      if (!price || price <= 0) return setError('Ø³Ø¹Ø± Ø§Ù„Ø®Ø¯Ù…Ø© ÙŠØ¬Ø¨ Ø£Ù† ÙŠÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±');
 
       setItems((prev) => [
         ...prev,
@@ -370,7 +374,7 @@ export default function SalesTab() {
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // ─────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Calculations
   const subtotal = useMemo(() => items.reduce((sum, it) => sum + (it.total || 0), 0), [items]);
   const taxAmount = useMemo(() => {
@@ -388,7 +392,7 @@ export default function SalesTab() {
     return curr?.symbol || code;
   };
 
-  // ─────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Submit
   const handleActualSaveSale = async () => {
     if (!validateSaleForm()) {
@@ -431,7 +435,7 @@ export default function SalesTab() {
 
       const result = processSale(saleData);
       if (result.success) {
-        setSuccess(`تم إنشاء الفاتورة ${result.invoice_number} بنجاح`);
+        setSuccess(`ØªÙ… Ø¥Ù†Ø´Ø§Ø¡ Ø§Ù„ÙØ§ØªÙˆØ±Ø© ${result.invoice_number} Ø¨Ù†Ø¬Ø§Ø­`);
         setTimeout(() => setSuccess(''), 3000);
         handleCloseCreateDialog();
         loadData();
@@ -449,10 +453,10 @@ export default function SalesTab() {
           setShowRemnantDialog(true);
         }
       } else {
-        setError('فشل الحفظ: ' + result.error);
+        setError('ÙØ´Ù„ Ø§Ù„Ø­ÙØ¸: ' + result.error);
       }
     } catch (err) {
-      setError('حدث خطأ: ' + err.message);
+      setError('Ø­Ø¯Ø« Ø®Ø·Ø£: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -460,13 +464,13 @@ export default function SalesTab() {
 
   const handleSubmitSale = () => {
     if (items.length === 0) {
-      setError('يجب إضافة صنف واحد على الأقل');
+      setError('ÙŠØ¬Ø¨ Ø¥Ø¶Ø§ÙØ© ØµÙ†Ù ÙˆØ§Ø­Ø¯ Ø¹Ù„Ù‰ Ø§Ù„Ø£Ù‚Ù„');
       return;
     }
     openConfirm('save', null, handleActualSaveSale);
   };
 
-  // ─────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // View / Delete
   const handleViewSale = (saleId) => {
     const sale = getSaleById(saleId);
@@ -479,14 +483,14 @@ export default function SalesTab() {
     try {
       const result = deleteSale(saleId);
       if (result.success) {
-        setSuccess('تم حذف الفاتورة بنجاح');
+        setSuccess('ØªÙ… Ø­Ø°Ù Ø§Ù„ÙØ§ØªÙˆØ±Ø© Ø¨Ù†Ø¬Ø§Ø­');
         setTimeout(() => setSuccess(''), 2500);
         loadData();
       } else {
-        setError('فشل الحذف: ' + result.error);
+        setError('ÙØ´Ù„ Ø§Ù„Ø­Ø°Ù: ' + result.error);
       }
     } catch (err) {
-      setError('حدث خطأ: ' + err.message);
+      setError('Ø­Ø¯Ø« Ø®Ø·Ø£: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -499,7 +503,7 @@ export default function SalesTab() {
   const getPaymentStatusColor = (status) =>
     status === 'paid' ? 'success' : status === 'partial' ? 'warning' : 'error';
   const getPaymentStatusLabel = (status) =>
-    status === 'paid' ? 'مدفوعة' : status === 'partial' ? 'جزئية' : 'غير مدفوعة';
+    status === 'paid' ? 'Ù…Ø¯ÙÙˆØ¹Ø©' : status === 'partial' ? 'Ø¬Ø²Ø¦ÙŠØ©' : 'ØºÙŠØ± Ù…Ø¯ÙÙˆØ¹Ø©';
 
   const getPriceColor = (price, minPrice) => {
     if (!price || !minPrice) return 'inherit';
@@ -524,8 +528,8 @@ export default function SalesTab() {
     );
 
     requestPrint(docDefinition, {
-      name: `فاتورة ${selectedSale.invoice_number}`,
-      type: 'فاتورة بيع',
+      name: `ÙØ§ØªÙˆØ±Ø© ${selectedSale.invoice_number}`,
+      type: 'ÙØ§ØªÙˆØ±Ø© Ø¨ÙŠØ¹',
       estimatedPages: 1,
       defaultAction: 'print'
     });
@@ -547,22 +551,22 @@ export default function SalesTab() {
     );
 
     requestPrint(docDefinition, {
-      name: `فاتورة ${selectedSale.invoice_number}`,
-      type: 'فاتورة بيع',
+      name: `ÙØ§ØªÙˆØ±Ø© ${selectedSale.invoice_number}`,
+      type: 'ÙØ§ØªÙˆØ±Ø© Ø¨ÙŠØ¹',
       estimatedPages: 1,
       defaultAction: 'pdf'
     });
   };
 
-  // ─────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <Box>
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" fontWeight={700} gutterBottom>
-          إدارة المبيعات
+          Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª
         </Typography>
         <Typography variant="body1" color="text.secondary" fontSize="1.0625rem">
-          إنشاء الفواتير وإدارة المبيعات (معادن + خدمات)
+          Ø¥Ù†Ø´Ø§Ø¡ Ø§Ù„ÙÙˆØ§ØªÙŠØ± ÙˆØ¥Ø¯Ø§Ø±Ø© Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª (Ù…Ø¹Ø§Ø¯Ù† + Ø®Ø¯Ù…Ø§Øª)
         </Typography>
       </Box>
 
@@ -577,7 +581,7 @@ export default function SalesTab() {
           onClick={handleOpenCreateDialog}
           sx={{ fontWeight: 700 }}
         >
-          إنشاء فاتورة جديدة
+          Ø¥Ù†Ø´Ø§Ø¡ ÙØ§ØªÙˆØ±Ø© Ø¬Ø¯ÙŠØ¯Ø©
         </Button>
       </Box>
 
@@ -603,7 +607,7 @@ export default function SalesTab() {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <ShoppingCartIcon color="primary" sx={{ fontSize: 32 }} />
             <Typography variant="h5" fontWeight={700}>
-              إنشاء فاتورة جديدة
+              Ø¥Ù†Ø´Ø§Ø¡ ÙØ§ØªÙˆØ±Ø© Ø¬Ø¯ÙŠØ¯Ø©
             </Typography>
           </Box>
         </DialogTitle>
@@ -622,15 +626,15 @@ export default function SalesTab() {
             <Grid container spacing={2.5}>
               <Grid item xs={12} md={6}>
                 <UnifiedFormField
-                  label="رقم الفاتورة"
+                  label="Ø±Ù‚Ù… Ø§Ù„ÙØ§ØªÙˆØ±Ø©"
                   value={invoiceNumber}
                   InputProps={{ readOnly: true }}
-                  helperText="يتم توليده تلقائياً"
+                  helperText="ÙŠØªÙ… ØªÙˆÙ„ÙŠØ¯Ù‡ ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹"
                 />
               </Grid>
               <Grid item xs={12} md={6}>
                 <UnifiedFormField
-                  label="تاريخ البيع"
+                  label="ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¨ÙŠØ¹"
                   type="date"
                   value={saleDate}
                   onChange={(e) => {
@@ -659,7 +663,7 @@ export default function SalesTab() {
                   renderInput={(params) => (
                     <TextField
                       {...params}
-                      label="الزبون"
+                      label="Ø§Ù„Ø²Ø¨ÙˆÙ†"
                       required
                       error={!!errors.customer_id}
                       helperText={errors.customer_id || ''}
@@ -670,7 +674,7 @@ export default function SalesTab() {
 
               <Grid item xs={12} md={6}>
                 <UnifiedFormField
-                  label="عملة الفاتورة"
+                  label="Ø¹Ù…Ù„Ø© Ø§Ù„ÙØ§ØªÙˆØ±Ø©"
                   value={saleCurrency}
                   onChange={(e) => setSaleCurrency(e.target.value)}
                   name="currency"
@@ -688,13 +692,13 @@ export default function SalesTab() {
 
               <Grid item xs={12}>
                 <UnifiedFormField
-                  label="ملاحظات"
+                  label="Ù…Ù„Ø§Ø­Ø¸Ø§Øª"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   name="notes"
                   multiline
                   rows={2}
-                  helperText="اختياري"
+                  helperText="Ø§Ø®ØªÙŠØ§Ø±ÙŠ"
                 />
               </Grid>
             </Grid>
@@ -707,7 +711,7 @@ export default function SalesTab() {
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
                     <UnifiedFormField
-                      label="نوع الصنف"
+                      label="Ù†ÙˆØ¹ Ø§Ù„ØµÙ†Ù"
                       value={itemType}
                       onChange={(e) => {
                         setItemType(e.target.value);
@@ -717,8 +721,8 @@ export default function SalesTab() {
                       select
                       SelectProps={{ native: true }}
                     >
-                      <option value="material">معدن من المخزون</option>
-                      <option value="service">خدمة</option>
+                      <option value="material">Ù…Ø¹Ø¯Ù† Ù…Ù† Ø§Ù„Ù…Ø®Ø²ÙˆÙ†</option>
+                      <option value="service">Ø®Ø¯Ù…Ø©</option>
                     </UnifiedFormField>
                   </Grid>
 
@@ -726,7 +730,7 @@ export default function SalesTab() {
                   {itemType === 'material' && (
                     <Grid item xs={12}>
                       <FormLabel component="legend">
-                        <Typography fontWeight={600} fontSize="1rem">نوع البيع</Typography>
+                        <Typography fontWeight={600} fontSize="1rem">Ù†ÙˆØ¹ Ø§Ù„Ø¨ÙŠØ¹</Typography>
                       </FormLabel>
                       <RadioGroup
                         row
@@ -739,17 +743,17 @@ export default function SalesTab() {
                         <FormControlLabel
                           value="full_sheet"
                           control={<Radio />}
-                          label="صفيحة كاملة"
+                          label="ØµÙÙŠØ­Ø© ÙƒØ§Ù…Ù„Ø©"
                         />
                         <FormControlLabel
                           value="remnant_from_stock"
                           control={<Radio />}
-                          label="قطعة من المخزون (بواقي)"
+                          label="Ù‚Ø·Ø¹Ø© Ù…Ù† Ø§Ù„Ù…Ø®Ø²ÙˆÙ† (Ø¨ÙˆØ§Ù‚ÙŠ)"
                         />
                         <FormControlLabel
                           value="cut_from_sheet"
                           control={<Radio />}
-                          label="قص من صفيحة"
+                          label="Ù‚Øµ Ù…Ù† ØµÙÙŠØ­Ø©"
                         />
                       </RadioGroup>
                     </Grid>
@@ -766,24 +770,24 @@ export default function SalesTab() {
                               getOptionLabel={(s) => `${s.code} - ${s.metal_name} (${s.total_quantity})`}
                               value={selectedSheet}
                               onChange={(_e, val) => setSelectedSheet(val)}
-                              renderInput={(params) => <TextField {...params} label="اختر الصفيحة" required />}
+                              renderInput={(params) => <TextField {...params} label="Ø§Ø®ØªØ± Ø§Ù„ØµÙÙŠØ­Ø©" required />}
                             />
                           </Grid>
                           <Grid item xs={12} md={3}>
                             <UnifiedFormField
-                              label="الكمية"
+                              label="Ø§Ù„ÙƒÙ…ÙŠØ©"
                               type="number"
                               value={itemQuantity}
                               onChange={(e) => setItemQuantity(e.target.value)}
                               name="quantity"
                               required
                               inputProps={{ min: 1 }}
-                              helperText={selectedSheet ? `المتاح: ${selectedSheet.total_quantity}` : ' '}
+                              helperText={selectedSheet ? `Ø§Ù„Ù…ØªØ§Ø­: ${selectedSheet.total_quantity}` : ' '}
                             />
                           </Grid>
                           <Grid item xs={12} md={3}>
                             <UnifiedFormField
-                              label="السعر/قطعة"
+                              label="Ø§Ù„Ø³Ø¹Ø±/Ù‚Ø·Ø¹Ø©"
                               type="number"
                               value={itemPrice}
                               onChange={(e) => setItemPrice(e.target.value)}
@@ -805,27 +809,27 @@ export default function SalesTab() {
                           <Grid item xs={12} md={6}>
                             <Autocomplete
                               options={remnants}
-                              getOptionLabel={(r) => `${r.code} - ${r.metal_name} - ${r.length_mm}×${r.width_mm}×${r.thickness_mm} (${r.total_quantity})`}
+                              getOptionLabel={(r) => `${r.code} - ${r.metal_name} - ${r.length_mm}Ã—${r.width_mm}Ã—${r.thickness_mm} (${r.total_quantity})`}
                               value={selectedRemnant}
                               onChange={(_e, val) => setSelectedRemnant(val)}
-                              renderInput={(params) => <TextField {...params} label="اختر البقية" required />}
+                              renderInput={(params) => <TextField {...params} label="Ø§Ø®ØªØ± Ø§Ù„Ø¨Ù‚ÙŠØ©" required />}
                             />
                           </Grid>
                           <Grid item xs={12} md={3}>
                             <UnifiedFormField
-                              label="الكمية"
+                              label="Ø§Ù„ÙƒÙ…ÙŠØ©"
                               type="number"
                               value={itemQuantity}
                               onChange={(e) => setItemQuantity(e.target.value)}
                               name="quantity"
                               required
                               inputProps={{ min: 1 }}
-                              helperText={selectedRemnant ? `المتاح: ${selectedRemnant.total_quantity}` : ' '}
+                              helperText={selectedRemnant ? `Ø§Ù„Ù…ØªØ§Ø­: ${selectedRemnant.total_quantity}` : ' '}
                             />
                           </Grid>
                           <Grid item xs={12} md={3}>
                             <UnifiedFormField
-                              label="السعر/قطعة"
+                              label="Ø§Ù„Ø³Ø¹Ø±/Ù‚Ø·Ø¹Ø©"
                               type="number"
                               value={itemPrice}
                               onChange={(e) => setItemPrice(e.target.value)}
@@ -855,12 +859,12 @@ export default function SalesTab() {
                                   setSoldDimensions(prev => ({ ...prev, thickness: val.thickness_mm }));
                                 }
                               }}
-                              renderInput={(params) => <TextField {...params} label="اختر الصفيحة الأم" required />}
+                              renderInput={(params) => <TextField {...params} label="Ø§Ø®ØªØ± Ø§Ù„ØµÙÙŠØ­Ø© Ø§Ù„Ø£Ù…" required />}
                             />
                           </Grid>
                           <Grid item xs={12} md={2}>
                             <UnifiedFormField
-                              label="الطول (مم)"
+                              label="Ø§Ù„Ø·ÙˆÙ„ (Ù…Ù…)"
                               type="number"
                               value={soldDimensions.length}
                               onChange={(e) => setSoldDimensions(prev => ({ ...prev, length: e.target.value }))}
@@ -871,7 +875,7 @@ export default function SalesTab() {
                           </Grid>
                           <Grid item xs={12} md={2}>
                             <UnifiedFormField
-                              label="العرض (مم)"
+                              label="Ø§Ù„Ø¹Ø±Ø¶ (Ù…Ù…)"
                               type="number"
                               value={soldDimensions.width}
                               onChange={(e) => setSoldDimensions(prev => ({ ...prev, width: e.target.value }))}
@@ -882,7 +886,7 @@ export default function SalesTab() {
                           </Grid>
                           <Grid item xs={12} md={2}>
                             <UnifiedFormField
-                              label="السماكة (مم)"
+                              label="Ø§Ù„Ø³Ù…Ø§ÙƒØ© (Ù…Ù…)"
                               type="number"
                               value={soldDimensions.thickness}
                               onChange={(e) => setSoldDimensions(prev => ({ ...prev, thickness: e.target.value }))}
@@ -890,35 +894,35 @@ export default function SalesTab() {
                               required
                               inputProps={{ min: 0.1, step: 0.1 }}
                               disabled
-                              helperText="من الصفيحة الأم"
+                              helperText="Ù…Ù† Ø§Ù„ØµÙÙŠØ­Ø© Ø§Ù„Ø£Ù…"
                             />
                           </Grid>
                           <Grid item xs={12} md={3}>
                             <UnifiedFormField
-                              label="الكمية"
+                              label="Ø§Ù„ÙƒÙ…ÙŠØ©"
                               type="number"
                               value={itemQuantity}
                               onChange={(e) => setItemQuantity(e.target.value)}
                               name="quantity"
                               required
                               inputProps={{ min: 1 }}
-                              helperText={selectedSheet ? `المتاح: ${selectedSheet.total_quantity}` : ' '}
+                              helperText={selectedSheet ? `Ø§Ù„Ù…ØªØ§Ø­: ${selectedSheet.total_quantity}` : ' '}
                             />
                           </Grid>
                           <Grid item xs={12} md={3}>
                             <UnifiedFormField
-                              label="الوزن (كغ)"
+                              label="Ø§Ù„ÙˆØ²Ù† (ÙƒØº)"
                               type="number"
                               value={soldWeight}
                               onChange={(e) => setSoldWeight(e.target.value)}
                               name="weight"
                               inputProps={{ min: 0, step: 0.001 }}
-                              helperText="اختياري - حساب تلقائي"
+                              helperText="Ø§Ø®ØªÙŠØ§Ø±ÙŠ - Ø­Ø³Ø§Ø¨ ØªÙ„Ù‚Ø§Ø¦ÙŠ"
                             />
                           </Grid>
                           <Grid item xs={12} md={3}>
                             <UnifiedFormField
-                              label="السعر/كغ"
+                              label="Ø§Ù„Ø³Ø¹Ø±/ÙƒØº"
                               type="number"
                               value={itemPricePerKg}
                               onChange={(e) => setItemPricePerKg(e.target.value)}
@@ -932,7 +936,7 @@ export default function SalesTab() {
                           </Grid>
                           <Grid item xs={12} md={3}>
                             <UnifiedFormField
-                              label="السعر/قطعة"
+                              label="Ø§Ù„Ø³Ø¹Ø±/Ù‚Ø·Ø¹Ø©"
                               type="number"
                               value={itemPrice}
                               onChange={(e) => setItemPrice(e.target.value)}
@@ -955,32 +959,32 @@ export default function SalesTab() {
                           getOptionLabel={(s) => s.name_ar}
                           value={selectedService}
                           onChange={(_e, val) => setSelectedService(val)}
-                          renderInput={(params) => <TextField {...params} label="اختر الخدمة" required />}
+                          renderInput={(params) => <TextField {...params} label="Ø§Ø®ØªØ± Ø§Ù„Ø®Ø¯Ù…Ø©" required />}
                         />
                       </Grid>
                       <Grid item xs={12} md={4}>
                         <UnifiedFormField
-                          label="وصف المادة (نوع، أبعاد، كمية)"
+                          label="ÙˆØµÙ Ø§Ù„Ù…Ø§Ø¯Ø© (Ù†ÙˆØ¹ØŒ Ø£Ø¨Ø¹Ø§Ø¯ØŒ ÙƒÙ…ÙŠØ©)"
                           value={materialDescription}
                           onChange={(e) => setMaterialDescription(e.target.value)}
                           name="material_description"
-                          helperText="اختياري - مثال: ستانلس 1000×2000×1.5"
+                          helperText="Ø§Ø®ØªÙŠØ§Ø±ÙŠ - Ù…Ø«Ø§Ù„: Ø³ØªØ§Ù†Ù„Ø³ 1000Ã—2000Ã—1.5"
                         />
                       </Grid>
                       <Grid item xs={12} md={2}>
                         <UnifiedFormField
-                          label="الكمية"
+                          label="Ø§Ù„ÙƒÙ…ÙŠØ©"
                           type="number"
                           value={itemQuantity}
                           onChange={(e) => setItemQuantity(e.target.value)}
                           name="quantity"
                           inputProps={{ min: 1 }}
-                          helperText="افتراضي: 1"
+                          helperText="Ø§ÙØªØ±Ø§Ø¶ÙŠ: 1"
                         />
                       </Grid>
                       <Grid item xs={12} md={2}>
                         <UnifiedFormField
-                          label="سعر الخدمة"
+                          label="Ø³Ø¹Ø± Ø§Ù„Ø®Ø¯Ù…Ø©"
                           type="number"
                           value={servicePrice}
                           onChange={(e) => setServicePrice(e.target.value)}
@@ -994,13 +998,13 @@ export default function SalesTab() {
                       </Grid>
                       <Grid item xs={12}>
                         <UnifiedFormField
-                          label="ملاحظات الخدمة"
+                          label="Ù…Ù„Ø§Ø­Ø¸Ø§Øª Ø§Ù„Ø®Ø¯Ù…Ø©"
                           value={itemNotes}
                           onChange={(e) => setItemNotes(e.target.value)}
                           name="item_notes"
                           multiline
                           rows={2}
-                          helperText="اختياري"
+                          helperText="Ø§Ø®ØªÙŠØ§Ø±ÙŠ"
                         />
                       </Grid>
                     </>
@@ -1008,7 +1012,7 @@ export default function SalesTab() {
 
                   <Grid item xs={12}>
                     <Button variant="contained" size="large" startIcon={<AddIcon />} onClick={handleAddItem}>
-                      إضافة
+                      Ø¥Ø¶Ø§ÙØ©
                     </Button>
                   </Grid>
                 </Grid>
@@ -1019,12 +1023,12 @@ export default function SalesTab() {
                   <Table size="small">
                     <TableHead sx={{ bgcolor: 'grey.100' }}>
                       <TableRow>
-                        <TableCell><Typography fontWeight={700} fontSize="1rem">النوع</Typography></TableCell>
-                        <TableCell><Typography fontWeight={700} fontSize="1rem">الوصف</Typography></TableCell>
-                        <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الكمية</Typography></TableCell>
-                        <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">السعر</Typography></TableCell>
-                        <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الإجمالي</Typography></TableCell>
-                        <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">حذف</Typography></TableCell>
+                        <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ù†ÙˆØ¹</Typography></TableCell>
+                        <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„ÙˆØµÙ</Typography></TableCell>
+                        <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">Ø§Ù„ÙƒÙ…ÙŠØ©</Typography></TableCell>
+                        <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ø³Ø¹Ø±</Typography></TableCell>
+                        <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ</Typography></TableCell>
+                        <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">Ø­Ø°Ù</Typography></TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -1032,7 +1036,7 @@ export default function SalesTab() {
                         <TableRow key={idx} hover>
                           <TableCell>
                             <Chip
-                              label={item.item_type === 'material' ? 'معدن' : 'خدمة'}
+                              label={item.item_type === 'material' ? 'Ù…Ø¹Ø¯Ù†' : 'Ø®Ø¯Ù…Ø©'}
                               color={item.item_type === 'material' ? 'primary' : 'secondary'}
                               size="small"
                             />
@@ -1049,7 +1053,7 @@ export default function SalesTab() {
                               <Typography fontSize="0.9375rem">
                                 {item.service_name}{' '}
                                 <Typography component="span" variant="caption" color="text.secondary">
-                                  {item.material_description ? `– ${item.material_description}` : ''}
+                                  {item.material_description ? `â€“ ${item.material_description}` : ''}
                                 </Typography>
                               </Typography>
                             )}
@@ -1080,7 +1084,7 @@ export default function SalesTab() {
             <Box>
               <Card variant="outlined" sx={{ p: 3, mb: 2, borderRadius: 2 }}>
                 <Grid container spacing={2}>
-                  <Grid item xs={6}><Typography fontSize="1.0625rem">المجموع الفرعي:</Typography></Grid>
+                  <Grid item xs={6}><Typography fontSize="1.0625rem">Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹ Ø§Ù„ÙØ±Ø¹ÙŠ:</Typography></Grid>
                   <Grid item xs={6} sx={{ textAlign: 'left' }}>
                     <Typography fontSize="1.0625rem" fontWeight={600}>
                       {fmt(subtotal)} {getCurrencySymbol(saleCurrency)}
@@ -1089,7 +1093,7 @@ export default function SalesTab() {
 
                   <Grid item xs={12}>
                     <UnifiedFormField
-                      label="الخصم"
+                      label="Ø§Ù„Ø®ØµÙ…"
                       type="number"
                       value={discount}
                       onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
@@ -1098,13 +1102,13 @@ export default function SalesTab() {
                       InputProps={{
                         endAdornment: <InputAdornment position="end">{getCurrencySymbol(saleCurrency)}</InputAdornment>
                       }}
-                      helperText="اختياري"
+                      helperText="Ø§Ø®ØªÙŠØ§Ø±ÙŠ"
                     />
                   </Grid>
 
                   {profile?.vat_enabled && (
                     <>
-                      <Grid item xs={6}><Typography fontSize="1.0625rem">الضريبة ({profile.vat_rate}%):</Typography></Grid>
+                      <Grid item xs={6}><Typography fontSize="1.0625rem">Ø§Ù„Ø¶Ø±ÙŠØ¨Ø© ({profile.vat_rate}%):</Typography></Grid>
                       <Grid item xs={6} sx={{ textAlign: 'left' }}>
                         <Typography fontSize="1.0625rem" fontWeight={600}>
                           {fmt(taxAmount)} {getCurrencySymbol(saleCurrency)}
@@ -1115,7 +1119,7 @@ export default function SalesTab() {
 
                   <Grid item xs={12}><Divider /></Grid>
 
-                  <Grid item xs={6}><Typography variant="h6" fontWeight={700}>الإجمالي النهائي:</Typography></Grid>
+                  <Grid item xs={6}><Typography variant="h6" fontWeight={700}>Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù†Ù‡Ø§Ø¦ÙŠ:</Typography></Grid>
                   <Grid item xs={6} sx={{ textAlign: 'left' }}>
                     <Typography variant="h6" fontWeight={700} color="primary">
                       {fmt(totalAmount)} {getCurrencySymbol(saleCurrency)}
@@ -1126,7 +1130,7 @@ export default function SalesTab() {
 
                   <Grid item xs={12} md={6}>
                     <UnifiedFormField
-                      label="المبلغ المدفوع"
+                      label="Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø¯ÙÙˆØ¹"
                       type="number"
                       value={amountPaid}
                       onChange={(e) => setAmountPaid(parseFloat(e.target.value) || 0)}
@@ -1135,21 +1139,21 @@ export default function SalesTab() {
                       InputProps={{
                         endAdornment: <InputAdornment position="end">{getCurrencySymbol(saleCurrency)}</InputAdornment>
                       }}
-                      helperText="اختياري - صفر = آجل"
+                      helperText="Ø§Ø®ØªÙŠØ§Ø±ÙŠ - ØµÙØ± = Ø¢Ø¬Ù„"
                     />
                   </Grid>
 
                   <Grid item xs={12} md={6}>
                     <UnifiedFormField
-                      label="طريقة الدفع"
+                      label="Ø·Ø±ÙŠÙ‚Ø© Ø§Ù„Ø¯ÙØ¹"
                       value={paymentMethod}
                       onChange={(e) => setPaymentMethod(e.target.value)}
                       name="payment_method"
                       select
                       SelectProps={{ native: true }}
-                      helperText="اختياري"
+                      helperText="Ø§Ø®ØªÙŠØ§Ø±ÙŠ"
                     >
-                      <option value="">غير محدد</option>
+                      <option value="">ØºÙŠØ± Ù…Ø­Ø¯Ø¯</option>
                       {paymentMethods.map((pm) => (
                         <option key={pm.id} value={pm.name}>{pm.name}</option>
                       ))}
@@ -1158,7 +1162,7 @@ export default function SalesTab() {
 
                   {amountPaid > 0 && (
                     <>
-                      <Grid item xs={6}><Typography fontSize="1.0625rem" color="error">المتبقي:</Typography></Grid>
+                      <Grid item xs={6}><Typography fontSize="1.0625rem" color="error">Ø§Ù„Ù…ØªØ¨Ù‚ÙŠ:</Typography></Grid>
                       <Grid item xs={6} sx={{ textAlign: 'left' }}>
                         <Typography fontSize="1.0625rem" fontWeight={700} color="error.main">
                           {fmt(remaining)} {getCurrencySymbol(saleCurrency)}
@@ -1170,18 +1174,18 @@ export default function SalesTab() {
               </Card>
 
               <Alert severity="info" sx={{ fontSize: '0.9375rem' }}>
-                تأكّد من صحة جميع البيانات قبل الحفظ. سيتم خصم الكميات من المخزون تلقائياً.
+                ØªØ£ÙƒÙ‘Ø¯ Ù…Ù† ØµØ­Ø© Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ù‚Ø¨Ù„ Ø§Ù„Ø­ÙØ¸. Ø³ÙŠØªÙ… Ø®ØµÙ… Ø§Ù„ÙƒÙ…ÙŠØ§Øª Ù…Ù† Ø§Ù„Ù…Ø®Ø²ÙˆÙ† ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹.
               </Alert>
             </Box>
           )}
         </DialogContent>
 
         <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button onClick={handleCloseCreateDialog} size="large">إلغاء</Button>
-          {activeStep > 0 && <Button onClick={handleBack} size="large">السابق</Button>}
+          <Button onClick={handleCloseCreateDialog} size="large">Ø¥Ù„ØºØ§Ø¡</Button>
+          {activeStep > 0 && <Button onClick={handleBack} size="large">Ø§Ù„Ø³Ø§Ø¨Ù‚</Button>}
           {activeStep < STEPS.length - 1
-            ? <Button variant="contained" onClick={handleNext} size="large">التالي</Button>
-            : <Button variant="contained" onClick={handleSubmitSale} size="large">حفظ الفاتورة</Button>}
+            ? <Button variant="contained" onClick={handleNext} size="large">Ø§Ù„ØªØ§Ù„ÙŠ</Button>
+            : <Button variant="contained" onClick={handleSubmitSale} size="large">Ø­ÙØ¸ Ø§Ù„ÙØ§ØªÙˆØ±Ø©</Button>}
         </DialogActions>
       </Dialog>
 
@@ -1195,19 +1199,19 @@ export default function SalesTab() {
       >
         <DialogTitle>
           <Typography variant="h5" fontWeight={700}>
-            إضافة البواقي من القطع
+            Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø¨ÙˆØ§Ù‚ÙŠ Ù…Ù† Ø§Ù„Ù‚Ø·Ø¹
           </Typography>
         </DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2 }}>
             <Alert severity="info" sx={{ mb: 3, fontSize: '1rem' }}>
-              تم قص الصفيحة. هل تريد إضافة القطع المتبقية كبواقي؟
+              ØªÙ… Ù‚Øµ Ø§Ù„ØµÙÙŠØ­Ø©. Ù‡Ù„ ØªØ±ÙŠØ¯ Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ù‚Ø·Ø¹ Ø§Ù„Ù…ØªØ¨Ù‚ÙŠØ© ÙƒØ¨ÙˆØ§Ù‚ÙŠØŸ
             </Alert>
 
             {currentSaleData && (
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }} fontSize="0.9375rem">
-                الصفيحة الأم: {currentSaleData.sheetCode} |
-                القطعة المباعة: {currentSaleData.soldDimensions}
+                Ø§Ù„ØµÙÙŠØ­Ø© Ø§Ù„Ø£Ù…: {currentSaleData.sheetCode} |
+                Ø§Ù„Ù‚Ø·Ø¹Ø© Ø§Ù„Ù…Ø¨Ø§Ø¹Ø©: {currentSaleData.soldDimensions}
               </Typography>
             )}
 
@@ -1216,12 +1220,12 @@ export default function SalesTab() {
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
                     <Typography variant="subtitle2" fontWeight={600}>
-                      قطعة بقية #{index + 1}
+                      Ù‚Ø·Ø¹Ø© Ø¨Ù‚ÙŠØ© #{index + 1}
                     </Typography>
                   </Grid>
                   <Grid item xs={4}>
                     <UnifiedFormField
-                      label="الطول (مم)"
+                      label="Ø§Ù„Ø·ÙˆÙ„ (Ù…Ù…)"
                       type="number"
                       value={piece.length}
                       onChange={(e) => {
@@ -1235,7 +1239,7 @@ export default function SalesTab() {
                   </Grid>
                   <Grid item xs={4}>
                     <UnifiedFormField
-                      label="العرض (مم)"
+                      label="Ø§Ù„Ø¹Ø±Ø¶ (Ù…Ù…)"
                       type="number"
                       value={piece.width}
                       onChange={(e) => {
@@ -1249,7 +1253,7 @@ export default function SalesTab() {
                   </Grid>
                   <Grid item xs={4}>
                     <UnifiedFormField
-                      label="الكمية"
+                      label="Ø§Ù„ÙƒÙ…ÙŠØ©"
                       type="number"
                       value={piece.quantity}
                       onChange={(e) => {
@@ -1269,7 +1273,7 @@ export default function SalesTab() {
                         setRemnantPieces(remnantPieces.filter((_, i) => i !== index));
                       }}
                     >
-                      حذف هذه القطعة
+                      Ø­Ø°Ù Ù‡Ø°Ù‡ Ø§Ù„Ù‚Ø·Ø¹Ø©
                     </Button>
                   </Grid>
                 </Grid>
@@ -1292,13 +1296,13 @@ export default function SalesTab() {
               }}
               sx={{ mb: 2 }}
             >
-              إضافة قطعة أخرى
+              Ø¥Ø¶Ø§ÙØ© Ù‚Ø·Ø¹Ø© Ø£Ø®Ø±Ù‰
             </Button>
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3 }}>
           <Button onClick={() => setShowRemnantDialog(false)} size="large">
-            تخطي
+            ØªØ®Ø·ÙŠ
           </Button>
           <Button
             onClick={async () => {
@@ -1309,14 +1313,14 @@ export default function SalesTab() {
                 );
 
                 if (validPieces.length === 0) {
-                  setError('يجب إدخال بيانات صحيحة للبواقي');
+                  setError('ÙŠØ¬Ø¨ Ø¥Ø¯Ø®Ø§Ù„ Ø¨ÙŠØ§Ù†Ø§Øª ØµØ­ÙŠØ­Ø© Ù„Ù„Ø¨ÙˆØ§Ù‚ÙŠ');
                   return;
                 }
 
                 // Get parent sheet info
                 const parentSheet = sheets.find(s => s.id === currentSaleData?.sheetId);
                 if (!parentSheet) {
-                  setError('لم يتم العثور على الصفيحة الأم');
+                  setError('Ù„Ù… ÙŠØªÙ… Ø§Ù„Ø¹Ø«ÙˆØ± Ø¹Ù„Ù‰ Ø§Ù„ØµÙÙŠØ­Ø© Ø§Ù„Ø£Ù…');
                   return;
                 }
 
@@ -1343,9 +1347,9 @@ export default function SalesTab() {
                     supplier_id: null,
                     price_per_kg: parentSheet.min_price || 0,
                     total_cost: 0,
-                    storage_location: 'بواقي',
+                    storage_location: 'Ø¨ÙˆØ§Ù‚ÙŠ',
                     received_date: new Date().toISOString().split('T')[0],
-                    notes: `بقية من ${currentSaleData.sheetCode} - القطعة المباعة: ${currentSaleData.soldDimensions}`
+                    notes: `Ø¨Ù‚ÙŠØ© Ù…Ù† ${currentSaleData.sheetCode} - Ø§Ù„Ù‚Ø·Ø¹Ø© Ø§Ù„Ù…Ø¨Ø§Ø¹Ø©: ${currentSaleData.soldDimensions}`
                   };
 
                   const result = addSheetWithBatch(sheetData, batchData);
@@ -1353,7 +1357,7 @@ export default function SalesTab() {
                   if (result.success) {
                     savedCount++;
                     if (process.env.NODE_ENV === 'development') {
-                      console.log('✓ Remnant saved:', result.code);
+                      console.log('âœ“ Remnant saved:', result.code);
                     }
                   } else {
                     errorCount++;
@@ -1364,23 +1368,23 @@ export default function SalesTab() {
                 setShowRemnantDialog(false);
 
                 if (savedCount > 0) {
-                  setSuccess(`تم حفظ ${savedCount} قطعة بواقي بنجاح`);
+                  setSuccess(`ØªÙ… Ø­ÙØ¸ ${savedCount} Ù‚Ø·Ø¹Ø© Ø¨ÙˆØ§Ù‚ÙŠ Ø¨Ù†Ø¬Ø§Ø­`);
                   loadData(); // Reload data to show new remnants
                   setTimeout(() => setSuccess(''), 3000);
                 }
 
                 if (errorCount > 0) {
-                  setError(`فشل حفظ ${errorCount} قطعة`);
+                  setError(`ÙØ´Ù„ Ø­ÙØ¸ ${errorCount} Ù‚Ø·Ø¹Ø©`);
                 }
               } catch (err) {
-                setError('خطأ في حفظ البواقي: ' + err.message);
+                setError('Ø®Ø·Ø£ ÙÙŠ Ø­ÙØ¸ Ø§Ù„Ø¨ÙˆØ§Ù‚ÙŠ: ' + err.message);
                 console.error('Save remnants error:', err);
               }
             }}
             variant="contained"
             size="large"
           >
-            حفظ البواقي
+            Ø­ÙØ¸ Ø§Ù„Ø¨ÙˆØ§Ù‚ÙŠ
           </Button>
         </DialogActions>
       </Dialog>
@@ -1397,19 +1401,19 @@ export default function SalesTab() {
           <>
             <DialogTitle>
               <Typography variant="h5" fontWeight={700}>
-                تفاصيل الفاتورة {selectedSale.invoice_number}
+                ØªÙØ§ØµÙŠÙ„ Ø§Ù„ÙØ§ØªÙˆØ±Ø© {selectedSale.invoice_number}
               </Typography>
             </DialogTitle>
             <DialogContent>
               <Grid container spacing={2}>
                 <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">الزبون:</Typography>
+                  <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">Ø§Ù„Ø²Ø¨ÙˆÙ†:</Typography>
                   <Typography variant="body1" fontWeight={600} fontSize="1.0625rem">
-                    {selectedSale.customer_name || 'غير محدد'}
+                    {selectedSale.customer_name || 'ØºÙŠØ± Ù…Ø­Ø¯Ø¯'}
                   </Typography>
                 </Grid>
                 <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">التاريخ:</Typography>
+                  <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">Ø§Ù„ØªØ§Ø±ÙŠØ®:</Typography>
                   <Typography variant="body1" fontWeight={600} fontSize="1.0625rem">
                     {selectedSale.sale_date}
                   </Typography>
@@ -1418,16 +1422,16 @@ export default function SalesTab() {
                 <Grid item xs={12}><Divider /></Grid>
 
                 <Grid item xs={12}>
-                  <Typography variant="h6" fontWeight={700} gutterBottom>الأصناف:</Typography>
+                  <Typography variant="h6" fontWeight={700} gutterBottom>Ø§Ù„Ø£ØµÙ†Ø§Ù:</Typography>
                   <TableContainer component={Paper} variant="outlined">
                     <Table size="small">
                       <TableHead sx={{ bgcolor: 'grey.100' }}>
                         <TableRow>
-                          <TableCell><Typography fontWeight={700} fontSize="1rem">النوع</Typography></TableCell>
-                          <TableCell><Typography fontWeight={700} fontSize="1rem">الوصف</Typography></TableCell>
-                          <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الكمية</Typography></TableCell>
-                          <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">السعر</Typography></TableCell>
-                          <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الإجمالي</Typography></TableCell>
+                          <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ù†ÙˆØ¹</Typography></TableCell>
+                          <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„ÙˆØµÙ</Typography></TableCell>
+                          <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">Ø§Ù„ÙƒÙ…ÙŠØ©</Typography></TableCell>
+                          <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ø³Ø¹Ø±</Typography></TableCell>
+                          <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ</Typography></TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -1435,7 +1439,7 @@ export default function SalesTab() {
                           <TableRow key={idx}>
                             <TableCell>
                               <Chip
-                                label={item.item_type === 'material' ? 'معدن' : 'خدمة'}
+                                label={item.item_type === 'material' ? 'Ù…Ø¹Ø¯Ù†' : 'Ø®Ø¯Ù…Ø©'}
                                 color={item.item_type === 'material' ? 'primary' : 'secondary'}
                                 size="small"
                               />
@@ -1445,14 +1449,14 @@ export default function SalesTab() {
                                 <Typography fontSize="0.9375rem">
                                   {item.code}{' '}
                                   <Typography component="span" variant="caption" color="text.secondary">
-                                    – {item.length_mm}×{item.width_mm}×{item.thickness_mm} مم
+                                    â€“ {item.length_mm}Ã—{item.width_mm}Ã—{item.thickness_mm} Ù…Ù…
                                   </Typography>
                                 </Typography>
                               ) : (
                                 <Typography fontSize="0.9375rem">
                                   {item.service_name_ar}{' '}
                                   <Typography component="span" variant="caption" color="text.secondary">
-                                    {item.material_description ? `– ${item.material_description}` : ''}
+                                    {item.material_description ? `â€“ ${item.material_description}` : ''}
                                   </Typography>
                                 </Typography>
                               )}
@@ -1473,7 +1477,7 @@ export default function SalesTab() {
 
                 <Grid item xs={12}><Divider /></Grid>
 
-                <Grid item xs={6}><Typography fontSize="1.0625rem">المجموع الفرعي:</Typography></Grid>
+                <Grid item xs={6}><Typography fontSize="1.0625rem">Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹ Ø§Ù„ÙØ±Ø¹ÙŠ:</Typography></Grid>
                 <Grid item xs={6} sx={{ textAlign: 'left' }}>
                   <Typography fontSize="1.0625rem" fontWeight={600}>
                     {fmt(selectedSale.subtotal)} {baseCurrencyInfo.symbol}
@@ -1482,7 +1486,7 @@ export default function SalesTab() {
 
                 {selectedSale.discount > 0 && (
                   <>
-                    <Grid item xs={6}><Typography fontSize="1.0625rem">الخصم:</Typography></Grid>
+                    <Grid item xs={6}><Typography fontSize="1.0625rem">Ø§Ù„Ø®ØµÙ…:</Typography></Grid>
                     <Grid item xs={6} sx={{ textAlign: 'left' }}>
                       <Typography fontSize="1.0625rem" fontWeight={600}>
                         -{fmt(selectedSale.discount)} {baseCurrencyInfo.symbol}
@@ -1493,7 +1497,7 @@ export default function SalesTab() {
 
                 {selectedSale.tax > 0 && (
                   <>
-                    <Grid item xs={6}><Typography fontSize="1.0625rem">الضريبة:</Typography></Grid>
+                    <Grid item xs={6}><Typography fontSize="1.0625rem">Ø§Ù„Ø¶Ø±ÙŠØ¨Ø©:</Typography></Grid>
                     <Grid item xs={6} sx={{ textAlign: 'left' }}>
                       <Typography fontSize="1.0625rem" fontWeight={600}>
                         {fmt(selectedSale.tax)} {baseCurrencyInfo.symbol}
@@ -1504,14 +1508,14 @@ export default function SalesTab() {
 
                 <Grid item xs={12}><Divider /></Grid>
 
-                <Grid item xs={6}><Typography variant="h6" fontWeight={700}>الإجمالي:</Typography></Grid>
+                <Grid item xs={6}><Typography variant="h6" fontWeight={700}>Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ:</Typography></Grid>
                 <Grid item xs={6} sx={{ textAlign: 'left' }}>
                   <Typography variant="h6" fontWeight={700} color="primary">
                     {fmt(selectedSale.total_amount)} {baseCurrencyInfo.symbol}
                   </Typography>
                 </Grid>
 
-                <Grid item xs={6}><Typography fontSize="1.0625rem">المدفوع:</Typography></Grid>
+                <Grid item xs={6}><Typography fontSize="1.0625rem">Ø§Ù„Ù…Ø¯ÙÙˆØ¹:</Typography></Grid>
                 <Grid item xs={6} sx={{ textAlign: 'left' }}>
                   <Typography fontSize="1.0625rem" fontWeight={600} color="success.main">
                     {fmt(selectedSale.total_paid)} {baseCurrencyInfo.symbol}
@@ -1520,7 +1524,7 @@ export default function SalesTab() {
 
                 {selectedSale.remaining > 0 && (
                   <>
-                    <Grid item xs={6}><Typography fontSize="1.0625rem" color="error">المتبقي:</Typography></Grid>
+                    <Grid item xs={6}><Typography fontSize="1.0625rem" color="error">Ø§Ù„Ù…ØªØ¨Ù‚ÙŠ:</Typography></Grid>
                     <Grid item xs={6} sx={{ textAlign: 'left' }}>
                       <Typography fontSize="1.0625rem" fontWeight={700} color="error.main">
                         {fmt(selectedSale.remaining)} {baseCurrencyInfo.symbol}
@@ -1533,7 +1537,7 @@ export default function SalesTab() {
                   <>
                     <Grid item xs={12}><Divider /></Grid>
                     <Grid item xs={12}>
-                      <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">ملاحظات:</Typography>
+                      <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">Ù…Ù„Ø§Ø­Ø¸Ø§Øª:</Typography>
                       <Typography variant="body1" fontSize="1rem">{safeNotes(selectedSale.notes)}</Typography>
                     </Grid>
                   </>
@@ -1543,7 +1547,7 @@ export default function SalesTab() {
 
                 {selectedSale.created_by && (
                   <Grid item xs={6}>
-                    <Typography variant="body2" color="text.secondary" fontSize="0.875rem">أضيفت بواسطة:</Typography>
+                    <Typography variant="body2" color="text.secondary" fontSize="0.875rem">Ø£Ø¶ÙŠÙØª Ø¨ÙˆØ§Ø³Ø·Ø©:</Typography>
                     <Typography variant="body1" fontWeight={600} fontSize="0.9375rem">
                       {selectedSale.created_by}
                     </Typography>
@@ -1552,7 +1556,7 @@ export default function SalesTab() {
 
                 {selectedSale.updated_by && (
                   <Grid item xs={6}>
-                    <Typography variant="body2" color="text.secondary" fontSize="0.875rem">آخر تعديل بواسطة:</Typography>
+                    <Typography variant="body2" color="text.secondary" fontSize="0.875rem">Ø¢Ø®Ø± ØªØ¹Ø¯ÙŠÙ„ Ø¨ÙˆØ§Ø³Ø·Ø©:</Typography>
                     <Typography variant="body1" fontWeight={600} fontSize="0.9375rem">
                       {selectedSale.updated_by}
                     </Typography>
@@ -1568,7 +1572,7 @@ export default function SalesTab() {
                 variant="outlined"
                 size="large"
               />
-              <Button onClick={() => setOpenViewDialog(false)} size="large">إغلاق</Button>
+              <Button onClick={() => setOpenViewDialog(false)} size="large">Ø¥ØºÙ„Ø§Ù‚</Button>
             </DialogActions>
           </>
         )}
@@ -1579,23 +1583,39 @@ export default function SalesTab() {
         open={showPrintDialog}
         onClose={cancelPrint}
         onConfirm={executePrint}
-        title="تأكيد طباعة الفاتورة"
-        documentName={pendingDocument?.metadata?.name || 'الفاتورة'}
-        documentType={pendingDocument?.metadata?.type || 'فاتورة'}
+        title="ØªØ£ÙƒÙŠØ¯ Ø·Ø¨Ø§Ø¹Ø© Ø§Ù„ÙØ§ØªÙˆØ±Ø©"
+        documentName={pendingDocument?.metadata?.name || 'Ø§Ù„ÙØ§ØªÙˆØ±Ø©'}
+        documentType={pendingDocument?.metadata?.type || 'ÙØ§ØªÙˆØ±Ø©'}
         estimatedPages={pendingDocument?.metadata?.estimatedPages || 1}
         defaultAction={pendingDocument?.metadata?.defaultAction || 'print'}
       />
 
       {/* Confirmation Dialog */}
-      <UnifiedConfirmDialog
+      <UnifiedDialog
         open={confirmDialog.open}
         onClose={closeConfirm}
-        onConfirm={async () => {
-          await confirmDialog.action();
-          closeConfirm();
+        variant={confirmationDialogConfig.variant}
+        title={confirmationDialogConfig.title}
+        description={confirmationDialogConfig.description}
+        primaryAction={{
+          label: confirmationDialogConfig.primaryLabel,
+          color: confirmationDialogConfig.primaryColor,
+          loading,
+          onClick: async () => {
+            if (confirmDialog.action) {
+              await confirmDialog.action();
+            }
+            closeConfirm();
+          }
         }}
-        {...confirmationMessages[confirmDialog.type]}
-        loading={loading}
+        secondaryAction={{
+          label: confirmationDialogConfig.secondaryLabel,
+          onClick: closeConfirm
+        }}
+        allowBackdropClose={confirmationDialogConfig.allowBackdropClose}
+        allowEscapeClose={confirmationDialogConfig.allowEscapeClose}
+        requireAcknowledgement={confirmationDialogConfig.requireAcknowledgement}
+        acknowledgementLabel={confirmationDialogConfig.acknowledgementLabel}
       />
     </Box>
   );

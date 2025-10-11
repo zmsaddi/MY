@@ -1,4 +1,4 @@
-// src/components/tabs/InventoryTab.jsx
+﻿// src/components/tabs/InventoryTab.jsx
 import { useState, useEffect, useMemo } from 'react';
 import {
   Box, Card, CardContent, Grid, TextField, Button, Typography,
@@ -27,10 +27,9 @@ import ResponsiveTable from '../common/ResponsiveTable';
 import WeightPriceEntry from '../common/WeightPriceEntry';
 import UnifiedFormField from '../common/forms/UnifiedFormField';
 import UnifiedFormDialog from '../common/forms/UnifiedFormDialog';
-import UnifiedConfirmDialog from '../common/dialogs/UnifiedConfirmDialog';
+import UnifiedDialog from '../common/dialogs/UnifiedDialog';
 import PrintConfirmDialog from '../common/print/PrintConfirmDialog';
 import PrintButtons from '../common/print/PrintButtons';
-import { confirmationMessages } from '../../theme/designSystem';
 
 import { usePrint } from '../../hooks/usePrint';
 import { generateBatchPDF } from '../../utils/pdf/templates/batchPDF';
@@ -55,6 +54,21 @@ import {
 import { safeText, safeNotes } from '../../utils/displayHelpers';
 
 const fmt = (n) => Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+const createdByFallback = '\u0627\u0644\u0646\u0638\u0627\u0645 (\u0628\u064a\u0627\u0646\u0627\u062a \u0642\u062f\u064a\u0645\u0629)';
+const notUpdatedFallback = '\u0644\u0645 \u064a\u062a\u0645 \u0627\u0644\u062a\u0639\u062f\u064a\u0644 \u0628\u0639\u062f';
+
+const displayCreatedBy = (value) => {
+  const trimmed = typeof value === 'string' ? value.trim() : '';
+  return trimmed.length ? trimmed : createdByFallback;
+};
+
+const displayUpdatedBy = (value, createdValue) => {
+  const trimmed = typeof value === 'string' ? value.trim() : '';
+  if (trimmed.length) return trimmed;
+  const creator = typeof createdValue === 'string' ? createdValue.trim() : '';
+  if (creator.length) return creator;
+  return notUpdatedFallback;
+};
 
 export default function InventoryTab() {
   // Data
@@ -104,7 +118,7 @@ export default function InventoryTab() {
   // Auto-code generation
   const [autoGenerateCode, setAutoGenerateCode] = useState(true);
 
-  // Forms — Sheet info
+  // Forms â€” Sheet info
   const [sheetForm, setSheetForm] = useState({
     code: '',
     metal_type_id: '',
@@ -116,7 +130,7 @@ export default function InventoryTab() {
     weight_per_sheet_kg: '',
   });
 
-  // Forms — Initial batch for new sheet
+  // Forms â€” Initial batch for new sheet
   const [batchForm, setBatchForm] = useState({
     supplier_id: '',
     quantity: '',
@@ -136,7 +150,7 @@ export default function InventoryTab() {
     payment_notes: ''
   });
 
-  // Forms — Add batch for existing sheet
+  // Forms â€” Add batch for existing sheet
   const [existingBatchForm, setExistingBatchForm] = useState({
     supplier_id: '',
     quantity: '',
@@ -153,7 +167,7 @@ export default function InventoryTab() {
     payment_notes: ''
   });
 
-  // Forms — Remnant sheet info
+  // Forms â€” Remnant sheet info
   const [remnantForm, setRemnantForm] = useState({
     code: '',
     metal_type_id: '',
@@ -167,7 +181,7 @@ export default function InventoryTab() {
     piece_source: 'company_stock', // 'company_stock' or 'from_sheet_cutting'
   });
 
-  // Forms — Initial batch for new remnant
+  // Forms â€” Initial batch for new remnant
   const [remnantBatchForm, setRemnantBatchForm] = useState({
     supplier_id: '',
     quantity: '',
@@ -180,7 +194,7 @@ export default function InventoryTab() {
     notes: ''
   });
 
-  // Form — Edit batch
+  // Form â€” Edit batch
   const [editBatchForm, setEditBatchForm] = useState({
     quantity_original: '',
     price_per_kg: '',
@@ -217,7 +231,7 @@ export default function InventoryTab() {
     action: null
   });
 
-  // ──────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Helper Functions
   const openConfirm = (type, data = null, action = null) => {
     setConfirmDialog({ open: true, type, data, action });
@@ -227,7 +241,12 @@ export default function InventoryTab() {
     setConfirmDialog({ ...confirmDialog, open: false });
   };
 
-  // ──────────────────────────────────────────────────────────────
+  const confirmationDialogConfig = useMemo(
+    () => getConfirmationConfig(confirmDialog.type),
+    [confirmDialog.type]
+  );
+
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     refreshAll();
   }, []);
@@ -341,7 +360,7 @@ export default function InventoryTab() {
     return rows;
   }, [remnants, sheets, remnantSearchTerm, remnantFilterMetalType, remnantFilterThkMin, remnantFilterThkMax, remnantFilterQtyMin, remnantFilterQtyMax, remnantFilterParentSheet]);
 
-  // ──────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Helpers for pricing/weights
   const effBatchWeight = (qty, sheetWeight, batchWeight) => {
     const q = Number(qty) || 0;
@@ -370,29 +389,29 @@ export default function InventoryTab() {
     }
   };
 
-  // ──────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Validation Functions
   const validateSheetForm = () => {
     const newErrors = {};
 
     if (!sheetForm.code.trim()) {
-      newErrors.code = 'الكود مطلوب';
+      newErrors.code = 'Ø§Ù„ÙƒÙˆØ¯ Ù…Ø·Ù„ÙˆØ¨';
     }
 
     if (!sheetForm.metal_type_id) {
-      newErrors.metal_type_id = 'نوع المعدن مطلوب';
+      newErrors.metal_type_id = 'Ù†ÙˆØ¹ Ø§Ù„Ù…Ø¹Ø¯Ù† Ù…Ø·Ù„ÙˆØ¨';
     }
 
     if (!sheetForm.length_mm || Number(sheetForm.length_mm) <= 0) {
-      newErrors.length_mm = 'الطول مطلوب ويجب أن يكون أكبر من صفر';
+      newErrors.length_mm = 'Ø§Ù„Ø·ÙˆÙ„ Ù…Ø·Ù„ÙˆØ¨ ÙˆÙŠØ¬Ø¨ Ø£Ù† ÙŠÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±';
     }
 
     if (!sheetForm.width_mm || Number(sheetForm.width_mm) <= 0) {
-      newErrors.width_mm = 'العرض مطلوب ويجب أن يكون أكبر من صفر';
+      newErrors.width_mm = 'Ø§Ù„Ø¹Ø±Ø¶ Ù…Ø·Ù„ÙˆØ¨ ÙˆÙŠØ¬Ø¨ Ø£Ù† ÙŠÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±';
     }
 
     if (!sheetForm.thickness_mm || Number(sheetForm.thickness_mm) <= 0) {
-      newErrors.thickness_mm = 'السماكة مطلوبة ويجب أن تكون أكبر من صفر';
+      newErrors.thickness_mm = 'Ø§Ù„Ø³Ù…Ø§ÙƒØ© Ù…Ø·Ù„ÙˆØ¨Ø© ÙˆÙŠØ¬Ø¨ Ø£Ù† ØªÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±';
     }
 
     setSheetErrors(newErrors);
@@ -403,25 +422,25 @@ export default function InventoryTab() {
     const newErrors = {};
 
     if (!batchForm.supplier_id) {
-      newErrors.supplier_id = 'المورد مطلوب';
+      newErrors.supplier_id = 'Ø§Ù„Ù…ÙˆØ±Ø¯ Ù…Ø·Ù„ÙˆØ¨';
     }
 
     if (!batchForm.quantity || Number(batchForm.quantity) <= 0) {
-      newErrors.quantity = 'الكمية مطلوبة ويجب أن تكون أكبر من صفر';
+      newErrors.quantity = 'Ø§Ù„ÙƒÙ…ÙŠØ© Ù…Ø·Ù„ÙˆØ¨Ø© ÙˆÙŠØ¬Ø¨ Ø£Ù† ØªÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±';
     }
 
     const weightPerSheet = Number(batchForm.weight_per_sheet) || 0;
     const totalWeight = Number(batchForm.total_weight) || 0;
 
     if (weightPerSheet <= 0 && totalWeight <= 0) {
-      newErrors.weight = 'يجب إدخال الوزن (لكل قطعة أو الإجمالي)';
+      newErrors.weight = 'ÙŠØ¬Ø¨ Ø¥Ø¯Ø®Ø§Ù„ Ø§Ù„ÙˆØ²Ù† (Ù„ÙƒÙ„ Ù‚Ø·Ø¹Ø© Ø£Ùˆ Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ)';
     }
 
     setBatchErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // ──────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Add new sheet + initial batch
   const handleOpenAddDialog = () => {
     const defaultMetalType = metalTypes.find(m => m.is_active)?.id || '';
@@ -474,7 +493,7 @@ export default function InventoryTab() {
     setBatchErrors({});
   };
 
-  // ──────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Add Remnant Handlers
   const handleOpenAddRemnantDialog = () => {
     const defaultMetalType = metalTypes.find(m => m.is_active)?.id || '';
@@ -527,31 +546,31 @@ export default function InventoryTab() {
     const newBatchErrors = {};
 
     if (!remnantForm.code.trim()) {
-      newErrors.code = 'الكود مطلوب';
+      newErrors.code = 'Ø§Ù„ÙƒÙˆØ¯ Ù…Ø·Ù„ÙˆØ¨';
     }
 
     if (!remnantForm.metal_type_id) {
-      newErrors.metal_type_id = 'نوع المعدن مطلوب';
+      newErrors.metal_type_id = 'Ù†ÙˆØ¹ Ø§Ù„Ù…Ø¹Ø¯Ù† Ù…Ø·Ù„ÙˆØ¨';
     }
 
     if (!remnantForm.length_mm || Number(remnantForm.length_mm) <= 0) {
-      newErrors.length_mm = 'الطول يجب أن يكون أكبر من صفر';
+      newErrors.length_mm = 'Ø§Ù„Ø·ÙˆÙ„ ÙŠØ¬Ø¨ Ø£Ù† ÙŠÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±';
     }
 
     if (!remnantForm.width_mm || Number(remnantForm.width_mm) <= 0) {
-      newErrors.width_mm = 'العرض يجب أن يكون أكبر من صفر';
+      newErrors.width_mm = 'Ø§Ù„Ø¹Ø±Ø¶ ÙŠØ¬Ø¨ Ø£Ù† ÙŠÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±';
     }
 
     if (!remnantForm.thickness_mm || Number(remnantForm.thickness_mm) <= 0) {
-      newErrors.thickness_mm = 'السماكة يجب أن تكون أكبر من صفر';
+      newErrors.thickness_mm = 'Ø§Ù„Ø³Ù…Ø§ÙƒØ© ÙŠØ¬Ø¨ Ø£Ù† ØªÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±';
     }
 
     if (remnantForm.piece_source === 'from_sheet_cutting' && !remnantForm.parent_sheet_id) {
-      newErrors.parent_sheet_id = 'يجب اختيار الصفيحة الأم عند اختيار "من قص صفيحة"';
+      newErrors.parent_sheet_id = 'ÙŠØ¬Ø¨ Ø§Ø®ØªÙŠØ§Ø± Ø§Ù„ØµÙÙŠØ­Ø© Ø§Ù„Ø£Ù… Ø¹Ù†Ø¯ Ø§Ø®ØªÙŠØ§Ø± "Ù…Ù† Ù‚Øµ ØµÙÙŠØ­Ø©"';
     }
 
     if (!remnantBatchForm.quantity || Number(remnantBatchForm.quantity) <= 0) {
-      newBatchErrors.quantity = 'الكمية يجب أن تكون أكبر من صفر';
+      newBatchErrors.quantity = 'Ø§Ù„ÙƒÙ…ÙŠØ© ÙŠØ¬Ø¨ Ø£Ù† ØªÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±';
     }
 
     setRemnantErrors(newErrors);
@@ -601,17 +620,17 @@ export default function InventoryTab() {
 
       const result = addSheetWithBatch(sheetData, batchData);
       if (result.success) {
-        setSuccess(`✓ تم إضافة ${result.linked ? 'الدفعة للبقية الموجودة' : 'البقية والدفعة'} بنجاح`);
+        setSuccess(`âœ“ ØªÙ… Ø¥Ø¶Ø§ÙØ© ${result.linked ? 'Ø§Ù„Ø¯ÙØ¹Ø© Ù„Ù„Ø¨Ù‚ÙŠØ© Ø§Ù„Ù…ÙˆØ¬ÙˆØ¯Ø©' : 'Ø§Ù„Ø¨Ù‚ÙŠØ© ÙˆØ§Ù„Ø¯ÙØ¹Ø©'} Ø¨Ù†Ø¬Ø§Ø­`);
         setTimeout(() => setSuccess(''), 3000);
         handleCloseAddRemnantDialog();
         refreshAll();
         closeConfirm();
       } else {
-        setError('فشل الحفظ: ' + result.error);
+        setError('ÙØ´Ù„ Ø§Ù„Ø­ÙØ¸: ' + result.error);
         closeConfirm();
       }
     } catch (err) {
-      setError('حدث خطأ: ' + err.message);
+      setError('Ø­Ø¯Ø« Ø®Ø·Ø£: ' + err.message);
       closeConfirm();
     } finally {
       setLoading(false);
@@ -622,7 +641,7 @@ export default function InventoryTab() {
     openConfirm('save', remnantForm, handleActualSaveRemnant);
   };
 
-  // ──────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleActualSaveSheet = async () => {
     if (!validateSheetForm() || !validateBatchForm()) {
@@ -686,20 +705,20 @@ export default function InventoryTab() {
               currency: baseCurrencyInfo.code,
               payment_method: batchForm.payment_method,
               payment_date: batchForm.received_date,
-              notes: batchForm.payment_notes || `دفعة ${batchForm.payment_type === 'full' ? 'كاملة' : 'جزئية'} للدفعة`
+              notes: batchForm.payment_notes || `Ø¯ÙØ¹Ø© ${batchForm.payment_type === 'full' ? 'ÙƒØ§Ù…Ù„Ø©' : 'Ø¬Ø²Ø¦ÙŠØ©'} Ù„Ù„Ø¯ÙØ¹Ø©`
             });
           }
         }
 
-        setSuccess(`تم ${result.linked ? 'إضافة الدفعة للصفيحة الموجودة' : 'إضافة الصفيحة والدفعة'} بنجاح`);
+        setSuccess(`ØªÙ… ${result.linked ? 'Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø¯ÙØ¹Ø© Ù„Ù„ØµÙÙŠØ­Ø© Ø§Ù„Ù…ÙˆØ¬ÙˆØ¯Ø©' : 'Ø¥Ø¶Ø§ÙØ© Ø§Ù„ØµÙÙŠØ­Ø© ÙˆØ§Ù„Ø¯ÙØ¹Ø©'} Ø¨Ù†Ø¬Ø§Ø­`);
         setTimeout(() => setSuccess(''), 3000);
         handleCloseAddDialog();
         refreshAll();
       } else {
-        setError('فشل الحفظ: ' + result.error);
+        setError('ÙØ´Ù„ Ø§Ù„Ø­ÙØ¸: ' + result.error);
       }
     } catch (err) {
-      setError('حدث خطأ: ' + err.message);
+      setError('Ø­Ø¯Ø« Ø®Ø·Ø£: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -709,7 +728,7 @@ export default function InventoryTab() {
     openConfirm('save', sheetForm, handleActualSaveSheet);
   };
 
-  // ──────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Show batches & add new batch to existing sheet
   const handleShowBatches = (sheet) => {
     setSelectedSheet(sheet);
@@ -739,11 +758,11 @@ export default function InventoryTab() {
     const newErrors = {};
 
     if (!existingBatchForm.quantity || Number(existingBatchForm.quantity) <= 0) {
-      newErrors.quantity = 'الكمية يجب أن تكون أكبر من صفر';
+      newErrors.quantity = 'Ø§Ù„ÙƒÙ…ÙŠØ© ÙŠØ¬Ø¨ Ø£Ù† ØªÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±';
     }
 
     if (!existingBatchForm.batch_weight_kg || Number(existingBatchForm.batch_weight_kg) <= 0) {
-      newErrors.batch_weight_kg = 'الوزن لكل قطعة مطلوب ويجب أن يكون أكبر من صفر';
+      newErrors.batch_weight_kg = 'Ø§Ù„ÙˆØ²Ù† Ù„ÙƒÙ„ Ù‚Ø·Ø¹Ø© Ù…Ø·Ù„ÙˆØ¨ ÙˆÙŠØ¬Ø¨ Ø£Ù† ÙŠÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -789,12 +808,12 @@ export default function InventoryTab() {
               currency: baseCurrencyInfo.code,
               payment_method: existingBatchForm.payment_method,
               payment_date: existingBatchForm.received_date,
-              notes: existingBatchForm.payment_notes || `دفعة ${existingBatchForm.payment_type === 'full' ? 'كاملة' : 'جزئية'}`
+              notes: existingBatchForm.payment_notes || `Ø¯ÙØ¹Ø© ${existingBatchForm.payment_type === 'full' ? 'ÙƒØ§Ù…Ù„Ø©' : 'Ø¬Ø²Ø¦ÙŠØ©'}`
             });
           }
         }
 
-        setSuccess('تمت إضافة الدفعة بنجاح');
+        setSuccess('ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø¯ÙØ¹Ø© Ø¨Ù†Ø¬Ø§Ø­');
         setTimeout(() => setSuccess(''), 3000);
         const list = getBatchesBySheetId(selectedSheet.id);
         setBatches(list);
@@ -813,10 +832,10 @@ export default function InventoryTab() {
           payment_notes: ''
         }));
       } else {
-        setError('فشل إضافة الدفعة: ' + (res?.error || ''));
+        setError('ÙØ´Ù„ Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø¯ÙØ¹Ø©: ' + (res?.error || ''));
       }
     } catch (err) {
-      setError('حدث خطأ: ' + err.message);
+      setError('Ø­Ø¯Ø« Ø®Ø·Ø£: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -832,7 +851,7 @@ export default function InventoryTab() {
     return 'success';
   };
 
-  // ──────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Print handlers
   const handlePrintBatch = () => {
     if (!selectedBatch || !selectedSheet) return;
@@ -848,8 +867,8 @@ export default function InventoryTab() {
     );
 
     requestPrint(docDefinition, {
-      name: `دفعة ${selectedSheet.code}`,
-      type: 'تفاصيل دفعة',
+      name: `Ø¯ÙØ¹Ø© ${selectedSheet.code}`,
+      type: 'ØªÙØ§ØµÙŠÙ„ Ø¯ÙØ¹Ø©',
       estimatedPages: 1,
       defaultAction: 'print'
     });
@@ -869,14 +888,14 @@ export default function InventoryTab() {
     );
 
     requestPrint(docDefinition, {
-      name: `دفعة ${selectedSheet.code}`,
-      type: 'تفاصيل دفعة',
+      name: `Ø¯ÙØ¹Ø© ${selectedSheet.code}`,
+      type: 'ØªÙØ§ØµÙŠÙ„ Ø¯ÙØ¹Ø©',
       estimatedPages: 1,
       defaultAction: 'pdf'
     });
   };
 
-  // ──────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Batch view and edit handlers
   const handleViewBatch = (batch) => {
     setSelectedBatch(batch);
@@ -913,7 +932,7 @@ export default function InventoryTab() {
     const newErrors = {};
 
     if (!editBatchForm.quantity_original || Number(editBatchForm.quantity_original) <= 0) {
-      newErrors.quantity_original = 'الكمية الأصلية مطلوبة ويجب أن تكون أكبر من صفر';
+      newErrors.quantity_original = 'Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ø£ØµÙ„ÙŠØ© Ù…Ø·Ù„ÙˆØ¨Ø© ÙˆÙŠØ¬Ø¨ Ø£Ù† ØªÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -942,7 +961,7 @@ export default function InventoryTab() {
 
       const result = updateBatch(selectedBatch.id, updates);
       if (result.success) {
-        setSuccess('تم تحديث الدفعة بنجاح');
+        setSuccess('ØªÙ… ØªØ­Ø¯ÙŠØ« Ø§Ù„Ø¯ÙØ¹Ø© Ø¨Ù†Ø¬Ø§Ø­');
         setTimeout(() => setSuccess(''), 3000);
         setIsEditingBatch(false);
         setOpenBatchViewDialog(false);
@@ -951,10 +970,10 @@ export default function InventoryTab() {
         setBatches(list);
         refreshAll();
       } else {
-        setError('فشل تحديث الدفعة: ' + result.error);
+        setError('ÙØ´Ù„ ØªØ­Ø¯ÙŠØ« Ø§Ù„Ø¯ÙØ¹Ø©: ' + result.error);
       }
     } catch (err) {
-      setError('حدث خطأ: ' + err.message);
+      setError('Ø­Ø¯Ø« Ø®Ø·Ø£: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -974,17 +993,17 @@ export default function InventoryTab() {
     try {
       const result = deleteBatch(selectedBatch.id);
       if (result.success) {
-        setSuccess('تم حذف الدفعة بنجاح');
+        setSuccess('ØªÙ… Ø­Ø°Ù Ø§Ù„Ø¯ÙØ¹Ø© Ø¨Ù†Ø¬Ø§Ø­');
         setTimeout(() => setSuccess(''), 3000);
         setOpenBatchViewDialog(false);
         const list = getBatchesBySheetId(selectedSheet.id);
         setBatches(list);
         refreshAll();
       } else {
-        setError('فشل حذف الدفعة: ' + result.error);
+        setError('ÙØ´Ù„ Ø­Ø°Ù Ø§Ù„Ø¯ÙØ¹Ø©: ' + result.error);
       }
     } catch (err) {
-      setError('حدث خطأ: ' + err.message);
+      setError('Ø­Ø¯Ø« Ø®Ø·Ø£: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -1004,15 +1023,15 @@ export default function InventoryTab() {
     try {
       const result = deleteSheet(selectedSheet.id);
       if (result.success) {
-        setSuccess('تم حذف الصفيحة بنجاح');
+        setSuccess('ØªÙ… Ø­Ø°Ù Ø§Ù„ØµÙÙŠØ­Ø© Ø¨Ù†Ø¬Ø§Ø­');
         setTimeout(() => setSuccess(''), 3000);
         setOpenBatchesDialog(false);
         refreshAll();
       } else {
-        setError('فشل حذف الصفيحة: ' + result.error);
+        setError('ÙØ´Ù„ Ø­Ø°Ù Ø§Ù„ØµÙÙŠØ­Ø©: ' + result.error);
       }
     } catch (err) {
-      setError('حدث خطأ: ' + err.message);
+      setError('Ø­Ø¯Ø« Ø®Ø·Ø£: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -1035,15 +1054,15 @@ export default function InventoryTab() {
     return parentSheet ? parentSheet.code : null;
   };
 
-  // ──────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <Box>
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" fontWeight={700} gutterBottom>
-          إدارة المخزون
+          Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ù…Ø®Ø²ÙˆÙ†
         </Typography>
         <Typography variant="body1" color="text.secondary" fontSize="1.0625rem">
-          إدارة الصفائح المعدنية والدفعات
+          Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„ØµÙØ§Ø¦Ø­ Ø§Ù„Ù…Ø¹Ø¯Ù†ÙŠØ© ÙˆØ§Ù„Ø¯ÙØ¹Ø§Øª
         </Typography>
       </Box>
 
@@ -1066,12 +1085,12 @@ export default function InventoryTab() {
           }}
         >
           <Tab
-            label={`الصفائح الكاملة (${sheets.length})`}
+            label={`Ø§Ù„ØµÙØ§Ø¦Ø­ Ø§Ù„ÙƒØ§Ù…Ù„Ø© (${sheets.length})`}
             icon={<InventoryIcon />}
             iconPosition="start"
           />
           <Tab
-            label={`البواقي (${remnants.length})`}
+            label={`Ø§Ù„Ø¨ÙˆØ§Ù‚ÙŠ (${remnants.length})`}
             icon={<AddBoxIcon />}
             iconPosition="start"
           />
@@ -1087,7 +1106,7 @@ export default function InventoryTab() {
                 <Grid item xs={12} md={4}>
                   <TextField
                     fullWidth
-                    placeholder="بحث بالكود أو نوع المعدن..."
+                    placeholder="Ø¨Ø­Ø« Ø¨Ø§Ù„ÙƒÙˆØ¯ Ø£Ùˆ Ù†ÙˆØ¹ Ø§Ù„Ù…Ø¹Ø¯Ù†..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     InputProps={{
@@ -1103,12 +1122,12 @@ export default function InventoryTab() {
                   <TextField
                     select
                     fullWidth
-                    label="نوع المعدن"
+                    label="Ù†ÙˆØ¹ Ø§Ù„Ù…Ø¹Ø¯Ù†"
                     value={filterMetalType}
                     onChange={(e) => setFilterMetalType(e.target.value)}
                     SelectProps={{ native: true }}
                   >
-                    <option value="">الكل</option>
+                    <option value="">Ø§Ù„ÙƒÙ„</option>
                     {metalTypes.filter(m => m.is_active).map(metal => (
                       <option key={metal.id} value={metal.id}>{metal.name_ar}</option>
                     ))}
@@ -1120,14 +1139,14 @@ export default function InventoryTab() {
                     onClick={() => setShowAdvanced(v => !v)}
                     size="large"
                   >
-                    فلاتر متقدمة
+                    ÙÙ„Ø§ØªØ± Ù…ØªÙ‚Ø¯Ù…Ø©
                   </Button>
                   <Button
                     startIcon={<RestartAltIcon />}
                     onClick={resetFilters}
                     size="large"
                   >
-                    إعادة ضبط
+                    Ø¥Ø¹Ø§Ø¯Ø© Ø¶Ø¨Ø·
                   </Button>
                   <Button
                     variant="contained"
@@ -1136,7 +1155,7 @@ export default function InventoryTab() {
                     onClick={handleOpenAddDialog}
                     sx={{ fontWeight: 700 }}
                   >
-                    إضافة صفيحة جديدة
+                    Ø¥Ø¶Ø§ÙØ© ØµÙÙŠØ­Ø© Ø¬Ø¯ÙŠØ¯Ø©
                   </Button>
                 </Grid>
               </Grid>
@@ -1148,7 +1167,7 @@ export default function InventoryTab() {
                     <TextField
                       fullWidth
                       type="number"
-                      label="أدنى سماكة (مم)"
+                      label="Ø£Ø¯Ù†Ù‰ Ø³Ù…Ø§ÙƒØ© (Ù…Ù…)"
                       value={filterThkMin}
                       onChange={(e) => setFilterThkMin(e.target.value)}
                       InputLabelProps={{ shrink: true }}
@@ -1158,7 +1177,7 @@ export default function InventoryTab() {
                     <TextField
                       fullWidth
                       type="number"
-                      label="أقصى سماكة (مم)"
+                      label="Ø£Ù‚ØµÙ‰ Ø³Ù…Ø§ÙƒØ© (Ù…Ù…)"
                       value={filterThkMax}
                       onChange={(e) => setFilterThkMax(e.target.value)}
                       InputLabelProps={{ shrink: true }}
@@ -1168,7 +1187,7 @@ export default function InventoryTab() {
                     <TextField
                       fullWidth
                       type="number"
-                      label="أدنى كمية"
+                      label="Ø£Ø¯Ù†Ù‰ ÙƒÙ…ÙŠØ©"
                       value={filterQtyMin}
                       onChange={(e) => setFilterQtyMin(e.target.value)}
                       InputLabelProps={{ shrink: true }}
@@ -1178,7 +1197,7 @@ export default function InventoryTab() {
                     <TextField
                       fullWidth
                       type="number"
-                      label="أقصى كمية"
+                      label="Ø£Ù‚ØµÙ‰ ÙƒÙ…ÙŠØ©"
                       value={filterQtyMax}
                       onChange={(e) => setFilterQtyMax(e.target.value)}
                       InputLabelProps={{ shrink: true }}
@@ -1193,21 +1212,21 @@ export default function InventoryTab() {
             <Table>
               <TableHead sx={{ bgcolor: 'grey.100' }}>
                 <TableRow>
-                  <TableCell><Typography fontWeight={700} fontSize="1rem">الكود</Typography></TableCell>
-                  <TableCell><Typography fontWeight={700} fontSize="1rem">النوع</Typography></TableCell>
-                  <TableCell><Typography fontWeight={700} fontSize="1rem">الأبعاد (مم)</Typography></TableCell>
-                  <TableCell><Typography fontWeight={700} fontSize="1rem">السماكة</Typography></TableCell>
-                  <TableCell><Typography fontWeight={700} fontSize="1rem">الوزن/ورقة</Typography></TableCell>
-                  <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الكمية</Typography></TableCell>
-                  <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">السعر/كغ</Typography></TableCell>
-                  <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الإجراءات</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„ÙƒÙˆØ¯</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ù†ÙˆØ¹</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ø£Ø¨Ø¹Ø§Ø¯ (Ù…Ù…)</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ø³Ù…Ø§ÙƒØ©</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„ÙˆØ²Ù†/ÙˆØ±Ù‚Ø©</Typography></TableCell>
+                  <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">Ø§Ù„ÙƒÙ…ÙŠØ©</Typography></TableCell>
+                  <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ø³Ø¹Ø±/ÙƒØº</Typography></TableCell>
+                  <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª</Typography></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {filteredSheets.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} align="center">
-                      <Typography color="text.secondary" py={3} fontSize="1rem">لا توجد صفائح كاملة</Typography>
+                      <Typography color="text.secondary" py={3} fontSize="1rem">Ù„Ø§ ØªÙˆØ¬Ø¯ ØµÙØ§Ø¦Ø­ ÙƒØ§Ù…Ù„Ø©</Typography>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -1217,11 +1236,11 @@ export default function InventoryTab() {
                         <Typography fontWeight={600} fontSize="0.9375rem">{sheet.code}</Typography>
                       </TableCell>
                       <TableCell><Typography fontSize="0.9375rem">{sheet.metal_name}</Typography></TableCell>
-                      <TableCell><Typography fontSize="0.9375rem">{sheet.length_mm} × {sheet.width_mm}</Typography></TableCell>
-                      <TableCell><Typography fontSize="0.9375rem">{sheet.thickness_mm} مم</Typography></TableCell>
+                      <TableCell><Typography fontSize="0.9375rem">{sheet.length_mm} Ã— {sheet.width_mm}</Typography></TableCell>
+                      <TableCell><Typography fontSize="0.9375rem">{sheet.thickness_mm} Ù…Ù…</Typography></TableCell>
                       <TableCell>
                         <Typography fontSize="0.9375rem">
-                          {sheet.weight_per_sheet_kg ? `${fmt(sheet.weight_per_sheet_kg)} كغ` : '---'}
+                          {sheet.weight_per_sheet_kg ? `${fmt(sheet.weight_per_sheet_kg)} ÙƒØº` : '---'}
                         </Typography>
                       </TableCell>
                       <TableCell align="center">
@@ -1246,7 +1265,7 @@ export default function InventoryTab() {
                         ) : <Typography fontSize="0.9375rem">---</Typography>}
                       </TableCell>
                       <TableCell align="center">
-                        <Tooltip title="عرض الدفعات / إضافة دفعة">
+                        <Tooltip title="Ø¹Ø±Ø¶ Ø§Ù„Ø¯ÙØ¹Ø§Øª / Ø¥Ø¶Ø§ÙØ© Ø¯ÙØ¹Ø©">
                           <IconButton
                             size="small"
                             color="primary"
@@ -1274,7 +1293,7 @@ export default function InventoryTab() {
                 <Grid item xs={12} md={4}>
                   <TextField
                     fullWidth
-                    placeholder="بحث بالكود أو نوع المعدن..."
+                    placeholder="Ø¨Ø­Ø« Ø¨Ø§Ù„ÙƒÙˆØ¯ Ø£Ùˆ Ù†ÙˆØ¹ Ø§Ù„Ù…Ø¹Ø¯Ù†..."
                     value={remnantSearchTerm}
                     onChange={(e) => setRemnantSearchTerm(e.target.value)}
                     InputProps={{
@@ -1290,12 +1309,12 @@ export default function InventoryTab() {
                   <TextField
                     select
                     fullWidth
-                    label="نوع المعدن"
+                    label="Ù†ÙˆØ¹ Ø§Ù„Ù…Ø¹Ø¯Ù†"
                     value={remnantFilterMetalType}
                     onChange={(e) => setRemnantFilterMetalType(e.target.value)}
                     SelectProps={{ native: true }}
                   >
-                    <option value="">الكل</option>
+                    <option value="">Ø§Ù„ÙƒÙ„</option>
                     {metalTypes.filter(m => m.is_active).map(metal => (
                       <option key={metal.id} value={metal.id}>{metal.name_ar}</option>
                     ))}
@@ -1307,14 +1326,14 @@ export default function InventoryTab() {
                     onClick={() => setShowRemnantAdvanced(v => !v)}
                     size="large"
                   >
-                    فلاتر متقدمة
+                    ÙÙ„Ø§ØªØ± Ù…ØªÙ‚Ø¯Ù…Ø©
                   </Button>
                   <Button
                     startIcon={<RestartAltIcon />}
                     onClick={resetRemnantFilters}
                     size="large"
                   >
-                    إعادة ضبط
+                    Ø¥Ø¹Ø§Ø¯Ø© Ø¶Ø¨Ø·
                   </Button>
                   <Button
                     variant="contained"
@@ -1323,7 +1342,7 @@ export default function InventoryTab() {
                     onClick={handleOpenAddRemnantDialog}
                     sx={{ fontWeight: 700 }}
                   >
-                    إضافة بقية جديدة
+                    Ø¥Ø¶Ø§ÙØ© Ø¨Ù‚ÙŠØ© Ø¬Ø¯ÙŠØ¯Ø©
                   </Button>
                 </Grid>
               </Grid>
@@ -1335,7 +1354,7 @@ export default function InventoryTab() {
                     <TextField
                       fullWidth
                       type="number"
-                      label="أدنى سماكة (مم)"
+                      label="Ø£Ø¯Ù†Ù‰ Ø³Ù…Ø§ÙƒØ© (Ù…Ù…)"
                       value={remnantFilterThkMin}
                       onChange={(e) => setRemnantFilterThkMin(e.target.value)}
                       InputLabelProps={{ shrink: true }}
@@ -1345,7 +1364,7 @@ export default function InventoryTab() {
                     <TextField
                       fullWidth
                       type="number"
-                      label="أقصى سماكة (مم)"
+                      label="Ø£Ù‚ØµÙ‰ Ø³Ù…Ø§ÙƒØ© (Ù…Ù…)"
                       value={remnantFilterThkMax}
                       onChange={(e) => setRemnantFilterThkMax(e.target.value)}
                       InputLabelProps={{ shrink: true }}
@@ -1355,7 +1374,7 @@ export default function InventoryTab() {
                     <TextField
                       fullWidth
                       type="number"
-                      label="أدنى كمية"
+                      label="Ø£Ø¯Ù†Ù‰ ÙƒÙ…ÙŠØ©"
                       value={remnantFilterQtyMin}
                       onChange={(e) => setRemnantFilterQtyMin(e.target.value)}
                       InputLabelProps={{ shrink: true }}
@@ -1365,7 +1384,7 @@ export default function InventoryTab() {
                     <TextField
                       fullWidth
                       type="number"
-                      label="أقصى كمية"
+                      label="Ø£Ù‚ØµÙ‰ ÙƒÙ…ÙŠØ©"
                       value={remnantFilterQtyMax}
                       onChange={(e) => setRemnantFilterQtyMax(e.target.value)}
                       InputLabelProps={{ shrink: true }}
@@ -1374,8 +1393,8 @@ export default function InventoryTab() {
                   <Grid item xs={12} md={6}>
                     <TextField
                       fullWidth
-                      label="الصفيحة الأم"
-                      placeholder="ابحث بكود الصفيحة الأم..."
+                      label="Ø§Ù„ØµÙÙŠØ­Ø© Ø§Ù„Ø£Ù…"
+                      placeholder="Ø§Ø¨Ø­Ø« Ø¨ÙƒÙˆØ¯ Ø§Ù„ØµÙÙŠØ­Ø© Ø§Ù„Ø£Ù…..."
                       value={remnantFilterParentSheet}
                       onChange={(e) => setRemnantFilterParentSheet(e.target.value)}
                     />
@@ -1389,21 +1408,21 @@ export default function InventoryTab() {
             <Table>
               <TableHead sx={{ bgcolor: 'grey.100' }}>
                 <TableRow>
-                  <TableCell><Typography fontWeight={700} fontSize="1rem">الكود</Typography></TableCell>
-                  <TableCell><Typography fontWeight={700} fontSize="1rem">النوع</Typography></TableCell>
-                  <TableCell><Typography fontWeight={700} fontSize="1rem">الأبعاد (مم)</Typography></TableCell>
-                  <TableCell><Typography fontWeight={700} fontSize="1rem">السماكة</Typography></TableCell>
-                  <TableCell><Typography fontWeight={700} fontSize="1rem">الصفيحة الأم</Typography></TableCell>
-                  <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الكمية</Typography></TableCell>
-                  <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">السعر/كغ</Typography></TableCell>
-                  <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الإجراءات</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„ÙƒÙˆØ¯</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ù†ÙˆØ¹</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ø£Ø¨Ø¹Ø§Ø¯ (Ù…Ù…)</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ø³Ù…Ø§ÙƒØ©</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„ØµÙÙŠØ­Ø© Ø§Ù„Ø£Ù…</Typography></TableCell>
+                  <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">Ø§Ù„ÙƒÙ…ÙŠØ©</Typography></TableCell>
+                  <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ø³Ø¹Ø±/ÙƒØº</Typography></TableCell>
+                  <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª</Typography></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {filteredRemnants.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} align="center">
-                      <Typography color="text.secondary" py={3} fontSize="1rem">لا توجد بواقي</Typography>
+                      <Typography color="text.secondary" py={3} fontSize="1rem">Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¨ÙˆØ§Ù‚ÙŠ</Typography>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -1415,11 +1434,11 @@ export default function InventoryTab() {
                           <Typography fontWeight={600} fontSize="0.9375rem">{sheet.code}</Typography>
                         </TableCell>
                         <TableCell><Typography fontSize="0.9375rem">{sheet.metal_name}</Typography></TableCell>
-                        <TableCell><Typography fontSize="0.9375rem">{sheet.length_mm} × {sheet.width_mm}</Typography></TableCell>
-                        <TableCell><Typography fontSize="0.9375rem">{sheet.thickness_mm} مم</Typography></TableCell>
+                        <TableCell><Typography fontSize="0.9375rem">{sheet.length_mm} Ã— {sheet.width_mm}</Typography></TableCell>
+                        <TableCell><Typography fontSize="0.9375rem">{sheet.thickness_mm} Ù…Ù…</Typography></TableCell>
                         <TableCell>
                           {parentCode ? (
-                            <Tooltip title="الصفيحة الأم" arrow>
+                            <Tooltip title="Ø§Ù„ØµÙÙŠØ­Ø© Ø§Ù„Ø£Ù…" arrow>
                               <Chip
                                 label={parentCode}
                                 size="small"
@@ -1453,7 +1472,7 @@ export default function InventoryTab() {
                           ) : <Typography fontSize="0.9375rem">---</Typography>}
                         </TableCell>
                         <TableCell align="center">
-                          <Tooltip title="عرض الدفعات / إضافة دفعة">
+                          <Tooltip title="Ø¹Ø±Ø¶ Ø§Ù„Ø¯ÙØ¹Ø§Øª / Ø¥Ø¶Ø§ÙØ© Ø¯ÙØ¹Ø©">
                             <IconButton
                               size="small"
                               color="primary"
@@ -1478,9 +1497,9 @@ export default function InventoryTab() {
         open={openAddDialog}
         onClose={handleCloseAddDialog}
         onSubmit={handleSheetFormSubmit}
-        title="إضافة صفيحة جديدة"
-        subtitle="أدخل معلومات الصفيحة والدفعة الأولى"
-        submitText="حفظ"
+        title="Ø¥Ø¶Ø§ÙØ© ØµÙÙŠØ­Ø© Ø¬Ø¯ÙŠØ¯Ø©"
+        subtitle="Ø£Ø¯Ø®Ù„ Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„ØµÙÙŠØ­Ø© ÙˆØ§Ù„Ø¯ÙØ¹Ø© Ø§Ù„Ø£ÙˆÙ„Ù‰"
+        submitText="Ø­ÙØ¸"
         loading={loading}
         maxWidth="md"
       >
@@ -1490,7 +1509,7 @@ export default function InventoryTab() {
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
               <Typography variant="h6" fontWeight={700}>
                 <InventoryIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
-                معلومات الصفيحة
+                Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„ØµÙÙŠØ­Ø©
               </Typography>
             </AccordionSummary>
             <AccordionDetails>
@@ -1512,7 +1531,7 @@ export default function InventoryTab() {
                     label={
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <AutoFixHighIcon fontSize="small" />
-                        <Typography fontSize="1rem">توليد الكود تلقائياً</Typography>
+                        <Typography fontSize="1rem">ØªÙˆÙ„ÙŠØ¯ Ø§Ù„ÙƒÙˆØ¯ ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹</Typography>
                       </Box>
                     }
                   />
@@ -1520,20 +1539,20 @@ export default function InventoryTab() {
 
                 <Grid item xs={12} md={6}>
                   <UnifiedFormField
-                    label="الكود"
+                    label="Ø§Ù„ÙƒÙˆØ¯"
                     value={sheetForm.code}
                     onChange={(e) => setSheetForm({ ...sheetForm, code: e.target.value })}
                     name="code"
                     required
                     disabled={autoGenerateCode}
                     error={sheetErrors.code}
-                    helperText={autoGenerateCode ? "سيتم توليد الكود تلقائياً بناءً على المواصفات" : ""}
+                    helperText={autoGenerateCode ? "Ø³ÙŠØªÙ… ØªÙˆÙ„ÙŠØ¯ Ø§Ù„ÙƒÙˆØ¯ ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹ Ø¨Ù†Ø§Ø¡Ù‹ Ø¹Ù„Ù‰ Ø§Ù„Ù…ÙˆØ§ØµÙØ§Øª" : ""}
                   />
                 </Grid>
 
                 <Grid item xs={12} md={6}>
                   <UnifiedFormField
-                    label="نوع المعدن"
+                    label="Ù†ÙˆØ¹ Ø§Ù„Ù…Ø¹Ø¯Ù†"
                     value={sheetForm.metal_type_id}
                     onChange={(e) => {
                       const newMetalId = e.target.value;
@@ -1549,7 +1568,7 @@ export default function InventoryTab() {
                     required
                     error={sheetErrors.metal_type_id}
                   >
-                    <MenuItem value="">-- اختر النوع --</MenuItem>
+                    <MenuItem value="">-- Ø§Ø®ØªØ± Ø§Ù„Ù†ÙˆØ¹ --</MenuItem>
                     {metalTypes.filter(m => m.is_active).map(metal => (
                       <MenuItem key={metal.id} value={metal.id}>{metal.name_ar}</MenuItem>
                     ))}
@@ -1558,15 +1577,15 @@ export default function InventoryTab() {
 
                 <Grid item xs={12} md={6}>
                   <UnifiedFormField
-                    label="الدرجة"
+                    label="Ø§Ù„Ø¯Ø±Ø¬Ø©"
                     value={sheetForm.grade_id}
                     onChange={(e) => setSheetForm({ ...sheetForm, grade_id: e.target.value })}
                     name="grade_id"
                     select
                     disabled={!sheetForm.metal_type_id || grades.length === 0}
-                    helperText={!sheetForm.metal_type_id ? "اختر نوع المعدن أولاً" : (grades.length === 0 ? "لا توجد درجات متاحة - اختياري" : "اختياري")}
+                    helperText={!sheetForm.metal_type_id ? "Ø§Ø®ØªØ± Ù†ÙˆØ¹ Ø§Ù„Ù…Ø¹Ø¯Ù† Ø£ÙˆÙ„Ø§Ù‹" : (grades.length === 0 ? "Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¯Ø±Ø¬Ø§Øª Ù…ØªØ§Ø­Ø© - Ø§Ø®ØªÙŠØ§Ø±ÙŠ" : "Ø§Ø®ØªÙŠØ§Ø±ÙŠ")}
                   >
-                    <MenuItem value="">-- بدون درجة (xx) --</MenuItem>
+                    <MenuItem value="">-- Ø¨Ø¯ÙˆÙ† Ø¯Ø±Ø¬Ø© (xx) --</MenuItem>
                     {grades.map(grade => (
                       <MenuItem key={grade.id} value={grade.id}>{grade.name}</MenuItem>
                     ))}
@@ -1575,15 +1594,15 @@ export default function InventoryTab() {
 
                 <Grid item xs={12} md={6}>
                   <UnifiedFormField
-                    label="التشطيب"
+                    label="Ø§Ù„ØªØ´Ø·ÙŠØ¨"
                     value={sheetForm.finish_id}
                     onChange={(e) => setSheetForm({ ...sheetForm, finish_id: e.target.value })}
                     name="finish_id"
                     select
                     disabled={!sheetForm.metal_type_id || finishes.length === 0}
-                    helperText={!sheetForm.metal_type_id ? "اختر نوع المعدن أولاً" : (finishes.length === 0 ? "لا توجد تشطيبات متاحة - اختياري" : "اختياري")}
+                    helperText={!sheetForm.metal_type_id ? "Ø§Ø®ØªØ± Ù†ÙˆØ¹ Ø§Ù„Ù…Ø¹Ø¯Ù† Ø£ÙˆÙ„Ø§Ù‹" : (finishes.length === 0 ? "Ù„Ø§ ØªÙˆØ¬Ø¯ ØªØ´Ø·ÙŠØ¨Ø§Øª Ù…ØªØ§Ø­Ø© - Ø§Ø®ØªÙŠØ§Ø±ÙŠ" : "Ø§Ø®ØªÙŠØ§Ø±ÙŠ")}
                   >
-                    <MenuItem value="">-- بدون تشطيب (xx) --</MenuItem>
+                    <MenuItem value="">-- Ø¨Ø¯ÙˆÙ† ØªØ´Ø·ÙŠØ¨ (xx) --</MenuItem>
                     {finishes.map(finish => (
                       <MenuItem key={finish.id} value={finish.id}>
                         {finish.name_ar} ({finish.name_en})
@@ -1594,7 +1613,7 @@ export default function InventoryTab() {
 
                 <Grid item xs={12} md={4}>
                   <UnifiedFormField
-                    label="الطول (مم)"
+                    label="Ø§Ù„Ø·ÙˆÙ„ (Ù…Ù…)"
                     value={sheetForm.length_mm}
                     onChange={(e) => setSheetForm({ ...sheetForm, length_mm: e.target.value })}
                     name="length_mm"
@@ -1606,7 +1625,7 @@ export default function InventoryTab() {
                 </Grid>
                 <Grid item xs={12} md={4}>
                   <UnifiedFormField
-                    label="العرض (مم)"
+                    label="Ø§Ù„Ø¹Ø±Ø¶ (Ù…Ù…)"
                     value={sheetForm.width_mm}
                     onChange={(e) => setSheetForm({ ...sheetForm, width_mm: e.target.value })}
                     name="width_mm"
@@ -1618,7 +1637,7 @@ export default function InventoryTab() {
                 </Grid>
                 <Grid item xs={12} md={4}>
                   <UnifiedFormField
-                    label="السماكة (مم)"
+                    label="Ø§Ù„Ø³Ù…Ø§ÙƒØ© (Ù…Ù…)"
                     value={sheetForm.thickness_mm}
                     onChange={(e) => setSheetForm({ ...sheetForm, thickness_mm: e.target.value })}
                     name="thickness_mm"
@@ -1637,14 +1656,14 @@ export default function InventoryTab() {
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
               <Typography variant="h6" fontWeight={700}>
                 <LocalShippingIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
-                معلومات الدفعة
+                Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ø¯ÙØ¹Ø©
               </Typography>
             </AccordionSummary>
             <AccordionDetails>
               <Grid container spacing={2}>
                 <Grid item xs={12} md={6}>
                   <UnifiedFormField
-                    label="المورد"
+                    label="Ø§Ù„Ù…ÙˆØ±Ø¯"
                     value={batchForm.supplier_id}
                     onChange={(e) => setBatchForm({ ...batchForm, supplier_id: e.target.value })}
                     name="supplier_id"
@@ -1652,7 +1671,7 @@ export default function InventoryTab() {
                     required
                     error={batchErrors.supplier_id}
                   >
-                    <MenuItem value="">-- اختر المورد --</MenuItem>
+                    <MenuItem value="">-- Ø§Ø®ØªØ± Ø§Ù„Ù…ÙˆØ±Ø¯ --</MenuItem>
                     {suppliers.map(supplier => (
                       <MenuItem key={supplier.id} value={supplier.id}>{supplier.name}</MenuItem>
                     ))}
@@ -1660,7 +1679,7 @@ export default function InventoryTab() {
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <UnifiedFormField
-                    label="الكمية"
+                    label="Ø§Ù„ÙƒÙ…ÙŠØ©"
                     value={batchForm.quantity}
                     onChange={(e) => setBatchForm({ ...batchForm, quantity: e.target.value })}
                     name="quantity"
@@ -1676,7 +1695,7 @@ export default function InventoryTab() {
                   <WeightPriceEntry
                     mode="weight"
                     weightMode={batchForm.weight_input_mode || 'per_sheet'}
-                    label="الوزن"
+                    label="Ø§Ù„ÙˆØ²Ù†"
                     value={batchForm.weight_per_sheet || ''}
                     totalWeight={batchForm.total_weight || ''}
                     quantity={batchForm.quantity || ''}
@@ -1711,7 +1730,7 @@ export default function InventoryTab() {
                   <WeightPriceEntry
                     mode="price"
                     pricingMode={batchForm.pricing_mode || 'per_kg'}
-                    label="التسعير"
+                    label="Ø§Ù„ØªØ³Ø¹ÙŠØ±"
                     pricePerKg={batchForm.price_per_kg || ''}
                     pricePerPiece=""
                     totalCost={batchForm.total_cost || ''}
@@ -1733,7 +1752,7 @@ export default function InventoryTab() {
 
                 <Grid item xs={12} md={6}>
                   <UnifiedFormField
-                    label="تاريخ الاستلام"
+                    label="ØªØ§Ø±ÙŠØ® Ø§Ù„Ø§Ø³ØªÙ„Ø§Ù…"
                     value={batchForm.received_date}
                     onChange={(e) => setBatchForm({ ...batchForm, received_date: e.target.value })}
                     name="received_date"
@@ -1743,22 +1762,22 @@ export default function InventoryTab() {
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <UnifiedFormField
-                    label="موقع التخزين"
+                    label="Ù…ÙˆÙ‚Ø¹ Ø§Ù„ØªØ®Ø²ÙŠÙ†"
                     value={batchForm.storage_location}
                     onChange={(e) => setBatchForm({ ...batchForm, storage_location: e.target.value })}
                     name="storage_location"
-                    helperText="اختياري"
+                    helperText="Ø§Ø®ØªÙŠØ§Ø±ÙŠ"
                   />
                 </Grid>
                 <Grid item xs={12}>
                   <UnifiedFormField
-                    label="ملاحظات"
+                    label="Ù…Ù„Ø§Ø­Ø¸Ø§Øª"
                     value={batchForm.notes}
                     onChange={(e) => setBatchForm({ ...batchForm, notes: e.target.value })}
                     name="notes"
                     multiline
                     rows={2}
-                    helperText="اختياري"
+                    helperText="Ø§Ø®ØªÙŠØ§Ø±ÙŠ"
                   />
                 </Grid>
 
@@ -1791,17 +1810,17 @@ export default function InventoryTab() {
                           <>
                             <Grid item xs={12} md={4}>
                               <Typography variant="body2">
-                                <strong>السعر لكل قطعة:</strong> {fmt(pricePerSheet)} {baseCurrencyInfo.symbol}
+                                <strong>Ø§Ù„Ø³Ø¹Ø± Ù„ÙƒÙ„ Ù‚Ø·Ø¹Ø©:</strong> {fmt(pricePerSheet)} {baseCurrencyInfo.symbol}
                               </Typography>
                             </Grid>
                             <Grid item xs={12} md={4}>
                               <Typography variant="body2">
-                                <strong>السعر لكل كيلو:</strong> {fmt(calculatedPricePerKg)} {baseCurrencyInfo.symbol}
+                                <strong>Ø§Ù„Ø³Ø¹Ø± Ù„ÙƒÙ„ ÙƒÙŠÙ„Ùˆ:</strong> {fmt(calculatedPricePerKg)} {baseCurrencyInfo.symbol}
                               </Typography>
                             </Grid>
                             <Grid item xs={12} md={4}>
                               <Typography variant="body2">
-                                <strong>التكلفة الإجمالية:</strong> {fmt(calculatedTotalCost)} {baseCurrencyInfo.symbol}
+                                <strong>Ø§Ù„ØªÙƒÙ„ÙØ© Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠØ©:</strong> {fmt(calculatedTotalCost)} {baseCurrencyInfo.symbol}
                               </Typography>
                             </Grid>
                           </>
@@ -1820,28 +1839,28 @@ export default function InventoryTab() {
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Typography variant="h6" fontWeight={700}>
                   <PaymentIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
-                  الدفع للمورد
+                  Ø§Ù„Ø¯ÙØ¹ Ù„Ù„Ù…ÙˆØ±Ø¯
                 </Typography>
               </AccordionSummary>
               <AccordionDetails>
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
-                    <FormLabel component="legend">نوع الدفع</FormLabel>
+                    <FormLabel component="legend">Ù†ÙˆØ¹ Ø§Ù„Ø¯ÙØ¹</FormLabel>
                     <RadioGroup
                       row
                       value={batchForm.payment_type}
                       onChange={(e) => setBatchForm({ ...batchForm, payment_type: e.target.value })}
                     >
-                      <FormControlLabel value="full" control={<Radio />} label="دفع كامل" />
-                      <FormControlLabel value="partial" control={<Radio />} label="دفع جزئي" />
-                      <FormControlLabel value="later" control={<Radio />} label="الدفع لاحقاً" />
+                      <FormControlLabel value="full" control={<Radio />} label="Ø¯ÙØ¹ ÙƒØ§Ù…Ù„" />
+                      <FormControlLabel value="partial" control={<Radio />} label="Ø¯ÙØ¹ Ø¬Ø²Ø¦ÙŠ" />
+                      <FormControlLabel value="later" control={<Radio />} label="Ø§Ù„Ø¯ÙØ¹ Ù„Ø§Ø­Ù‚Ø§Ù‹" />
                     </RadioGroup>
                   </Grid>
 
                   {batchForm.payment_type === 'partial' && (
                     <Grid item xs={12} md={6}>
                       <UnifiedFormField
-                        label="المبلغ المدفوع"
+                        label="Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø¯ÙÙˆØ¹"
                         value={batchForm.payment_amount}
                         onChange={(e) => setBatchForm({ ...batchForm, payment_amount: e.target.value })}
                         name="payment_amount"
@@ -1857,7 +1876,7 @@ export default function InventoryTab() {
                   {batchForm.payment_type !== 'later' && (
                     <Grid item xs={12} md={batchForm.payment_type === 'partial' ? 6 : 12}>
                       <UnifiedFormField
-                        label="طريقة الدفع"
+                        label="Ø·Ø±ÙŠÙ‚Ø© Ø§Ù„Ø¯ÙØ¹"
                         value={batchForm.payment_method}
                         onChange={(e) => setBatchForm({ ...batchForm, payment_method: e.target.value })}
                         name="payment_method"
@@ -1873,11 +1892,11 @@ export default function InventoryTab() {
                   {batchForm.payment_type !== 'later' && (
                     <Grid item xs={12}>
                       <UnifiedFormField
-                        label="ملاحظات الدفع"
+                        label="Ù…Ù„Ø§Ø­Ø¸Ø§Øª Ø§Ù„Ø¯ÙØ¹"
                         value={batchForm.payment_notes}
                         onChange={(e) => setBatchForm({ ...batchForm, payment_notes: e.target.value })}
                         name="payment_notes"
-                        helperText="اختياري"
+                        helperText="Ø§Ø®ØªÙŠØ§Ø±ÙŠ"
                       />
                     </Grid>
                   )}
@@ -1893,9 +1912,9 @@ export default function InventoryTab() {
         open={openAddRemnantDialog}
         onClose={handleCloseAddRemnantDialog}
         onSubmit={handleSaveNewRemnant}
-        title="إضافة بقية جديدة"
-        subtitle="أدخل معلومات البقية والدفعة الأولى"
-        submitText="حفظ"
+        title="Ø¥Ø¶Ø§ÙØ© Ø¨Ù‚ÙŠØ© Ø¬Ø¯ÙŠØ¯Ø©"
+        subtitle="Ø£Ø¯Ø®Ù„ Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ø¨Ù‚ÙŠØ© ÙˆØ§Ù„Ø¯ÙØ¹Ø© Ø§Ù„Ø£ÙˆÙ„Ù‰"
+        submitText="Ø­ÙØ¸"
         loading={loading}
         maxWidth="md"
       >
@@ -1906,7 +1925,7 @@ export default function InventoryTab() {
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
               <Typography variant="h6" fontWeight={700}>
                 <AddBoxIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
-                معلومات البقية
+                Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ø¨Ù‚ÙŠØ©
               </Typography>
             </AccordionSummary>
             <AccordionDetails>
@@ -1914,7 +1933,7 @@ export default function InventoryTab() {
                 {/* Piece Source Selection */}
                 <Grid item xs={12}>
                   <FormLabel component="legend">
-                    <Typography fontWeight={600} fontSize="1rem">مصدر القطعة *</Typography>
+                    <Typography fontWeight={600} fontSize="1rem">Ù…ØµØ¯Ø± Ø§Ù„Ù‚Ø·Ø¹Ø© *</Typography>
                   </FormLabel>
                   <RadioGroup
                     row
@@ -1923,7 +1942,7 @@ export default function InventoryTab() {
                       const newSource = e.target.value;
                       setRemnantForm(prev => ({ ...prev, piece_source: newSource }));
                       if (newSource === 'company_stock') {
-                        const companySupplier = suppliers.find(s => s.name === 'الشركة' || s.name.includes('الشركة'));
+                        const companySupplier = suppliers.find(s => s.name === 'Ø§Ù„Ø´Ø±ÙƒØ©' || s.name.includes('Ø§Ù„Ø´Ø±ÙƒØ©'));
                         if (companySupplier) {
                           setRemnantBatchForm(prev => ({ ...prev, supplier_id: companySupplier.id }));
                         }
@@ -1935,12 +1954,12 @@ export default function InventoryTab() {
                     <FormControlLabel
                       value="company_stock"
                       control={<Radio />}
-                      label={<Typography fontSize="1rem">مخزون الشركة</Typography>}
+                      label={<Typography fontSize="1rem">Ù…Ø®Ø²ÙˆÙ† Ø§Ù„Ø´Ø±ÙƒØ©</Typography>}
                     />
                     <FormControlLabel
                       value="from_sheet_cutting"
                       control={<Radio />}
-                      label={<Typography fontSize="1rem">من قص صفيحة</Typography>}
+                      label={<Typography fontSize="1rem">Ù…Ù† Ù‚Øµ ØµÙÙŠØ­Ø©</Typography>}
                     />
                   </RadioGroup>
                 </Grid>
@@ -1962,7 +1981,7 @@ export default function InventoryTab() {
                     label={
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <AutoFixHighIcon fontSize="small" />
-                        <Typography fontSize="1rem">توليد الكود تلقائياً</Typography>
+                        <Typography fontSize="1rem">ØªÙˆÙ„ÙŠØ¯ Ø§Ù„ÙƒÙˆØ¯ ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹</Typography>
                       </Box>
                     }
                   />
@@ -1970,7 +1989,7 @@ export default function InventoryTab() {
 
                 <Grid item xs={12} md={6}>
                   <UnifiedFormField
-                    label="الكود"
+                    label="Ø§Ù„ÙƒÙˆØ¯"
                     value={remnantForm.code}
                     onChange={(e) => {
                       setRemnantForm({ ...remnantForm, code: e.target.value });
@@ -1982,13 +2001,13 @@ export default function InventoryTab() {
                     required
                     error={remnantErrors.code}
                     disabled={autoGenerateCode}
-                    helperText={autoGenerateCode ? "سيتم توليد الكود تلقائياً (R...)" : ""}
+                    helperText={autoGenerateCode ? "Ø³ÙŠØªÙ… ØªÙˆÙ„ÙŠØ¯ Ø§Ù„ÙƒÙˆØ¯ ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹ (R...)" : ""}
                   />
                 </Grid>
 
                 <Grid item xs={12} md={6}>
                   <UnifiedFormField
-                    label="نوع المعدن"
+                    label="Ù†ÙˆØ¹ Ø§Ù„Ù…Ø¹Ø¯Ù†"
                     value={remnantForm.metal_type_id}
                     onChange={(e) => {
                       const newMetalId = e.target.value;
@@ -2011,7 +2030,7 @@ export default function InventoryTab() {
                     required
                     error={remnantErrors.metal_type_id}
                   >
-                    <MenuItem value="">-- اختر النوع --</MenuItem>
+                    <MenuItem value="">-- Ø§Ø®ØªØ± Ø§Ù„Ù†ÙˆØ¹ --</MenuItem>
                     {metalTypes.filter(m => m.is_active).map(metal => (
                       <MenuItem key={metal.id} value={metal.id}>{metal.name_ar}</MenuItem>
                     ))}
@@ -2020,14 +2039,14 @@ export default function InventoryTab() {
 
                 <Grid item xs={12} md={6}>
                   <UnifiedFormField
-                    label="الدرجة"
+                    label="Ø§Ù„Ø¯Ø±Ø¬Ø©"
                     value={remnantForm.grade_id}
                     onChange={(e) => setRemnantForm({ ...remnantForm, grade_id: e.target.value })}
                     name="grade_id"
                     select
                     disabled={!remnantForm.metal_type_id || grades.length === 0}
                   >
-                    <MenuItem value="">-- بدون درجة --</MenuItem>
+                    <MenuItem value="">-- Ø¨Ø¯ÙˆÙ† Ø¯Ø±Ø¬Ø© --</MenuItem>
                     {grades.map(grade => (
                       <MenuItem key={grade.id} value={grade.id}>{grade.name}</MenuItem>
                     ))}
@@ -2036,14 +2055,14 @@ export default function InventoryTab() {
 
                 <Grid item xs={12} md={6}>
                   <UnifiedFormField
-                    label="التشطيب"
+                    label="Ø§Ù„ØªØ´Ø·ÙŠØ¨"
                     value={remnantForm.finish_id}
                     onChange={(e) => setRemnantForm({ ...remnantForm, finish_id: e.target.value })}
                     name="finish_id"
                     select
                     disabled={!remnantForm.metal_type_id || finishes.length === 0}
                   >
-                    <MenuItem value="">-- بدون تشطيب --</MenuItem>
+                    <MenuItem value="">-- Ø¨Ø¯ÙˆÙ† ØªØ´Ø·ÙŠØ¨ --</MenuItem>
                     {finishes.map(finish => (
                       <MenuItem key={finish.id} value={finish.id}>
                         {finish.name_ar} ({finish.name_en})
@@ -2054,7 +2073,7 @@ export default function InventoryTab() {
 
                 <Grid item xs={12} md={4}>
                   <UnifiedFormField
-                    label="الطول (مم)"
+                    label="Ø§Ù„Ø·ÙˆÙ„ (Ù…Ù…)"
                     value={remnantForm.length_mm}
                     onChange={(e) => {
                       setRemnantForm({ ...remnantForm, length_mm: e.target.value });
@@ -2072,7 +2091,7 @@ export default function InventoryTab() {
 
                 <Grid item xs={12} md={4}>
                   <UnifiedFormField
-                    label="العرض (مم)"
+                    label="Ø§Ù„Ø¹Ø±Ø¶ (Ù…Ù…)"
                     value={remnantForm.width_mm}
                     onChange={(e) => {
                       setRemnantForm({ ...remnantForm, width_mm: e.target.value });
@@ -2090,7 +2109,7 @@ export default function InventoryTab() {
 
                 <Grid item xs={12} md={4}>
                   <UnifiedFormField
-                    label="السماكة (مم)"
+                    label="Ø§Ù„Ø³Ù…Ø§ÙƒØ© (Ù…Ù…)"
                     value={remnantForm.thickness_mm}
                     onChange={(e) => {
                       setRemnantForm({ ...remnantForm, thickness_mm: e.target.value });
@@ -2108,29 +2127,29 @@ export default function InventoryTab() {
 
                 <Grid item xs={12}>
                   <UnifiedFormField
-                    label="الوزن لكل قطعة (كغ)"
+                    label="Ø§Ù„ÙˆØ²Ù† Ù„ÙƒÙ„ Ù‚Ø·Ø¹Ø© (ÙƒØº)"
                     value={remnantForm.weight_per_sheet_kg}
                     onChange={(e) => setRemnantForm({ ...remnantForm, weight_per_sheet_kg: e.target.value })}
                     name="weight_per_sheet_kg"
                     type="number"
                     inputProps={{ step: 0.001, min: 0 }}
-                    helperText="اختياري"
+                    helperText="Ø§Ø®ØªÙŠØ§Ø±ÙŠ"
                   />
                 </Grid>
 
                 {remnantForm.piece_source === 'from_sheet_cutting' && (
                   <Grid item xs={12}>
                     <UnifiedFormField
-                      label="الصفيحة الأم"
+                      label="Ø§Ù„ØµÙÙŠØ­Ø© Ø§Ù„Ø£Ù…"
                       value={remnantForm.parent_sheet_id || ''}
                       onChange={(e) => setRemnantForm({ ...remnantForm, parent_sheet_id: e.target.value || null })}
                       name="parent_sheet_id"
                       select
                       required
                       error={remnantErrors.parent_sheet_id}
-                      helperText="اختر الصفيحة التي تم قصها"
+                      helperText="Ø§Ø®ØªØ± Ø§Ù„ØµÙÙŠØ­Ø© Ø§Ù„ØªÙŠ ØªÙ… Ù‚ØµÙ‡Ø§"
                     >
-                      <MenuItem value="">-- اختر الصفيحة الأم --</MenuItem>
+                      <MenuItem value="">-- Ø§Ø®ØªØ± Ø§Ù„ØµÙÙŠØ­Ø© Ø§Ù„Ø£Ù… --</MenuItem>
                       {sheets.map(sheet => (
                         <MenuItem key={sheet.id} value={sheet.id}>
                           {sheet.code} - {sheet.metal_name}
@@ -2148,21 +2167,21 @@ export default function InventoryTab() {
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
               <Typography variant="h6" fontWeight={700}>
                 <LocalShippingIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
-                معلومات الدفعة
+                Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ø¯ÙØ¹Ø©
               </Typography>
             </AccordionSummary>
             <AccordionDetails>
               <Grid container spacing={2}>
                 <Grid item xs={12} md={6}>
                   <UnifiedFormField
-                    label="المورد"
+                    label="Ø§Ù„Ù…ÙˆØ±Ø¯"
                     value={remnantBatchForm.supplier_id}
                     onChange={(e) => setRemnantBatchForm({ ...remnantBatchForm, supplier_id: e.target.value })}
                     name="supplier_id"
                     select
                     disabled={remnantForm.piece_source === 'company_stock'}
                   >
-                    <MenuItem value="">بدون مورد</MenuItem>
+                    <MenuItem value="">Ø¨Ø¯ÙˆÙ† Ù…ÙˆØ±Ø¯</MenuItem>
                     {suppliers.map(supplier => (
                       <MenuItem key={supplier.id} value={supplier.id}>{supplier.name}</MenuItem>
                     ))}
@@ -2171,7 +2190,7 @@ export default function InventoryTab() {
 
                 <Grid item xs={12} md={6}>
                   <UnifiedFormField
-                    label="الكمية"
+                    label="Ø§Ù„ÙƒÙ…ÙŠØ©"
                     value={remnantBatchForm.quantity}
                     onChange={(e) => {
                       setRemnantBatchForm({ ...remnantBatchForm, quantity: e.target.value });
@@ -2191,7 +2210,7 @@ export default function InventoryTab() {
                   <WeightPriceEntry
                     mode="price"
                     pricingMode={remnantBatchForm.pricing_mode}
-                    label="التسعير"
+                    label="Ø§Ù„ØªØ³Ø¹ÙŠØ±"
                     pricePerKg={remnantBatchForm.price_per_kg || ''}
                     pricePerPiece=""
                     totalCost={remnantBatchForm.total_cost || ''}
@@ -2217,19 +2236,19 @@ export default function InventoryTab() {
 
                 <Grid item xs={12} md={6}>
                   <UnifiedFormField
-                    label="الوزن الإجمالي للدفعة (كغ)"
+                    label="Ø§Ù„ÙˆØ²Ù† Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ù„Ù„Ø¯ÙØ¹Ø© (ÙƒØº)"
                     value={remnantBatchForm.batch_weight_kg}
                     onChange={(e) => setRemnantBatchForm({ ...remnantBatchForm, batch_weight_kg: e.target.value })}
                     name="batch_weight_kg"
                     type="number"
                     inputProps={{ step: 0.001, min: 0 }}
-                    helperText="اختياري"
+                    helperText="Ø§Ø®ØªÙŠØ§Ø±ÙŠ"
                   />
                 </Grid>
 
                 <Grid item xs={12} md={6}>
                   <UnifiedFormField
-                    label="تاريخ الاستلام"
+                    label="ØªØ§Ø±ÙŠØ® Ø§Ù„Ø§Ø³ØªÙ„Ø§Ù…"
                     value={remnantBatchForm.received_date}
                     onChange={(e) => setRemnantBatchForm({ ...remnantBatchForm, received_date: e.target.value })}
                     name="received_date"
@@ -2239,7 +2258,7 @@ export default function InventoryTab() {
 
                 <Grid item xs={12} md={6}>
                   <UnifiedFormField
-                    label="موقع التخزين"
+                    label="Ù…ÙˆÙ‚Ø¹ Ø§Ù„ØªØ®Ø²ÙŠÙ†"
                     value={remnantBatchForm.storage_location}
                     onChange={(e) => setRemnantBatchForm({ ...remnantBatchForm, storage_location: e.target.value })}
                     name="storage_location"
@@ -2248,7 +2267,7 @@ export default function InventoryTab() {
 
                 <Grid item xs={12}>
                   <UnifiedFormField
-                    label="ملاحظات"
+                    label="Ù…Ù„Ø§Ø­Ø¸Ø§Øª"
                     value={remnantBatchForm.notes}
                     onChange={(e) => setRemnantBatchForm({ ...remnantBatchForm, notes: e.target.value })}
                     name="notes"
@@ -2267,27 +2286,27 @@ export default function InventoryTab() {
         open={openBatchesDialog}
         onClose={() => setOpenBatchesDialog(false)}
         onSubmit={() => setOpenBatchesDialog(false)}
-        title={`الدفعات - ${selectedSheet?.code}`}
-        subtitle={`${selectedSheet?.metal_name} | ${selectedSheet?.length_mm}×${selectedSheet?.width_mm} | ${selectedSheet?.thickness_mm} مم`}
-        submitText="إغلاق"
+        title={`Ø§Ù„Ø¯ÙØ¹Ø§Øª - ${selectedSheet?.code}`}
+        subtitle={`${selectedSheet?.metal_name} | ${selectedSheet?.length_mm}Ã—${selectedSheet?.width_mm} | ${selectedSheet?.thickness_mm} Ù…Ù…`}
+        submitText="Ø¥ØºÙ„Ø§Ù‚"
         cancelText=""
         maxWidth="lg"
       >
         <Box sx={{ mb: 3 }}>
           <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <AddBoxIcon fontSize="small" /> إضافة دفعة للصفيحة
+            <AddBoxIcon fontSize="small" /> Ø¥Ø¶Ø§ÙØ© Ø¯ÙØ¹Ø© Ù„Ù„ØµÙÙŠØ­Ø©
           </Typography>
           <Grid container spacing={2}>
             <Grid item xs={12} md={4}>
               <UnifiedFormField
-                label="المورد"
+                label="Ø§Ù„Ù…ÙˆØ±Ø¯"
                 value={existingBatchForm.supplier_id}
                 onChange={(e) => setExistingBatchForm({ ...existingBatchForm, supplier_id: e.target.value })}
                 name="supplier_id"
                 select
-                helperText="اختياري"
+                helperText="Ø§Ø®ØªÙŠØ§Ø±ÙŠ"
               >
-                <MenuItem value="">بدون مورد</MenuItem>
+                <MenuItem value="">Ø¨Ø¯ÙˆÙ† Ù…ÙˆØ±Ø¯</MenuItem>
                 {suppliers.map(supplier => (
                   <MenuItem key={supplier.id} value={supplier.id}>{supplier.name}</MenuItem>
                 ))}
@@ -2295,7 +2314,7 @@ export default function InventoryTab() {
             </Grid>
             <Grid item xs={12} md={4}>
               <UnifiedFormField
-                label="الكمية"
+                label="Ø§Ù„ÙƒÙ…ÙŠØ©"
                 value={existingBatchForm.quantity}
                 onChange={(e) => setExistingBatchForm({ ...existingBatchForm, quantity: e.target.value })}
                 name="quantity"
@@ -2307,27 +2326,27 @@ export default function InventoryTab() {
             </Grid>
             <Grid item xs={12} md={4}>
               <UnifiedFormField
-                label="طريقة التسعير"
+                label="Ø·Ø±ÙŠÙ‚Ø© Ø§Ù„ØªØ³Ø¹ÙŠØ±"
                 value={existingBatchForm.pricing_mode}
                 onChange={(e) => setExistingBatchForm({ ...existingBatchForm, pricing_mode: e.target.value })}
                 name="pricing_mode"
                 select
               >
-                <MenuItem value="per_kg">بالكيلو (price/kg)</MenuItem>
-                <MenuItem value="per_batch">بالدفعة (total cost)</MenuItem>
+                <MenuItem value="per_kg">Ø¨Ø§Ù„ÙƒÙŠÙ„Ùˆ (price/kg)</MenuItem>
+                <MenuItem value="per_batch">Ø¨Ø§Ù„Ø¯ÙØ¹Ø© (total cost)</MenuItem>
               </UnifiedFormField>
             </Grid>
 
             <Grid item xs={12} md={6}>
               <UnifiedFormField
-                label="الوزن لكل قطعة (كغ)"
+                label="Ø§Ù„ÙˆØ²Ù† Ù„ÙƒÙ„ Ù‚Ø·Ø¹Ø© (ÙƒØº)"
                 value={existingBatchForm.batch_weight_kg}
                 onChange={(e) => setExistingBatchForm({ ...existingBatchForm, batch_weight_kg: e.target.value })}
                 name="batch_weight_kg"
                 type="number"
                 required
                 error={batchErrors.batch_weight_kg}
-                helperText="الوزن لكل قطعة واحدة"
+                helperText="Ø§Ù„ÙˆØ²Ù† Ù„ÙƒÙ„ Ù‚Ø·Ø¹Ø© ÙˆØ§Ø­Ø¯Ø©"
                 inputProps={{ step: 0.001, min: 0 }}
               />
             </Grid>
@@ -2336,14 +2355,14 @@ export default function InventoryTab() {
               <TextField
                 fullWidth
                 type="number"
-                label="الوزن الإجمالي (كغ)"
+                label="Ø§Ù„ÙˆØ²Ù† Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ (ÙƒØº)"
                 value={
                   existingBatchForm.quantity && existingBatchForm.batch_weight_kg
                     ? (Number(existingBatchForm.quantity) * Number(existingBatchForm.batch_weight_kg)).toFixed(3)
                     : ''
                 }
                 disabled
-                helperText="يُحسب تلقائياً: الكمية × الوزن لكل قطعة"
+                helperText="ÙŠÙØ­Ø³Ø¨ ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹: Ø§Ù„ÙƒÙ…ÙŠØ© Ã— Ø§Ù„ÙˆØ²Ù† Ù„ÙƒÙ„ Ù‚Ø·Ø¹Ø©"
                 InputLabelProps={{ shrink: true }}
               />
             </Grid>
@@ -2351,7 +2370,7 @@ export default function InventoryTab() {
             {existingBatchForm.pricing_mode === 'per_kg' ? (
               <Grid item xs={12} md={6}>
                 <UnifiedFormField
-                  label="السعر لكل كيلو"
+                  label="Ø§Ù„Ø³Ø¹Ø± Ù„ÙƒÙ„ ÙƒÙŠÙ„Ùˆ"
                   value={existingBatchForm.price_per_kg}
                   onChange={(e) => setExistingBatchForm({ ...existingBatchForm, price_per_kg: e.target.value })}
                   name="price_per_kg"
@@ -2365,7 +2384,7 @@ export default function InventoryTab() {
             ) : (
               <Grid item xs={12} md={6}>
                 <UnifiedFormField
-                  label="التكلفة الإجمالية"
+                  label="Ø§Ù„ØªÙƒÙ„ÙØ© Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠØ©"
                   value={existingBatchForm.total_cost}
                   onChange={(e) => setExistingBatchForm({ ...existingBatchForm, total_cost: e.target.value })}
                   name="total_cost"
@@ -2380,7 +2399,7 @@ export default function InventoryTab() {
 
             <Grid item xs={12} md={6}>
               <UnifiedFormField
-                label="تاريخ الاستلام"
+                label="ØªØ§Ø±ÙŠØ® Ø§Ù„Ø§Ø³ØªÙ„Ø§Ù…"
                 value={existingBatchForm.received_date}
                 onChange={(e) => setExistingBatchForm({ ...existingBatchForm, received_date: e.target.value })}
                 name="received_date"
@@ -2395,27 +2414,27 @@ export default function InventoryTab() {
                   <Divider sx={{ my: 1 }} />
                   <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
                     <PaymentIcon fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
-                    الدفع للمورد
+                    Ø§Ù„Ø¯ÙØ¹ Ù„Ù„Ù…ÙˆØ±Ø¯
                   </Typography>
                 </Grid>
                 <Grid item xs={12} md={4}>
                   <UnifiedFormField
-                    label="نوع الدفع"
+                    label="Ù†ÙˆØ¹ Ø§Ù„Ø¯ÙØ¹"
                     value={existingBatchForm.payment_type}
                     onChange={(e) => setExistingBatchForm({ ...existingBatchForm, payment_type: e.target.value })}
                     name="payment_type"
                     select
                   >
-                    <MenuItem value="later">الدفع لاحقاً</MenuItem>
-                    <MenuItem value="full">دفع كامل</MenuItem>
-                    <MenuItem value="partial">دفع جزئي</MenuItem>
+                    <MenuItem value="later">Ø§Ù„Ø¯ÙØ¹ Ù„Ø§Ø­Ù‚Ø§Ù‹</MenuItem>
+                    <MenuItem value="full">Ø¯ÙØ¹ ÙƒØ§Ù…Ù„</MenuItem>
+                    <MenuItem value="partial">Ø¯ÙØ¹ Ø¬Ø²Ø¦ÙŠ</MenuItem>
                   </UnifiedFormField>
                 </Grid>
 
                 {existingBatchForm.payment_type === 'partial' && (
                   <Grid item xs={12} md={4}>
                     <UnifiedFormField
-                      label="المبلغ المدفوع"
+                      label="Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø¯ÙÙˆØ¹"
                       value={existingBatchForm.payment_amount}
                       onChange={(e) => setExistingBatchForm({ ...existingBatchForm, payment_amount: e.target.value })}
                       name="payment_amount"
@@ -2431,7 +2450,7 @@ export default function InventoryTab() {
                 {existingBatchForm.payment_type !== 'later' && (
                   <Grid item xs={12} md={4}>
                     <UnifiedFormField
-                      label="طريقة الدفع"
+                      label="Ø·Ø±ÙŠÙ‚Ø© Ø§Ù„Ø¯ÙØ¹"
                       value={existingBatchForm.payment_method}
                       onChange={(e) => setExistingBatchForm({ ...existingBatchForm, payment_method: e.target.value })}
                       name="payment_method"
@@ -2458,14 +2477,14 @@ export default function InventoryTab() {
                 );
                 return (
                   <Typography variant="caption" color="text.secondary" fontSize="0.9375rem">
-                    الوزن المُستخدم للحساب: <b>{p.weight_used ? fmt(p.weight_used) : 'غير مُحدد'} كغ</b> —{' '}
+                    Ø§Ù„ÙˆØ²Ù† Ø§Ù„Ù…ÙØ³ØªØ®Ø¯Ù… Ù„Ù„Ø­Ø³Ø§Ø¨: <b>{p.weight_used ? fmt(p.weight_used) : 'ØºÙŠØ± Ù…ÙØ­Ø¯Ø¯'} ÙƒØº</b> â€”{' '}
                     {existingBatchForm.pricing_mode === 'per_kg' ? (
                       <>
-                        التكلفة المتوقعة: <b>{p.total_cost != null ? fmt(p.total_cost) : '—'} {baseCurrencyInfo.symbol}</b>
+                        Ø§Ù„ØªÙƒÙ„ÙØ© Ø§Ù„Ù…ØªÙˆÙ‚Ø¹Ø©: <b>{p.total_cost != null ? fmt(p.total_cost) : 'â€”'} {baseCurrencyInfo.symbol}</b>
                       </>
                     ) : (
                       <>
-                        السعر/كغ المتوقع: <b>{p.price_per_kg != null ? fmt(p.price_per_kg) : '—'} {baseCurrencyInfo.symbol}</b>
+                        Ø§Ù„Ø³Ø¹Ø±/ÙƒØº Ø§Ù„Ù…ØªÙˆÙ‚Ø¹: <b>{p.price_per_kg != null ? fmt(p.price_per_kg) : 'â€”'} {baseCurrencyInfo.symbol}</b>
                       </>
                     )}
                   </Typography>
@@ -2475,7 +2494,7 @@ export default function InventoryTab() {
 
             <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
               <Button variant="contained" size="large" startIcon={<AddBoxIcon />} onClick={handleBatchFormSubmit}>
-                إضافة الدفعة
+                Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø¯ÙØ¹Ø©
               </Button>
             </Grid>
           </Grid>
@@ -2485,7 +2504,7 @@ export default function InventoryTab() {
 
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="subtitle1" fontWeight={700}>
-            الدفعات المتاحة
+            Ø§Ù„Ø¯ÙØ¹Ø§Øª Ø§Ù„Ù…ØªØ§Ø­Ø©
           </Typography>
           <Button
             variant="outlined"
@@ -2494,30 +2513,30 @@ export default function InventoryTab() {
             startIcon={<DeleteIcon />}
             onClick={handleDeleteSheet}
           >
-            حذف الصفيحة
+            Ø­Ø°Ù Ø§Ù„ØµÙÙŠØ­Ø©
           </Button>
         </Box>
 
         {batches.length === 0 ? (
-          <Alert severity="info" sx={{ fontSize: '1rem' }}>لا توجد دفعات متاحة</Alert>
+          <Alert severity="info" sx={{ fontSize: '1rem' }}>Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¯ÙØ¹Ø§Øª Ù…ØªØ§Ø­Ø©</Alert>
         ) : (
           <TableContainer>
             <Table size="small">
               <TableHead sx={{ bgcolor: 'grey.100' }}>
                 <TableRow>
-                  <TableCell><Typography fontWeight={700} fontSize="1rem">المورد</Typography></TableCell>
-                  <TableCell><Typography fontWeight={700} fontSize="1rem">الكمية الأصلية</Typography></TableCell>
-                  <TableCell><Typography fontWeight={700} fontSize="1rem">المتبقي</Typography></TableCell>
-                  <TableCell><Typography fontWeight={700} fontSize="1rem">السعر/كغ</Typography></TableCell>
-                  <TableCell><Typography fontWeight={700} fontSize="1rem">التاريخ</Typography></TableCell>
-                  <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الإجراءات</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ù…ÙˆØ±Ø¯</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ø£ØµÙ„ÙŠØ©</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ù…ØªØ¨Ù‚ÙŠ</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ø³Ø¹Ø±/ÙƒØº</Typography></TableCell>
+                  <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„ØªØ§Ø±ÙŠØ®</Typography></TableCell>
+                  <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª</Typography></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {batches.map((batch) => (
                   <TableRow key={batch.id} hover sx={{ cursor: 'pointer' }}>
                     <TableCell onClick={() => handleViewBatch(batch)}>
-                      <Typography fontSize="0.9375rem">{batch.supplier_name || 'بدون مورد'}</Typography>
+                      <Typography fontSize="0.9375rem">{batch.supplier_name || 'Ø¨Ø¯ÙˆÙ† Ù…ÙˆØ±Ø¯'}</Typography>
                     </TableCell>
                     <TableCell onClick={() => handleViewBatch(batch)}>
                       <Typography fontSize="0.9375rem">{batch.quantity_original}</Typography>
@@ -2531,14 +2550,14 @@ export default function InventoryTab() {
                     </TableCell>
                     <TableCell onClick={() => handleViewBatch(batch)}>
                       <Typography fontSize="0.9375rem">
-                        {batch.price_per_kg ? `${fmt(batch.price_per_kg)} ${baseCurrencyInfo.symbol}` : '—'}
+                        {batch.price_per_kg ? `${fmt(batch.price_per_kg)} ${baseCurrencyInfo.symbol}` : 'â€”'}
                       </Typography>
                     </TableCell>
                     <TableCell onClick={() => handleViewBatch(batch)}>
                       <Typography fontSize="0.9375rem">{batch.received_date}</Typography>
                     </TableCell>
                     <TableCell align="center">
-                      <Tooltip title="عرض التفاصيل">
+                      <Tooltip title="Ø¹Ø±Ø¶ Ø§Ù„ØªÙØ§ØµÙŠÙ„">
                         <IconButton
                           size="small"
                           color="primary"
@@ -2561,32 +2580,34 @@ export default function InventoryTab() {
         open={openBatchViewDialog}
         onClose={handleCloseBatchView}
         onSubmit={isEditingBatch ? handleEditBatchFormSubmit : handleCloseBatchView}
-        title={isEditingBatch ? 'تعديل الدفعة' : 'تفاصيل الدفعة'}
-        submitText={isEditingBatch ? 'حفظ التعديلات' : 'إغلاق'}
-        cancelText={isEditingBatch ? 'إلغاء' : ''}
+        title={isEditingBatch ? 'ØªØ¹Ø¯ÙŠÙ„ Ø§Ù„Ø¯ÙØ¹Ø©' : 'ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ø¯ÙØ¹Ø©'}
+        submitText={isEditingBatch ? 'Ø­ÙØ¸ Ø§Ù„ØªØ¹Ø¯ÙŠÙ„Ø§Øª' : 'Ø¥ØºÙ„Ø§Ù‚'}
+        cancelText={isEditingBatch ? 'Ø¥Ù„ØºØ§Ø¡' : ''}
         loading={loading}
         maxWidth="sm"
+        allowBackdropClose={false}
+        allowEscapeClose={false}
       >
         <Box sx={{ mb: 2 }}>
           {!isEditingBatch ? (
             // View Mode
             <Grid container spacing={2}>
               <Grid item xs={12}>
-                <Typography variant="body2" color="text.secondary" fontSize="0.875rem">المورد</Typography>
+                <Typography variant="body2" color="text.secondary" fontSize="0.875rem">Ø§Ù„Ù…ÙˆØ±Ø¯</Typography>
                 <Typography variant="body1" fontWeight={600} fontSize="1rem">
-                  {selectedBatch?.supplier_name || 'بدون مورد'}
+                  {selectedBatch?.supplier_name || 'Ø¨Ø¯ÙˆÙ† Ù…ÙˆØ±Ø¯'}
                 </Typography>
               </Grid>
 
               <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary" fontSize="0.875rem">الكمية الأصلية</Typography>
+                <Typography variant="body2" color="text.secondary" fontSize="0.875rem">Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ø£ØµÙ„ÙŠØ©</Typography>
                 <Typography variant="body1" fontWeight={600} fontSize="1rem">
                   {selectedBatch?.quantity_original || 0}
                 </Typography>
               </Grid>
 
               <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary" fontSize="0.875rem">الكمية المتبقية</Typography>
+                <Typography variant="body2" color="text.secondary" fontSize="0.875rem">Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ù…ØªØ¨Ù‚ÙŠØ©</Typography>
                 <Chip
                   label={selectedBatch?.quantity_remaining || 0}
                   color={getStockColor(selectedBatch?.quantity_remaining || 0)}
@@ -2596,49 +2617,49 @@ export default function InventoryTab() {
               </Grid>
 
               <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary" fontSize="0.875rem">السعر لكل كيلو</Typography>
+                <Typography variant="body2" color="text.secondary" fontSize="0.875rem">Ø§Ù„Ø³Ø¹Ø± Ù„ÙƒÙ„ ÙƒÙŠÙ„Ùˆ</Typography>
                 <Typography variant="body1" fontWeight={600} fontSize="1rem">
                   {selectedBatch?.price_per_kg
                     ? `${fmt(selectedBatch.price_per_kg)} ${baseCurrencyInfo.symbol}`
-                    : '—'}
+                    : 'â€”'}
                 </Typography>
               </Grid>
 
               <Grid item xs={6}>
-                <Typography variant="body2" color="text.secondary" fontSize="0.875rem">التكلفة الإجمالية</Typography>
+                <Typography variant="body2" color="text.secondary" fontSize="0.875rem">Ø§Ù„ØªÙƒÙ„ÙØ© Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠØ©</Typography>
                 <Typography variant="body1" fontWeight={600} fontSize="1rem">
                   {selectedBatch?.total_cost
                     ? `${fmt(selectedBatch.total_cost)} ${baseCurrencyInfo.symbol}`
-                    : '—'}
+                    : 'â€”'}
                 </Typography>
               </Grid>
 
               {selectedSheet?.weight_per_sheet_kg && (
                 <Grid item xs={12}>
-                  <Typography variant="body2" color="text.secondary" fontSize="0.875rem">الوزن الإجمالي</Typography>
+                  <Typography variant="body2" color="text.secondary" fontSize="0.875rem">Ø§Ù„ÙˆØ²Ù† Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ</Typography>
                   <Typography variant="body1" fontWeight={600} fontSize="1rem">
-                    {fmt(selectedBatch?.quantity_original * selectedSheet.weight_per_sheet_kg)} كغ
+                    {fmt(selectedBatch?.quantity_original * selectedSheet.weight_per_sheet_kg)} ÙƒØº
                   </Typography>
                 </Grid>
               )}
 
               <Grid item xs={12}>
-                <Typography variant="body2" color="text.secondary" fontSize="0.875rem">تاريخ الاستلام</Typography>
+                <Typography variant="body2" color="text.secondary" fontSize="0.875rem">ØªØ§Ø±ÙŠØ® Ø§Ù„Ø§Ø³ØªÙ„Ø§Ù…</Typography>
                 <Typography variant="body1" fontWeight={600} fontSize="1rem">
-                  {selectedBatch?.received_date || '—'}
+                  {selectedBatch?.received_date || 'â€”'}
                 </Typography>
               </Grid>
 
               <Grid item xs={12}>
-                <Typography variant="body2" color="text.secondary" fontSize="0.875rem">موقع التخزين</Typography>
+                <Typography variant="body2" color="text.secondary" fontSize="0.875rem">Ù…ÙˆÙ‚Ø¹ Ø§Ù„ØªØ®Ø²ÙŠÙ†</Typography>
                 <Typography variant="body1" fontWeight={600} fontSize="1rem">
-                  {selectedBatch?.storage_location || '—'}
+                  {selectedBatch?.storage_location || 'â€”'}
                 </Typography>
               </Grid>
 
               {selectedBatch?.notes && (
                 <Grid item xs={12}>
-                  <Typography variant="body2" color="text.secondary" fontSize="0.875rem">ملاحظات</Typography>
+                  <Typography variant="body2" color="text.secondary" fontSize="0.875rem">Ù…Ù„Ø§Ø­Ø¸Ø§Øª</Typography>
                   <Typography variant="body1" fontSize="1rem">
                     {safeNotes(selectedBatch.notes)}
                   </Typography>
@@ -2649,22 +2670,36 @@ export default function InventoryTab() {
                 <Divider sx={{ my: 1 }} />
               </Grid>
 
-              {selectedBatch?.created_by && (
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary" fontSize="0.875rem">أضيفت بواسطة</Typography>
-                  <Typography variant="body1" fontWeight={600} fontSize="0.9375rem">
-                    {selectedBatch.created_by}
-                  </Typography>
-                </Grid>
-              )}
+              {selectedBatch && (
 
-              {selectedBatch?.updated_by && (
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary" fontSize="0.875rem">آخر تعديل بواسطة</Typography>
-                  <Typography variant="body1" fontWeight={600} fontSize="0.9375rem">
-                    {selectedBatch.updated_by}
-                  </Typography>
-                </Grid>
+                <>
+
+                  <Grid item xs={6}>
+
+                    <Typography variant="body2" color="text.secondary" fontSize="0.875rem">Ø£Ø¶ÙŠÙ Ø¨ÙˆØ§Ø³Ø·Ø©</Typography>
+
+                    <Typography variant="body1" fontWeight={600} fontSize="0.9375rem">
+
+                      {displayCreatedBy(selectedBatch.created_by)}
+
+                    </Typography>
+
+                  </Grid>
+
+                  <Grid item xs={6}>
+
+                    <Typography variant="body2" color="text.secondary" fontSize="0.875rem">Ø¢Ø®Ø± ØªØ­Ø¯ÙŠØ« Ø¨ÙˆØ§Ø³Ø·Ø©</Typography>
+
+                    <Typography variant="body1" fontWeight={600} fontSize="0.9375rem">
+
+                      {displayUpdatedBy(selectedBatch.updated_by, selectedBatch.created_by)}
+
+                    </Typography>
+
+                  </Grid>
+
+                </>
+
               )}
 
               <Grid item xs={12}>
@@ -2690,7 +2725,7 @@ export default function InventoryTab() {
                     onClick={handleEditBatch}
                     fullWidth
                   >
-                    تعديل
+                    ØªØ¹Ø¯ÙŠÙ„
                   </Button>
                   <Button
                     variant="outlined"
@@ -2700,7 +2735,7 @@ export default function InventoryTab() {
                     onClick={handleDeleteBatch}
                     fullWidth
                   >
-                    حذف
+                    Ø­Ø°Ù
                   </Button>
                 </Box>
               </Grid>
@@ -2710,13 +2745,13 @@ export default function InventoryTab() {
             <Grid container spacing={2}>
               <Grid item xs={12}>
                 <Alert severity="info" sx={{ fontSize: '0.9375rem' }}>
-                  تحديث الكمية الأصلية لن يؤثر على الكمية المتبقية. الكمية المتبقية تتغير فقط من خلال المبيعات.
+                  ØªØ­Ø¯ÙŠØ« Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ø£ØµÙ„ÙŠØ© Ù„Ù† ÙŠØ¤Ø«Ø± Ø¹Ù„Ù‰ Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ù…ØªØ¨Ù‚ÙŠØ©. Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ù…ØªØ¨Ù‚ÙŠØ© ØªØªØºÙŠØ± ÙÙ‚Ø· Ù…Ù† Ø®Ù„Ø§Ù„ Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª.
                 </Alert>
               </Grid>
 
               <Grid item xs={12}>
                 <UnifiedFormField
-                  label="الكمية الأصلية"
+                  label="Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ø£ØµÙ„ÙŠØ©"
                   value={editBatchForm.quantity_original}
                   onChange={(e) => setEditBatchForm({ ...editBatchForm, quantity_original: e.target.value })}
                   name="quantity_original"
@@ -2729,12 +2764,12 @@ export default function InventoryTab() {
 
               <Grid item xs={12}>
                 <UnifiedFormField
-                  label="السعر لكل كيلو"
+                  label="Ø§Ù„Ø³Ø¹Ø± Ù„ÙƒÙ„ ÙƒÙŠÙ„Ùˆ"
                   value={editBatchForm.price_per_kg}
                   onChange={(e) => setEditBatchForm({ ...editBatchForm, price_per_kg: e.target.value })}
                   name="price_per_kg"
                   type="number"
-                  helperText="اختياري"
+                  helperText="Ø§Ø®ØªÙŠØ§Ø±ÙŠ"
                   inputProps={{ step: 0.01, min: 0 }}
                   InputProps={{
                     endAdornment: <InputAdornment position="end">{baseCurrencyInfo.symbol}</InputAdornment>
@@ -2744,7 +2779,7 @@ export default function InventoryTab() {
 
               <Grid item xs={12}>
                 <UnifiedFormField
-                  label="تاريخ الاستلام"
+                  label="ØªØ§Ø±ÙŠØ® Ø§Ù„Ø§Ø³ØªÙ„Ø§Ù…"
                   value={editBatchForm.received_date}
                   onChange={(e) => setEditBatchForm({ ...editBatchForm, received_date: e.target.value })}
                   name="received_date"
@@ -2754,23 +2789,23 @@ export default function InventoryTab() {
 
               <Grid item xs={12}>
                 <UnifiedFormField
-                  label="موقع التخزين"
+                  label="Ù…ÙˆÙ‚Ø¹ Ø§Ù„ØªØ®Ø²ÙŠÙ†"
                   value={editBatchForm.storage_location}
                   onChange={(e) => setEditBatchForm({ ...editBatchForm, storage_location: e.target.value })}
                   name="storage_location"
-                  helperText="اختياري"
+                  helperText="Ø§Ø®ØªÙŠØ§Ø±ÙŠ"
                 />
               </Grid>
 
               <Grid item xs={12}>
                 <UnifiedFormField
-                  label="ملاحظات"
+                  label="Ù…Ù„Ø§Ø­Ø¸Ø§Øª"
                   value={editBatchForm.notes}
                   onChange={(e) => setEditBatchForm({ ...editBatchForm, notes: e.target.value })}
                   name="notes"
                   multiline
                   rows={3}
-                  helperText="اختياري"
+                  helperText="Ø§Ø®ØªÙŠØ§Ø±ÙŠ"
                 />
               </Grid>
             </Grid>
@@ -2783,23 +2818,39 @@ export default function InventoryTab() {
         open={showPrintDialog}
         onClose={cancelPrint}
         onConfirm={executePrint}
-        title="تأكيد طباعة تفاصيل الدفعة"
-        documentName={pendingDocument?.metadata?.name || 'الدفعة'}
-        documentType={pendingDocument?.metadata?.type || 'تفاصيل دفعة'}
+        title="ØªØ£ÙƒÙŠØ¯ Ø·Ø¨Ø§Ø¹Ø© ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ø¯ÙØ¹Ø©"
+        documentName={pendingDocument?.metadata?.name || 'Ø§Ù„Ø¯ÙØ¹Ø©'}
+        documentType={pendingDocument?.metadata?.type || 'ØªÙØ§ØµÙŠÙ„ Ø¯ÙØ¹Ø©'}
         estimatedPages={pendingDocument?.metadata?.estimatedPages || 1}
         defaultAction={pendingDocument?.metadata?.defaultAction || 'print'}
       />
 
       {/* Confirmation Dialog */}
-      <UnifiedConfirmDialog
+      <UnifiedDialog
         open={confirmDialog.open}
         onClose={closeConfirm}
-        onConfirm={async () => {
-          await confirmDialog.action();
-          closeConfirm();
+        variant={confirmationDialogConfig.variant}
+        title={confirmationDialogConfig.title}
+        description={confirmationDialogConfig.description}
+        primaryAction={{
+          label: confirmationDialogConfig.primaryLabel,
+          color: confirmationDialogConfig.primaryColor,
+          loading,
+          onClick: async () => {
+            if (confirmDialog.action) {
+              await confirmDialog.action();
+            }
+            closeConfirm();
+          }
         }}
-        {...confirmationMessages[confirmDialog.type]}
-        loading={loading}
+        secondaryAction={{
+          label: confirmationDialogConfig.secondaryLabel,
+          onClick: closeConfirm
+        }}
+        allowBackdropClose={confirmationDialogConfig.allowBackdropClose}
+        allowEscapeClose={confirmationDialogConfig.allowEscapeClose}
+        requireAcknowledgement={confirmationDialogConfig.requireAcknowledgement}
+        acknowledgementLabel={confirmationDialogConfig.acknowledgementLabel}
       />
     </Box>
   );

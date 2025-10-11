@@ -1,9 +1,9 @@
 import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
+import ensurePdfFontsLoaded from './fontLoader';
 
 pdfMake.vfs = pdfFonts.pdfMake?.vfs || pdfFonts.vfs || pdfFonts;
-
-pdfMake.fonts = {
+pdfMake.fonts = pdfMake.fonts || {
   Roboto: {
     normal: 'Roboto-Regular.ttf',
     bold: 'Roboto-Medium.ttf',
@@ -161,12 +161,16 @@ export function createRTLTable(headers, data, widths = null) {
 }
 
 function buildFinalDocument(docDefinition) {
+  const defaultStyle = {
+    font: 'Tajawal',
+    fontSize: 10,
+    alignment: 'right',
+    ...(docDefinition.defaultStyle || {})
+  };
+
   return {
     ...docDefinition,
-    defaultStyle: {
-      font: 'Roboto',
-      fontSize: 10
-    },
+    defaultStyle,
     pageSize: 'A4',
     pageOrientation: docDefinition.pageOrientation || 'portrait',
     pageMargins: docDefinition.pageMargins || [40, 60, 40, 60],
@@ -178,8 +182,13 @@ function buildFinalDocument(docDefinition) {
   };
 }
 
-export function generatePDF(docDefinition, filename = 'document.pdf', download = false) {
-  const pdfDoc = pdfMake.createPdf(buildFinalDocument(docDefinition));
+async function createDocument(docDefinition) {
+  await ensurePdfFontsLoaded();
+  return pdfMake.createPdf(buildFinalDocument(docDefinition));
+}
+
+export async function generatePDF(docDefinition, filename = 'document.pdf', download = false) {
+  const pdfDoc = await createDocument(docDefinition);
 
   if (download) {
     pdfDoc.download(filename);
@@ -190,8 +199,8 @@ export function generatePDF(docDefinition, filename = 'document.pdf', download =
   return pdfDoc;
 }
 
-export function printPDF(docDefinition) {
-  const pdfDoc = pdfMake.createPdf(buildFinalDocument(docDefinition));
+export async function printPDF(docDefinition) {
+  const pdfDoc = await createDocument(docDefinition);
   pdfDoc.print();
   return pdfDoc;
 }

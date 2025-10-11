@@ -1,4 +1,4 @@
-// src/components/tabs/PaymentsTab.jsx
+﻿// src/components/tabs/PaymentsTab.jsx
 import { useState, useEffect, useMemo } from 'react';
 import {
   Box, Card, CardContent, Grid, TextField, Button, Typography,
@@ -15,8 +15,8 @@ import BusinessIcon from '@mui/icons-material/Business';
 
 import UnifiedFormField from '../common/forms/UnifiedFormField';
 import UnifiedFormDialog from '../common/forms/UnifiedFormDialog';
-import UnifiedConfirmDialog from '../common/dialogs/UnifiedConfirmDialog';
-import { confirmationMessages } from '../../theme/designSystem';
+import UnifiedDialog from '../common/dialogs/UnifiedDialog';
+import getConfirmationConfig from '../../utils/dialogs/getConfirmationConfig';
 
 import {
   getCustomers, getSuppliers,
@@ -159,6 +159,14 @@ export default function PaymentsTab() {
     setConfirmDialog({ ...confirmDialog, open: false });
   };
 
+  const confirmationDialogConfig = useMemo(() => {
+    const overrides = {};
+    if (confirmDialog.type === 'payment') {
+      overrides.description = `سيتم تسجيل دفعة بمبلغ ${fmt(parseFloat(paymentAmount) || 0)} ${baseCurrencyInfo.symbol}.`;
+    }
+    return getConfirmationConfig(confirmDialog.type, overrides);
+  }, [confirmDialog.type, paymentAmount, baseCurrencyInfo.symbol]);
+
   // Handle Add Payment
   const handleOpenDialog = () => {
     setSelectedPersonId(null);
@@ -182,20 +190,20 @@ export default function PaymentsTab() {
     const newErrors = {};
 
     if (!selectedPersonId) {
-      newErrors.person = tabValue === 0 ? 'يجب اختيار زبون' : 'يجب اختيار مورد';
+      newErrors.person = tabValue === 0 ? 'ÙŠØ¬Ø¨ Ø§Ø®ØªÙŠØ§Ø± Ø²Ø¨ÙˆÙ†' : 'ÙŠØ¬Ø¨ Ø§Ø®ØªÙŠØ§Ø± Ù…ÙˆØ±Ø¯';
     }
 
     const amount = parseFloat(paymentAmount);
     if (!amount || amount <= 0) {
-      newErrors.amount = 'المبلغ يجب أن يكون أكبر من صفر';
+      newErrors.amount = 'Ø§Ù„Ù…Ø¨Ù„Øº ÙŠØ¬Ø¨ Ø£Ù† ÙŠÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±';
     }
 
     if (!paymentDate) {
-      newErrors.payment_date = 'تاريخ الدفع مطلوب';
+      newErrors.payment_date = 'ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¯ÙØ¹ Ù…Ø·Ù„ÙˆØ¨';
     }
 
     if (!paymentMethod) {
-      newErrors.payment_method = 'يجب اختيار طريقة الدفع';
+      newErrors.payment_method = 'ÙŠØ¬Ø¨ Ø§Ø®ØªÙŠØ§Ø± Ø·Ø±ÙŠÙ‚Ø© Ø§Ù„Ø¯ÙØ¹';
     }
 
     setErrors(newErrors);
@@ -234,15 +242,15 @@ export default function PaymentsTab() {
       }
 
       if (result.success) {
-        setSuccess('✓ تم تسجيل الدفعة بنجاح');
+        setSuccess('âœ“ ØªÙ… ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯ÙØ¹Ø© Ø¨Ù†Ø¬Ø§Ø­');
         setTimeout(() => setSuccess(''), 3000);
         handleCloseDialog();
         loadData();
       } else {
-        setError('فشل التسجيل: ' + result.error);
+        setError('ÙØ´Ù„ Ø§Ù„ØªØ³Ø¬ÙŠÙ„: ' + result.error);
       }
     } catch (err) {
-      setError('حدث خطأ: ' + err.message);
+      setError('Ø­Ø¯Ø« Ø®Ø·Ø£: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -290,16 +298,16 @@ export default function PaymentsTab() {
   };
 
   const personList = tabValue === 0 ? customers : suppliers;
-  const personLabel = tabValue === 0 ? 'الزبون' : 'المورد';
+  const personLabel = tabValue === 0 ? 'Ø§Ù„Ø²Ø¨ÙˆÙ†' : 'Ø§Ù„Ù…ÙˆØ±Ø¯';
 
   return (
     <Box>
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" fontWeight={700} gutterBottom>
-          إدارة الدفعات
+          Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ø¯ÙØ¹Ø§Øª
         </Typography>
         <Typography variant="body1" color="text.secondary" fontSize="1.0625rem">
-          تسجيل ومتابعة دفعات الزبائن والموردين
+          ØªØ³Ø¬ÙŠÙ„ ÙˆÙ…ØªØ§Ø¨Ø¹Ø© Ø¯ÙØ¹Ø§Øª Ø§Ù„Ø²Ø¨Ø§Ø¦Ù† ÙˆØ§Ù„Ù…ÙˆØ±Ø¯ÙŠÙ†
         </Typography>
       </Box>
 
@@ -312,7 +320,7 @@ export default function PaymentsTab() {
           <Card sx={{ borderRadius: 3, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
             <CardContent>
               <Typography variant="body2" color="white" gutterBottom fontSize="0.9375rem">
-                إجمالي الدفعات
+                Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø¯ÙØ¹Ø§Øª
               </Typography>
               <Typography variant="h5" fontWeight={700} color="white">
                 {fmt(stats.total)} {baseCurrencyInfo.symbol}
@@ -325,7 +333,7 @@ export default function PaymentsTab() {
           <Card sx={{ borderRadius: 3, bgcolor: 'success.main' }}>
             <CardContent>
               <Typography variant="body2" color="white" gutterBottom fontSize="0.9375rem">
-                عدد الدفعات
+                Ø¹Ø¯Ø¯ Ø§Ù„Ø¯ÙØ¹Ø§Øª
               </Typography>
               <Typography variant="h5" fontWeight={700} color="white">
                 {stats.count}
@@ -338,7 +346,7 @@ export default function PaymentsTab() {
           <Card sx={{ borderRadius: 3, bgcolor: 'info.main' }}>
             <CardContent>
               <Typography variant="body2" color="white" gutterBottom fontSize="0.9375rem">
-                دفعات اليوم
+                Ø¯ÙØ¹Ø§Øª Ø§Ù„ÙŠÙˆÙ…
               </Typography>
               <Typography variant="h5" fontWeight={700} color="white">
                 {fmt(stats.todayTotal)} {baseCurrencyInfo.symbol}
@@ -351,7 +359,7 @@ export default function PaymentsTab() {
           <Card sx={{ borderRadius: 3, bgcolor: 'warning.main' }}>
             <CardContent>
               <Typography variant="body2" color="white" gutterBottom fontSize="0.9375rem">
-                عدد دفعات اليوم
+                Ø¹Ø¯Ø¯ Ø¯ÙØ¹Ø§Øª Ø§Ù„ÙŠÙˆÙ…
               </Typography>
               <Typography variant="h5" fontWeight={700} color="white">
                 {stats.todayCount}
@@ -374,12 +382,12 @@ export default function PaymentsTab() {
           <Tab
             icon={<PersonIcon />}
             iconPosition="start"
-            label={<Typography fontSize="1rem" fontWeight={600}>دفعات الزبائن</Typography>}
+            label={<Typography fontSize="1rem" fontWeight={600}>Ø¯ÙØ¹Ø§Øª Ø§Ù„Ø²Ø¨Ø§Ø¦Ù†</Typography>}
           />
           <Tab
             icon={<BusinessIcon />}
             iconPosition="start"
-            label={<Typography fontSize="1rem" fontWeight={600}>دفعات الموردين</Typography>}
+            label={<Typography fontSize="1rem" fontWeight={600}>Ø¯ÙØ¹Ø§Øª Ø§Ù„Ù…ÙˆØ±Ø¯ÙŠÙ†</Typography>}
           />
         </Tabs>
       </Card>
@@ -396,7 +404,7 @@ export default function PaymentsTab() {
                   onChange={(e) => setFilterPerson(e.target.value)}
                   label={personLabel}
                 >
-                  <MenuItem value="">الكل</MenuItem>
+                  <MenuItem value="">Ø§Ù„ÙƒÙ„</MenuItem>
                   {personList.map(p => (
                     <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
                   ))}
@@ -408,7 +416,7 @@ export default function PaymentsTab() {
               <TextField
                 fullWidth
                 type="date"
-                label="من تاريخ"
+                label="Ù…Ù† ØªØ§Ø±ÙŠØ®"
                 value={filterDateFrom}
                 onChange={(e) => setFilterDateFrom(e.target.value)}
                 InputLabelProps={{ shrink: true }}
@@ -419,7 +427,7 @@ export default function PaymentsTab() {
               <TextField
                 fullWidth
                 type="date"
-                label="إلى تاريخ"
+                label="Ø¥Ù„Ù‰ ØªØ§Ø±ÙŠØ®"
                 value={filterDateTo}
                 onChange={(e) => setFilterDateTo(e.target.value)}
                 InputLabelProps={{ shrink: true }}
@@ -428,7 +436,7 @@ export default function PaymentsTab() {
 
             <Grid item xs={12} md={3}>
               <Box sx={{ display: 'flex', gap: 1 }}>
-                <Tooltip title="مسح الفلاتر">
+                <Tooltip title="Ù…Ø³Ø­ Ø§Ù„ÙÙ„Ø§ØªØ±">
                   <IconButton onClick={handleClearFilters} color="error">
                     <ClearIcon />
                   </IconButton>
@@ -441,7 +449,7 @@ export default function PaymentsTab() {
                   fullWidth
                   sx={{ fontWeight: 700 }}
                 >
-                  تسجيل دفعة
+                  ØªØ³Ø¬ÙŠÙ„ Ø¯ÙØ¹Ø©
                 </Button>
               </Box>
             </Grid>
@@ -454,18 +462,18 @@ export default function PaymentsTab() {
         <Table>
           <TableHead sx={{ bgcolor: 'grey.100' }}>
             <TableRow>
-              <TableCell><Typography fontWeight={700} fontSize="1rem">التاريخ</Typography></TableCell>
+              <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„ØªØ§Ø±ÙŠØ®</Typography></TableCell>
               <TableCell><Typography fontWeight={700} fontSize="1rem">{personLabel}</Typography></TableCell>
-              <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">المبلغ</Typography></TableCell>
-              <TableCell><Typography fontWeight={700} fontSize="1rem">الملاحظات</Typography></TableCell>
-              <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">الرصيد بعد الدفعة</Typography></TableCell>
+              <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ù…Ø¨Ù„Øº</Typography></TableCell>
+              <TableCell><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ù…Ù„Ø§Ø­Ø¸Ø§Øª</Typography></TableCell>
+              <TableCell align="center"><Typography fontWeight={700} fontSize="1rem">Ø§Ù„Ø±ØµÙŠØ¯ Ø¨Ø¹Ø¯ Ø§Ù„Ø¯ÙØ¹Ø©</Typography></TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {filteredPayments.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} align="center">
-                  <Typography color="text.secondary" py={3} fontSize="1rem">لا توجد دفعات</Typography>
+                  <Typography color="text.secondary" py={3} fontSize="1rem">Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¯ÙØ¹Ø§Øª</Typography>
                 </TableCell>
               </TableRow>
             ) : (
@@ -492,7 +500,7 @@ export default function PaymentsTab() {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" color="text.secondary" fontSize="0.9375rem">
-                      {safeNotes(payment.notes) || '—'}
+                      {safeNotes(payment.notes) || 'â€”'}
                     </Typography>
                   </TableCell>
                   <TableCell align="center">
@@ -517,9 +525,9 @@ export default function PaymentsTab() {
         open={openDialog}
         onClose={handleCloseDialog}
         onSubmit={handleSubmitPayment}
-        title={`تسجيل دفعة ${tabValue === 0 ? 'زبون' : 'مورد'}`}
-        subtitle="أدخل بيانات الدفعة"
-        submitText="تسجيل الدفعة"
+        title={`ØªØ³Ø¬ÙŠÙ„ Ø¯ÙØ¹Ø© ${tabValue === 0 ? 'Ø²Ø¨ÙˆÙ†' : 'Ù…ÙˆØ±Ø¯'}`}
+        subtitle="Ø£Ø¯Ø®Ù„ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¯ÙØ¹Ø©"
+        submitText="ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯ÙØ¹Ø©"
         loading={loading}
       >
         <Grid container spacing={2.5}>
@@ -541,7 +549,7 @@ export default function PaymentsTab() {
 
           <Grid item xs={12} md={6}>
             <UnifiedFormField
-              label="المبلغ المدفوع"
+              label="Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø¯ÙÙˆØ¹"
               value={paymentAmount}
               onChange={handleInputChange}
               name="amount"
@@ -561,21 +569,21 @@ export default function PaymentsTab() {
 
           <Grid item xs={12} md={6}>
             <UnifiedFormField
-              label="العملة"
+              label="Ø§Ù„Ø¹Ù…Ù„Ø©"
               value={paymentCurrency}
               onChange={handleInputChange}
               name="currency"
               select
               required
             >
-              <MenuItem value="SYP">ليرة سورية</MenuItem>
-              <MenuItem value="USD">دولار أمريكي</MenuItem>
+              <MenuItem value="SYP">Ù„ÙŠØ±Ø© Ø³ÙˆØ±ÙŠØ©</MenuItem>
+              <MenuItem value="USD">Ø¯ÙˆÙ„Ø§Ø± Ø£Ù…Ø±ÙŠÙƒÙŠ</MenuItem>
             </UnifiedFormField>
           </Grid>
 
           <Grid item xs={12} md={6}>
             <UnifiedFormField
-              label="تاريخ الدفعة"
+              label="ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¯ÙØ¹Ø©"
               value={paymentDate}
               onChange={handleInputChange}
               name="payment_date"
@@ -587,7 +595,7 @@ export default function PaymentsTab() {
 
           <Grid item xs={12} md={6}>
             <UnifiedFormField
-              label="طريقة الدفع"
+              label="Ø·Ø±ÙŠÙ‚Ø© Ø§Ù„Ø¯ÙØ¹"
               value={paymentMethod}
               onChange={handleInputChange}
               name="payment_method"
@@ -603,7 +611,7 @@ export default function PaymentsTab() {
 
           <Grid item xs={12}>
             <UnifiedFormField
-              label="ملاحظات"
+              label="Ù…Ù„Ø§Ø­Ø¸Ø§Øª"
               value={paymentNotes}
               onChange={handleInputChange}
               name="notes"
@@ -615,21 +623,33 @@ export default function PaymentsTab() {
       </UnifiedFormDialog>
 
       {/* Confirmation Dialog */}
-      <UnifiedConfirmDialog
+      <UnifiedDialog
         open={confirmDialog.open}
         onClose={closeConfirm}
-        onConfirm={async () => {
-          await confirmDialog.action();
-          closeConfirm();
+        variant={confirmationDialogConfig.variant}
+        title={confirmationDialogConfig.title}
+        description={confirmationDialogConfig.description}
+        primaryAction={{
+          label: confirmationDialogConfig.primaryLabel,
+          color: confirmationDialogConfig.primaryColor,
+          loading,
+          onClick: async () => {
+            if (confirmDialog.action) {
+              await confirmDialog.action();
+            }
+            closeConfirm();
+          }
         }}
-        {...confirmationMessages[confirmDialog.type]}
-        message={
-          confirmDialog.type === 'payment'
-            ? `تسجيل دفعة بمبلغ ${fmt(parseFloat(paymentAmount) || 0)} ${baseCurrencyInfo.symbol}؟`
-            : confirmationMessages[confirmDialog.type]?.message
-        }
-        loading={loading}
+        secondaryAction={{
+          label: confirmationDialogConfig.secondaryLabel,
+          onClick: closeConfirm
+        }}
+        allowBackdropClose={confirmationDialogConfig.allowBackdropClose}
+        allowEscapeClose={confirmationDialogConfig.allowEscapeClose}
+        requireAcknowledgement={confirmationDialogConfig.requireAcknowledgement}
+        acknowledgementLabel={confirmationDialogConfig.acknowledgementLabel}
       />
+
     </Box>
   );
 }

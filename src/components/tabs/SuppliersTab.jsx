@@ -18,8 +18,8 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 
 import UnifiedFormField from '../common/forms/UnifiedFormField';
 import UnifiedFormDialog from '../common/forms/UnifiedFormDialog';
-import UnifiedConfirmDialog from '../common/dialogs/UnifiedConfirmDialog';
-import { confirmationMessages } from '../../theme/designSystem';
+import UnifiedDialog from '../common/dialogs/UnifiedDialog';
+import getConfirmationConfig from '../../utils/dialogs/getConfirmationConfig';
 
 import {
   getSuppliers, addSupplier, updateSupplier,
@@ -127,6 +127,14 @@ export default function SuppliersTab() {
   const closeConfirm = () => {
     setConfirmDialog({ ...confirmDialog, open: false });
   };
+
+  const confirmationDialogConfig = useMemo(() => {
+    const overrides = {};
+    if (confirmDialog.type === 'payment') {
+      overrides.description = `سيتم تسجيل دفعة بمبلغ ${fmt(paymentData.amount || 0)} ${baseCurrencyInfo.symbol}.`;
+    }
+    return getConfirmationConfig(confirmDialog.type, overrides);
+  }, [confirmDialog.type, paymentData.amount, baseCurrencyInfo.symbol]);
 
   const openCreate = () => {
     setEditingId(null);
@@ -703,20 +711,31 @@ export default function SuppliersTab() {
       </UnifiedFormDialog>
 
       {/* Confirmation Dialog */}
-      <UnifiedConfirmDialog
+      <UnifiedDialog
         open={confirmDialog.open}
         onClose={closeConfirm}
-        onConfirm={async () => {
-          await confirmDialog.action();
-          closeConfirm();
+        variant={confirmationDialogConfig.variant}
+        title={confirmationDialogConfig.title}
+        description={confirmationDialogConfig.description}
+        primaryAction={{
+          label: confirmationDialogConfig.primaryLabel,
+          color: confirmationDialogConfig.primaryColor,
+          loading,
+          onClick: async () => {
+            if (confirmDialog.action) {
+              await confirmDialog.action();
+            }
+            closeConfirm();
+          }
         }}
-        {...confirmationMessages[confirmDialog.type]}
-        message={
-          confirmDialog.type === 'payment'
-            ? `تسجيل دفعة بمبلغ ${fmt(paymentData.amount)} ${baseCurrencyInfo.symbol}؟`
-            : confirmationMessages[confirmDialog.type]?.message
-        }
-        loading={loading}
+        secondaryAction={{
+          label: confirmationDialogConfig.secondaryLabel,
+          onClick: closeConfirm
+        }}
+        allowBackdropClose={confirmationDialogConfig.allowBackdropClose}
+        allowEscapeClose={confirmationDialogConfig.allowEscapeClose}
+        requireAcknowledgement={confirmationDialogConfig.requireAcknowledgement}
+        acknowledgementLabel={confirmationDialogConfig.acknowledgementLabel}
       />
 
       {/* Dialog: Statement */}
