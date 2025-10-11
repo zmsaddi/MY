@@ -102,5 +102,3 @@ cypress/screenshots/
 electron/test-*.js
 # Duplicate test folders
 /tests/
-# Auto-generated documentation (keep only in git for reference)
-auto_run.log
