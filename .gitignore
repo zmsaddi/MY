@@ -1,0 +1,103 @@
+# ===== تبعيات =====
+node_modules/
+
+# ===== مخرجات البناء =====
+dist/
+out/
+release/
+build/
+
+# ===== كاش وأدوات =====
+.vite/
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+.turbo/
+.sass-cache/
+.cache-loader/
+
+# ===== سجلات =====
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ===== ملفات بيئية =====
+.env
+.env.local
+.env.*.local
+.env.*
+!.env.example
+
+# ===== ملفات نظام التشغيل =====
+.DS_Store
+Thumbs.db
+desktop.ini
+nul
+
+# ===== ملفات مؤقتة =====
+*.tmp
+*.temp
+*.backup
+*.bak
+*~
+
+# ===== المحررات =====
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# ===== TypeScript =====
+*.tsbuildinfo
+
+# ===== اختبارات وتغطية =====
+coverage/
+.nyc_output/
+
+# ===== Electron (مخرجات وتقارير) =====
+*.asar
+*.asar.unpacked/
+*.blockmap
+*.dmg
+*.exe
+*.msi
+*.appx
+*.appxbundle
+*.nupkg
+*.snap
+*.AppImage
+*.deb
+*.rpm
+*.tar.gz
+*.zip
+*.7z
+*.app
+*.pdb
+
+# خرائط المصدر (غالبًا ضمن dist/ المُتجاهَل)
+*.map
+
+# ===== أدوات اختيارية =====
+# Sentry CLI
+.sentryclirc
+
+# Playwright/Cypress
+.playwright/
+test-results/
+cypress/videos/
+cypress/screenshots/
+
+# Yarn Berry PnP (اختياري)
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions

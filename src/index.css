@@ -1,0 +1,144 @@
+/* src/index.css */
+
+/* Base styles */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Cairo', 'Tajawal', 'Segoe UI', Tahoma, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  direction: rtl;
+  overflow-x: hidden;
+}
+
+/* Mobile optimizations */
+@media (max-width: 600px) {
+  /* Smaller base font */
+  html {
+    font-size: 14px;
+  }
+  
+  /* Improve table scrolling */
+  .MuiTableContainer-root {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Better touch targets */
+  .MuiIconButton-root {
+    padding: 10px !important;
+  }
+  
+  /* Reduce grid spacing */
+  .MuiGrid-container {
+    margin-top: -8px !important;
+    margin-left: -8px !important;
+  }
+  
+  .MuiGrid-item {
+    padding-top: 8px !important;
+    padding-left: 8px !important;
+  }
+  
+  /* Compact tabs */
+  .MuiTab-root {
+    min-width: 70px !important;
+    padding: 8px 10px !important;
+  }
+  
+  /* Better accordion sizing */
+  .MuiAccordionSummary-root {
+    min-height: 44px !important;
+  }
+  
+  .MuiAccordionSummary-content {
+    margin: 10px 0 !important;
+  }
+  
+  /* Smaller form controls */
+  .MuiFormControl-root {
+    margin-bottom: 12px !important;
+  }
+  
+  /* Compact alerts */
+  .MuiAlert-message {
+    padding: 6px 0 !important;
+  }
+}
+
+/* Tablet optimizations */
+@media (min-width: 601px) and (max-width: 959px) {
+  html {
+    font-size: 15px;
+  }
+}
+
+/* Desktop */
+@media (min-width: 960px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+/* Improve scrollbar on desktop */
+@media (min-width: 960px) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+}
+
+/* Print styles */
+@media print {
+  body {
+    background: white;
+  }
+  
+  .MuiDrawer-root,
+  .MuiAppBar-root {
+    display: none !important;
+  }
+}
+
+/* Performance improvements */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Focus improvements */
+:focus-visible {
+  outline: 2px solid #1976d2;
+  outline-offset: 2px;
+}
+
+button:focus:not(:focus-visible) {
+  outline: none;
+}
