@@ -44,12 +44,12 @@ function Login({ onLogin }) {
     e.preventDefault();
     setError('');
 
-    if (!username.trim()) {
+    if (!username || !username.trim()) {
       setError('يرجى إدخال اسم المستخدم');
       return;
     }
 
-    if (!password && username.trim().toLowerCase() !== 'admin') {
+    if (!password && (username || '').trim().toLowerCase() !== 'admin') {
       setError('يرجى إدخال كلمة المرور');
       return;
     }
@@ -182,11 +182,11 @@ function Login({ onLogin }) {
               fullWidth
               type={showPassword ? 'text' : 'password'}
               label="كلمة المرور"
-              placeholder={username.toLowerCase() === 'admin' ? 'اتركها فارغة للإعداد الأولي' : ''}
-              helperText={username.toLowerCase() === 'admin' && !password ? 'للإعداد الأولي، اترك كلمة المرور فارغة' : ''}
+              placeholder={(username || '').toLowerCase() === 'admin' ? 'اتركها فارغة للإعداد الأولي' : ''}
+              helperText={(username || '').toLowerCase() === 'admin' && !password ? 'للإعداد الأولي، اترك كلمة المرور فارغة' : ''}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              autoComplete={username.toLowerCase() === 'admin' ? 'new-password' : 'current-password'}
+              autoComplete={(username || '').toLowerCase() === 'admin' ? 'new-password' : 'current-password'}
               disabled={loading}
               sx={{ mb: 4 }}
               InputProps={{

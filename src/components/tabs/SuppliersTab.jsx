@@ -111,7 +111,7 @@ export default function SuppliersTab() {
   };
 
   const filtered = useMemo(() => {
-    const q = filter.trim().toLowerCase();
+    const q = (filter || '').trim().toLowerCase();
     if (!q) return suppliers;
     return suppliers.filter(s =>
       [s.name, s.company_name, s.phone1, s.phone2, s.address, s.email]
